@@ -480,7 +480,7 @@ class PlexmateAider(PluginAider):
                     LOGGER.debug(f'스캔 중: {section.title}: {location}')
                     '''
                     스캔 추적을 섹션 상태에 의존
-                    다른 곳에서 동일 섹션을 스캔 시도할 경우?
+                        다른 곳에서 동일 섹션을 스캔 시도할 경우?
                     '''
                     while section.refreshing:
                         if (time.time() - start) >= max_seconds:
@@ -618,7 +618,7 @@ class RcloneAider(Aider):
         if local_path.is_file():
             response = requests.Response()
             response.status_code = 0
-            reason = '이미 존재하는 파일입니다.'
+            reason = '이미 존재하는 파일입니다'
             response._content = bytes(reason, 'utf-8')
             LOGGER.debug(f'{reason}: {local_path}')
         else:

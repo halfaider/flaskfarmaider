@@ -200,6 +200,9 @@ function init_trash() {
     E_TRASH_TOTAL_DELETED = $('#trash-total-deleted');
     E_TRASH_TOTAL_PATHS = $('#trash-total-paths');
     E_TRASH_SECTIONS = $('#trash-sections');
+    E_TRASH_SECTIONS.change(function() {
+        trash_get_list($(this).prop('value'), 1);
+    });
     E_TRASH_SECTION_TYPE = $('#trash-section-type');
     E_TRASH_SECTION_TYPE.change(function() {
         set_section_list($(this).prop('value'), E_TRASH_SECTIONS);
@@ -253,7 +256,7 @@ function trash_make_list(data) {
             col_id = '<td class="text-center">' + item.id + '</td>';
             col_deleted = '<td class="text-center">' + item.deleted_at + '</td>';
             col_file = '<td class="">' + item.file + '</td>';
-            col_menu = '<td class="text-center"><button type="button" class="btn btn-outline-primary sch-context-menu"';
+            col_menu = '<td class="text-center"><button type="button" class="btn btn-outline-primary trash-context-menu"';
             col_menu += ' data-id="' + item.id + '" data-metadata_item_id="' + item.metadata_item_id +'" data-path="' + item.file +'">메뉴</button></td>';
             row = '<tr class="">' + col_id + col_deleted + col_file + col_menu + '</tr>';
             tbody.append(row);
@@ -263,10 +266,12 @@ function trash_make_list(data) {
     pagination($('nav.trash-pagination'), data.page, data.total, data.limit);
     // 컨텍스트 메뉴
     $.contextMenu({
-        selector: '.sch-context-menu',
+        selector: '.trash-context-menu',
         trigger: 'left',
         callback: function(command, opt) {
             path = opt.$trigger.data('path');
+            // trash 목록에는 파일만 나오므로 요청시 모두 폴더로 요청
+            path = path.replace(path.replace(/^.*[\\\/]/, ''), '');
             recursive = opt.inputs['recursive'].$input.prop('checked');
             scan_mode = opt.inputs['scan_mode'].$input.prop('value');
             globalSendCommandPage(command, path, recursive, scan_mode + "|-1", function(result) {
@@ -476,7 +481,7 @@ function list_dir(result) {
             [TASK_KEYS[2]]: {
                 name: TASKS[TASK_KEYS[2]].name,
                 icon: 'fa-search',
-                disabled: function(){return $(this).hasClass('no-context');},
+                disabled: function(){return $(this).hasClass('restrict-context');},
             },
             sep1: "---------",
             schedule: {
@@ -512,7 +517,7 @@ function list_dir(result) {
                     [SCAN_MODE_KEYS[0]]: SCAN_MODES[SCAN_MODE_KEYS[0]].name,
                 },
                 selected: SCAN_MODE_KEYS[2],
-                disabled: function(){return $(this).hasClass('no-context');},
+                disabled: function(){return $(this).hasClass('restrict-context');},
             },
         },
     });
