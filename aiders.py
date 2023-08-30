@@ -228,18 +228,18 @@ class SettingAider(Aider):
             if not DEPEND_USER_YAML.exists():
                 shutil.copyfile(DEPEND_SOURCE_YAML, DEPEND_USER_YAML)
             if text:
-                with DEPEND_USER_YAML.open(mode='w') as file:
+                with DEPEND_USER_YAML.open(mode='w', encoding='utf-8', newline='\n') as file:
                     file.write(text)
                     depends = text
             else:
-                with DEPEND_USER_YAML.open() as file:
+                with DEPEND_USER_YAML.open(encoding='utf-8', newline='\n') as file:
                     depends = file.read()
             return depends
         except Exception as e:
             LOGGER.error(traceback.format_exc())
             if text: return text
             else:
-                with DEPEND_SOURCE_YAML.open() as file:
+                with DEPEND_SOURCE_YAML.open(encoding='utf-8', newline='\n') as file:
                     return file.read()
 
 

@@ -304,7 +304,7 @@ class Setting(BaseModule):
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name=SETTING)
         self.db_default = {
-            SETTING_DB_VERSION: '4',
+            SETTING_DB_VERSION: DB_VERSIONS[-1],
             SETTING_RCLONE_REMOTE_ADDR: 'http://172.17.0.1:5572',
             SETTING_RCLONE_REMOTE_VFS: '',
             SETTING_RCLONE_REMOTE_USER: '',
@@ -407,9 +407,14 @@ class Schedule(BaseModule):
         args[f'{self.name}_working_directory'] = PLUGIN.ModelSetting.get(SCHEDULE_WORKING_DIRECTORY)
         args[f'{self.name}_last_list_option'] = PLUGIN.ModelSetting.get(SCHEDULE_LAST_LIST_OPTION)
         args['rclone_remote_vfs'] = PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_VFS)
-        plexmateaider = PlexmateAider()
-        args['periodics'] = plexmateaider.get_periodics()
-        args['sections'] = plexmateaider.get_sections()
+        try:
+            plexmateaider = PlexmateAider()
+            args['periodics'] = plexmateaider.get_periodics()
+            args['sections'] = plexmateaider.get_sections()
+        except:
+            LOGGER.error(traceback.format_exc())
+            args['periodics'] = []
+            args['sections'] = []
         args['task_keys'] = TASK_KEYS
         args['tasks'] = TASKS
         args['statuses'] = STATUSES
@@ -484,7 +489,7 @@ class Manual(BaseModule):
     def get_template_args(self) -> dict[str, Any]:
         '''override'''
         args = super().get_template_args()
-        with README.open() as file:
+        with README.open(encoding='utf-8', newline='\n') as file:
             manual = file.read()
         args['manual'] = manual
         return args
@@ -512,8 +517,12 @@ class ToolTrash(BasePage):
         args = super().get_template_args()
         args['section_type_keys'] = SECTION_TYPE_KEYS
         args['section_types'] = SECTION_TYPES
-        plexmateaider = PlexmateAider()
-        args['sections'] = plexmateaider.get_sections()
+        try:
+            plexmateaider = PlexmateAider()
+            args['sections'] = plexmateaider.get_sections()
+        except:
+            LOGGER.error(traceback.format_exc())
+            args['sections'] = []
         args['task_keys'] = TASK_KEYS
         args['tasks'] = TASKS
         args['scan_mode_keys'] = SCAN_MODE_KEYS
