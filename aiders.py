@@ -80,13 +80,6 @@ class Aider:
             response.status_code = 0
             return response
 
-    def log_response(self, response: Response) -> None:
-        try:
-            msg = f'code: {response.status_code}, content: {response.json()}'
-        except requests.exceptions.JSONDecodeError:
-            msg = f'code: {response.status_code}, content: {response.text}'
-        LOGGER.debug(msg)
-
 
 class JobAider(Aider):
 
@@ -135,7 +128,7 @@ class JobAider(Aider):
                     if not result:
                         LOGGER.warning(f'새로고침 실패: [{target}]: {reason}')
             else:
-                LOGGER.info(f'plex_mate 새로고침 대상이 없습니다.')
+                LOGGER.info(f'plex_mate: 새로고침 대상이 없습니다.')
         elif job.task == TASK_KEYS[4]:
             '''clear'''
             plexmateaider = PlexmateAider()
@@ -228,7 +221,7 @@ class SettingAider(Aider):
 
     def remote_command(self, command: str, url: str, username: str, password: str) -> requests.Response:
         LOGGER.debug(url)
-        return self.reqest('POST', f'{url}/{command}', auth=(username, password))
+        return self.request('POST', f'{url}/{command}', auth=(username, password))
 
     def depends(self, text: str = None):
         try:
@@ -594,7 +587,7 @@ class RcloneAider(Aider):
         return self.command("vfs/stats", data={"fs": fs})
 
     def command(self, command: str, data: dict = None) -> Response:
-        LOGGER.debug(f'Rclone RC: {command} {data}')
+        LOGGER.debug(f'{command}: {data}')
         return self.request(
             "JSON",
             f'{PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_ADDR)}/{command}',
@@ -612,8 +605,11 @@ class RcloneAider(Aider):
         start = time.time()
         response = self.command('vfs/refresh', data=data)
         dirs, files = self.get_metadata_cache(data["fs"])
-        self.log_response(response)
-        LOGGER.info(f'vfs/refresh: dirs={dirs - start_dirs} files={files - start_files} elapsed={(time.time() - start):.1f}s')
+        try:
+            content = response.json()
+        except requests.exceptions.JSONDecodeError:
+            content = response.text
+        LOGGER.info(f'새로고침 결과: dirs={dirs - start_dirs} files={files - start_files} elapsed={(time.time() - start):.1f}s content={content}')
         return response
 
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> Response:
