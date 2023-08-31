@@ -251,19 +251,25 @@ class BrowserAider(Aider):
     def get_dir(self, target_path: str) -> list[dict[str, str]]:
         target_path = Path(target_path)
         with os.scandir(target_path) as scandirs:
-            target_list = [self.pack_dir(Path(entry)) for entry in scandirs]
-        target_list = sorted(target_list, key=lambda entry: (entry.get('is_file'), entry.get('name')))
-        parent_pack = self.pack_dir(target_path.parent)
-        parent_pack['name'] = '..'
-        target_list.insert(0, parent_pack)
-        return target_list
+            target_list = []
+            for entry in scandirs:
+                try:
+                    target_list.append(self.pack_dir(entry))
+                except Exception as e:
+                    LOGGER.warning(e)
+                    continue
+            target_list = sorted(target_list, key=lambda entry: (entry.get('is_file'), entry.get('name')))
+            parent_pack = self.pack_dir(target_path.parent)
+            parent_pack['name'] = '..'
+            target_list.insert(0, parent_pack)
+            return target_list
 
-    def pack_dir(self, path_obj: Path) -> dict[str, Any]:
-        stats = path_obj.stat()
+    def pack_dir(self, entry: os.DirEntry | Path) -> dict[str, Any]:
+        stats: os.stat_result = entry.stat(follow_symlinks=True)
         return {
-            'name': path_obj.name,
-            'path': str(path_obj.absolute()),
-            'is_file': path_obj.is_file(),
+            'name': entry.name,
+            'path': entry.path if isinstance(entry, os.DirEntry) else str(entry),
+            'is_file': entry.is_file(),
             'size': self.format_file_size(stats.st_size),
             'ctime': self.get_readable_time(stats.st_ctime),
             'mtime': self.get_readable_time(stats.st_mtime),
