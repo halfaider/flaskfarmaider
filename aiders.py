@@ -89,7 +89,8 @@ class JobAider(Aider):
     @FRAMEWORK.celery.task(bind=True)
     def start_job(self, job: ModelBase) -> None:
         # bind=True, self 는 task 의 instance
-        job.set_status(STATUS_KEYS[1])
+        if job.id and job.id > 0:
+            job.set_status(STATUS_KEYS[1])
         if job.task == TASK_KEYS[0]:
             '''refresh_scan'''
             plexmateaider = PlexmateAider()
@@ -174,8 +175,8 @@ class JobAider(Aider):
                 LOGGER.error(traceback.format_exc())
             finally:
                 PLUGIN.ModelSetting.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[0])
-        if job.id > 0:
-            job.set_status(STATUS_KEYS[2], save=True)
+        if job.id and job.id > 0:
+            job.set_status(STATUS_KEYS[2])
 
     @classmethod
     def create_schedule_id(cls, job_id: int, middle: str = SCHEDULE) -> str:

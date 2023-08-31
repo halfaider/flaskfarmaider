@@ -113,7 +113,7 @@ class Job(ModelBase):
                         LOGGER.debug(f'일정을 재등록합니다: {schedule_id}')
                         JobAider.add_schedule(model.id)
 
-            th = Thread(target=re_add, args=(model))
+            th = Thread(target=re_add, args=(model,))
             th.start()
             model.save()
         except:
