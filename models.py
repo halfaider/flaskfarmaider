@@ -1,6 +1,8 @@
 from datetime import datetime
 import traceback
 from typing import Any
+import time
+from threading import Thread
 
 from .aiders import JobAider
 from .setup import PLUGIN, LOGGER, LocalProxy, Query, desc, ModelBase
@@ -98,13 +100,21 @@ class Job(ModelBase):
             model.clear_level = formdata.get('sch-clear-level')[0] if formdata.get('sch-clear-level') else ''
             model.clear_section = int(formdata.get('sch-clear-section')[0]) if formdata.get('sch-clear-section') else -1
 
-            schedule_id = JobAider.create_schedule_id(model.id)
-            is_include = FRAMEWORK.scheduler.is_include(schedule_id)
-            if is_include:
-                FRAMEWORK.scheduler.remove_job(schedule_id)
-                if model.schedule_mode == FF_SCHEDULE_KEYS[2]:
-                    LOGGER.debug(f'일정에 재등록합니다: {schedule_id}')
-                    JobAider.add_schedule(model.id)
+            def re_add(job):
+                schedule_id = JobAider.create_schedule_id(model.id)
+                counter = 0
+                if FRAMEWORK.scheduler.is_include(schedule_id):
+                    while FRAMEWORK.scheduler.is_include(schedule_id):
+                        FRAMEWORK.scheduler.remove_job(schedule_id)
+                        time.sleep(1)
+                        if counter > 60:
+                            break
+                    if model.schedule_mode == FF_SCHEDULE_KEYS[2]:
+                        LOGGER.debug(f'일정을 재등록합니다: {schedule_id}')
+                        JobAider.add_schedule(model.id)
+
+            th = Thread(target=re_add, args=(model))
+            th.start()
             model.save()
         except:
             LOGGER.error(traceback.format_exc())
@@ -142,6 +152,7 @@ class Job(ModelBase):
             self.status = status
             if status == STATUS_KEYS[2]:
                 self.ftime = datetime.now()
+                self.status = STATUS_KEYS[0]
             if save:
                 self.save()
         else:
