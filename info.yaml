@@ -8,5 +8,3 @@ more: 'https://raw.githubusercontent.com/halfaider/flaskfarmaider/main/README.md
 require_plugin:
   - package_name: 'plex_mate'
     home: 'https://github.com/flaskfarm/plex_mate'
-require_os:
-  - 'linux'
