@@ -13,6 +13,7 @@ import shlex
 import platform
 from collections import defaultdict
 import time
+import locale
 
 import requests
 from requests import Response
@@ -137,9 +138,16 @@ class JobAider(Aider):
             plexmateaider.clear_section(job.clear_section, job.clear_type, job.clear_level)
         elif job.task == TASK_KEYS[5]:
             '''startup'''
-            ubuntuaider = UbuntuAider()
-            ubuntuaider.startup()
-            pass
+            platform_name = platform.system().lower()
+            LOGGER.debug(f'플랫폼: {platform_name}')
+            if platform_name == 'windows':
+                winaider = WindowsAider()
+                winaider.startup()
+            elif platform_name == 'linux':
+                ubuntuaider = UbuntuAider()
+                ubuntuaider.startup()
+            else:
+                LOGGER.warning(f'실행할 수 없는 OS 환경입니다: {platform_name}')
         elif job.task == TASK_KEYS[6]:
             '''trash'''
             pass
@@ -687,7 +695,8 @@ class StatupAider(Aider):
 
     def sub_run(self, *args: tuple[str],
                 stdout: int = subprocess.PIPE, stderr: int = subprocess.STDOUT,
-                encoding: str = 'utf-8', **kwds: dict[str, Any]) -> CompletedProcess:
+                encoding: str = locale.getpreferredencoding(),
+                **kwds: dict[str, Any]) -> CompletedProcess:
         startup_executable = PLUGIN.ModelSetting.get(SETTING_STARTUP_EXECUTABLE)
         startup_executable = True if startup_executable.lower() == 'true' else False
         if not startup_executable:
@@ -705,61 +714,18 @@ class StatupAider(Aider):
                 return subprocess.CompletedProcess(args, returncode=1, stderr='', stdout=str(e))
 
     def startup(self) -> None:
-        pass
-
-
-class UbuntuAider(StatupAider):
-
-    def __init__(self):
-        super().__init__()
-
-    def startup(self) -> None:
-        if platform.system().lower() != 'linux':
-            LOGGER.warning(f'실행할 수 없는 OS 환경입니다: {platform.system()}')
-            return
-
-        require_plugins = set()
-        require_packages = set()
-        require_commands = set()
-
         plugins_installed = [plugin_name for plugin_name in FRAMEWORK.PluginManager.all_package_list.keys()]
         depends = yaml.safe_load(SettingAider().depends()).get('dependencies')
 
-        # plugin by plugin
-        for plugin in plugins_installed:
-           # append this plugin's requires to
-            depend_plugins = depends.get(plugin, {}).get('plugins', [])
-            for depend in depend_plugins:
-                if depend not in plugins_installed:
-                    require_plugins.add(depend)
+        require_plugins, require_packages, require_commands = self.get_require_plugins(plugins_installed, depends)
 
-            # append this plugin's packages to
-            for depend in depends.get(plugin, {}).get('packages', []):
-                require_packages.add(depend)
-
-            # append this plugin's commands to
-            for depend in depends.get(plugin, {}).get('commands', []):
-                require_commands.add(depend)
-
-        executable_commands = []
-        # 1. Commands from the config file
-        setiing_commands = self.split_by_newline(PLUGIN.ModelSetting.get(SETTING_STARTUP_COMMANDS))
-        if setiing_commands:
-            for command in setiing_commands:
-                executable_commands.append(command)
-
+        # 1. Commands from the setting
+        executable_commands = self.split_by_newline(PLUGIN.ModelSetting.get(SETTING_STARTUP_COMMANDS))
         # 2. Commands of installing required packages
-        if require_packages:
-            for req in require_packages:
-                command = f'apt-get install -y {req}'
-                executable_commands.append(command)
+        executable_commands.extend(self.get_commands_from_packages(require_packages))
+        # 3. Commands from plugin dependencies
+        executable_commands.extend(require_commands)
 
-        # 3. Commands from plugin dependencies of the config file
-        if require_commands:
-            for req in require_commands:
-                executable_commands.append(req)
-
-        # 4. Commands of installing required plugins
         if require_plugins:
             for plugin in require_plugins:
                 LOGGER.info(f'설치 예정 플러그인: {plugin}')
@@ -767,11 +733,13 @@ class UbuntuAider(StatupAider):
         for command in executable_commands:
             LOGGER.info(f'실행 예정 명령어: {command}')
 
-        # run commands
+        self.execute(executable_commands, require_plugins, depends)
+
+    def execute(self, commands: list[str], require_plugins: set[str] = {}, depends: dict[str, Any] = {}) -> None:
         startup_executable = PLUGIN.ModelSetting.get(SETTING_STARTUP_EXECUTABLE)
         startup_executable = True if startup_executable.lower() == 'true' else False
         if startup_executable:
-            for command in executable_commands:
+            for command in commands:
                 command = shlex.split(command)
                 result: CompletedProcess = self.sub_run(*command, timeout=int(PLUGIN.ModelSetting.get(SETTING_STARTUP_TIMEOUT)))
                 if result.returncode == 0:
@@ -785,3 +753,49 @@ class UbuntuAider(StatupAider):
                 LOGGER.info(result.get('msg'))
         else:
             LOGGER.warning(f'실행이 허용되지 않았어요.')
+
+    def get_installed_plugins(self) -> list[str]:
+        return [plugin_name for plugin_name in FRAMEWORK.PluginManager.all_package_list.keys()]
+
+    def get_require_plugins(self, plugins_installed: list[str], depends) -> tuple[set, set, set]:
+        require_plugins = set()
+        require_packages = set()
+        require_commands = set()
+        # plugin by plugin
+        for plugin in plugins_installed:
+            # append this plugin's requires to
+            depend_plugins = depends.get(plugin, {}).get('plugins', [])
+            for depend in depend_plugins:
+                if depend not in plugins_installed:
+                    require_plugins.add(depend)
+
+            # append this plugin's packages to
+            for depend in depends.get(plugin, {}).get('packages', []):
+                require_packages.add(depend)
+
+            # append this plugin's commands to
+            for depend in depends.get(plugin, {}).get('commands', []):
+                require_commands.add(depend)
+        return require_plugins, require_packages, require_commands
+
+    def get_commands_from_packages(self, require_packages) -> list[str]:
+        pass
+
+
+class UbuntuAider(StatupAider):
+
+    def __init__(self):
+        super().__init__()
+
+    def get_commands_from_packages(self, require_packages) -> list[str]:
+        return [f'apt-get install -y {req}' for req in require_packages]
+
+
+class WindowsAider(StatupAider):
+
+    def __init__(self):
+        super().__init__()
+
+    def get_commands_from_packages(self, require_packages) -> list[str]:
+        LOGGER.warning(f'윈도우는 패키지 설치 명령어를 "commands" 혹은 "실행할 명령어"로 실행')
+        return []

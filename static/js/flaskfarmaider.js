@@ -201,7 +201,7 @@ function init_trash() {
     E_TRASH_TOTAL_PATHS = $('#trash-total-paths');
     E_TRASH_SECTIONS = $('#trash-sections');
     E_TRASH_SECTIONS.change(function() {
-        trash_get_list($(this).prop('value'), 1);
+        trash_get_list(1);
     });
     E_TRASH_SECTION_TYPE = $('#trash-section-type');
     E_TRASH_SECTION_TYPE.change(function() {
@@ -210,7 +210,7 @@ function init_trash() {
     set_section_list(E_TRASH_SECTION_TYPE.prop('value'), E_TRASH_SECTIONS);
     E_TRASH_BTN_LIST = $('#trash-btn-list');
     E_TRASH_BTN_LIST.on('click', function(e) {
-        trash_get_list(E_TRASH_SECTIONS.prop('value'), 1);
+        trash_get_list(1);
     });
     console.log(TOOL_TRASH_TASK_STATUS);
     E_TRASH_BTN_STOP = $('#trash-btn-stop');
@@ -236,7 +236,8 @@ function init_trash() {
     });
 }
 
-async function trash_get_list(lib_id, page_no) {
+async function trash_get_list(page_no) {
+    lib_id = E_TRASH_SECTIONS.prop('value');
     globalSendCommandPage('list', lib_id, page_no, 50, function(result) {
         if (result.success) {
             trash_make_list(result.data);
@@ -263,7 +264,7 @@ function trash_make_list(data) {
         });
     }
     // 페이지
-    pagination($('nav.trash-pagination'), data.page, data.total, data.limit);
+    pagination($('nav.trash-pagination'), data.page, data.total, data.limit, trash_get_list);
     // 컨텍스트 메뉴
     $.contextMenu({
         selector: '.trash-context-menu',
@@ -306,7 +307,7 @@ function trash_make_list(data) {
                             if (result.success) {
                                 notify(result.data, 'success');
                                 page = $('ul.pagination li.active[aria-current=page]').first().text()
-                                trash_get_list(E_TRASH_SECTIONS.prop('value'), page ? page : 1);
+                                trash_get_list(page ? page : 1);
                             } else {
                                 notify(result.data, 'warning');
                             }
@@ -335,7 +336,7 @@ function trash_make_list(data) {
     });
 }
 
-function pagination(target, page, total, limit) {
+function pagination(target, page, total, limit, list_func) {
     target.empty();
     limit_page = 10;
     final_page = Math.ceil(total / limit);
@@ -368,8 +369,7 @@ function pagination(target, page, total, limit) {
     }
     target.append(elements);
     $('.page-link').on('click', function(e) {
-        page = $(this).data('page');
-        trash_get_list(E_TRASH_SECTIONS.prop('value'), page);
+        list_func($(this).data('page'));
     });
 
 }
