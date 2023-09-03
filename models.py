@@ -79,7 +79,7 @@ class Job(ModelBase):
         try:
             model.task = formdata.get('sch-task')[0] if formdata.get('sch-task') else TASK_KEYS[0]
             desc = formdata.get('sch-description')[0] if formdata.get('sch-description') else ''
-            model.desc = desc if desc != '' else f'{TASKS[model.task]["name"]}'
+            model.desc = desc or TASKS[model.task]["name"]
             model.schedule_mode = formdata.get('sch-schedule-mode')[0] if formdata.get('sch-schedule-mode') else FF_SCHEDULE_KEYS[0]
             model.schedule_interval = formdata.get('sch-schedule-interval')[0] if formdata.get('sch-schedule-interval') else '60'
             if model.task == TASK_KEYS[5]:
@@ -173,7 +173,7 @@ class Job(ModelBase):
                 search = req.form['keyword'].strip()
             option1 = req.form.get('option1', 'all')
             option2 = req.form.get('option2', 'all')
-            order = req.form['order'] if 'order' in req.form else 'desc'
+            order = req.form.get('order') or 'desc'
             query = cls.make_query(req, order=order, search=search, option1=option1, option2=option2)
             count = query.count()
             query = query.limit(page_size).offset((page-1)*page_size)

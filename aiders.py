@@ -11,7 +11,6 @@ import subprocess
 from subprocess import CompletedProcess
 import shlex
 import platform
-from collections import defaultdict
 import time
 import locale
 
@@ -31,19 +30,6 @@ class Aider:
     def __init__(self, name: str = None):
         self.name = name
 
-    def split_by_newline(cls, setting_text: str) -> list[str]:
-        return [text.strip() for text in setting_text.split('\n')]
-
-    def _split_by_newline(cls, setting_text: str) -> list[str]:
-        if '\r\n' in setting_text:
-            return setting_text.split('\r\n')
-        elif '\n\r' in setting_text:
-            return setting_text.split('\n\r')
-        elif '\r' in setting_text:
-            return setting_text.split('\r')
-        else:
-            return setting_text.split('\n')
-
     def get_readable_time(self, _time: float) -> str:
         return datetime.utcfromtimestamp(_time).strftime('%b %d %H:%M')
 
@@ -56,7 +42,7 @@ class Aider:
     def parse_mappings(self, text: str) -> dict[str, str]:
         mappings = {}
         if text:
-            settings = self.split_by_newline(text)
+            settings = text.splitlines()
             for setting in settings:
                 source, target = setting.split(':')
                 mappings[source.strip()] = target.strip()
@@ -65,12 +51,12 @@ class Aider:
     def update_path(self, target: str, mappings: dict) -> str:
         for k, v in mappings.items():
             target = target.replace(k, v)
-        return str(Path(target))
+        return target
 
     def request(self, method: str = 'POST', url: str = None, data: dict = None, **kwds: Any) -> Response:
         try:
             if method.upper() == 'JSON':
-                return requests.request('POST', url, json=data if data else {}, **kwds)
+                return requests.request('POST', url, json=data or {}, **kwds)
             else:
                 return requests.request(method, url, data=data, **kwds)
         except:
@@ -119,7 +105,7 @@ class JobAider(Aider):
             '''pm_ready_refresh'''
             # plexmate
             plexmateaider = PlexmateAider()
-            plexmateaider.check_scanning(int(PLUGIN.ModelSetting.get(SETTING_PLEXMATE_MAX_SCAN_TIME)))
+            plexmateaider.check_scanning(PLUGIN.ModelSetting.get_int(SETTING_PLEXMATE_MAX_SCAN_TIME))
             plexmateaider.check_timeover(PLUGIN.ModelSetting.get(SETTING_PLEXMATE_TIMEOVER_RANGE))
             # refresh
             targets = plexmateaider.get_scan_targets('READY')
@@ -194,7 +180,7 @@ class JobAider(Aider):
     def add_schedule(cls, id: int, job: ModelBase = None) -> bool:
         try:
             from .models import Job
-            job = job if job else Job.get_by_id(id)
+            job = job or Job.get_by_id(id)
             schedule_id = cls.create_schedule_id(job.id)
             if not FRAMEWORK.scheduler.is_include(schedule_id):
                 sch = FrameworkJob(__package__, schedule_id, job.schedule_interval, cls.start_job, job.desc, args=(job,))
@@ -359,7 +345,7 @@ class PlexmateAider(PluginAider):
         return self.deduplicate(targets)
 
     def get_sections(self) -> dict[str, Any]:
-        sections = defaultdict(list)
+        sections = {}
         sections[SECTION_TYPE_KEYS[0]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=1)]
         sections[SECTION_TYPE_KEYS[1]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=2)]
         sections[SECTION_TYPE_KEYS[2]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=8)]
@@ -555,10 +541,14 @@ class PlexmateAider(PluginAider):
     def clear_section(self, section_id: int, clear_type: str, clear_level: str) -> None:
         mod = self.get_module('clear')
         page = mod.get_page(clear_type)
-        info = f'{clear_level}, {self.get_section_by_id(section_id).get("name")}'
-        LOGGER.info(f'파일 정리 시작: {info}')
-        page.task_interface(clear_level, section_id, 'false').join()
-        LOGGER.info(f'파일 정리 종료: {info}')
+        sec = self.get_section_by_id(section_id)
+        if sec:
+            info = f'{clear_level}, {sec.get("name")}'
+            LOGGER.info(f'파일 정리 시작: {info}')
+            page.task_interface(clear_level, section_id, 'false').join()
+            LOGGER.info(f'파일 정리 종료: {info}')
+        else:
+            LOGGER.warning(f'존재하지 않는 섹션입니다: {section_id}')
 
     def delete_media(self, meta_id: int, media_id: int) -> str:
         """
@@ -592,6 +582,28 @@ class PlexmateAider(PluginAider):
         self.plex_server.library.sectionByID(section_id).emptyTrash()
 
 
+class GDSToolAider(PluginAider):
+
+    def __init__(self):
+        super().__init__('gds_tool')
+
+    def get_model(self, name: str) -> ModelBase:
+        return self.get_module(name).web_list_model
+
+    def get_total_records(self, name: str) -> int:
+        with FRAMEWORK.app.app_context():
+            return FRAMEWORK.db.session.query(self.get_model(name)).count()
+
+    def delete(self, name: str, span: int) -> None:
+        self.get_model(name).delete_all(span)
+        with FRAMEWORK.app.app_context():
+            db_file = FRAMEWORK.app.config['SQLALCHEMY_BINDS']['gds_tool'].replace('sqlite:///', '').split('?')[0]
+            with sqlite3.connect(db_file) as conn:
+                conn.row_factory = sqlite3.Row
+                cs = conn.cursor()
+                cs.execute(f'VACUUM;').fetchall()
+
+
 class RcloneAider(Aider):
 
     def __init__(self):
@@ -616,7 +628,7 @@ class RcloneAider(Aider):
     def _vfs_refresh(self, remote_path: str, recursive: bool = False, fs: str = None) -> Response:
         data = {
             'recursive': str(recursive).lower(),
-            'fs': fs if fs else PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_VFS),
+            'fs': fs or PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_VFS),
             'dir': remote_path
         }
         start_dirs, start_files = self.get_metadata_cache(data["fs"])
@@ -677,10 +689,7 @@ class RcloneAider(Aider):
             _json = response.json()
             if _json.get('result'):
                 result = list(_json.get('result').values())[0]
-                if result == 'OK':
-                    return True, result
-                else:
-                    return False, result
+                return (True, result) if result == 'OK' else (False, result)
             else:
                 return False, _json.get('error')
         except:
@@ -720,7 +729,7 @@ class StatupAider(Aider):
         require_plugins, require_packages, require_commands = self.get_require_plugins(plugins_installed, depends)
 
         # 1. Commands from the setting
-        executable_commands = self.split_by_newline(PLUGIN.ModelSetting.get(SETTING_STARTUP_COMMANDS))
+        executable_commands = PLUGIN.ModelSetting.get(SETTING_STARTUP_COMMANDS).splitlines()
         # 2. Commands of installing required packages
         executable_commands.extend(self.get_commands_from_packages(require_packages))
         # 3. Commands from plugin dependencies
@@ -741,7 +750,7 @@ class StatupAider(Aider):
         if startup_executable:
             for command in commands:
                 command = shlex.split(command)
-                result: CompletedProcess = self.sub_run(*command, timeout=int(PLUGIN.ModelSetting.get(SETTING_STARTUP_TIMEOUT)))
+                result: CompletedProcess = self.sub_run(*command, timeout=PLUGIN.ModelSetting.get_int(SETTING_STARTUP_TIMEOUT))
                 if result.returncode == 0:
                     msg = '성공'
                 else:

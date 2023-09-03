@@ -1,7 +1,7 @@
 from flask import Response, render_template, jsonify
 from werkzeug.local import LocalProxy
 from flask_sqlalchemy.query import Query
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 from plexapi.server import PlexServer
 
 from framework.init_main import Framework
@@ -11,7 +11,7 @@ from plugin.create_plugin import PluginBase
 from plugin.logic_module_base import PluginModuleBase, PluginPageBase
 from plugin.model_base import ModelBase
 
-from .constants import SCHEDULE, SETTING, TOOL, TOOL_TRASH, MANUAL, LOG
+from .constants import SCHEDULE, SETTING, TOOL, TOOL_TRASH, MANUAL, LOG, TOOL_GDS_TOOL
 
 config = {
     'filepath' : __file__,
@@ -34,7 +34,8 @@ config = {
                 'uri': TOOL,
                 'name': '도구',
                 'list': [
-                    {'uri': TOOL_TRASH, 'name': 'Plex 휴지통 스캔(개발중)'},
+                    {'uri': TOOL_TRASH, 'name': 'Plex 휴지통 스캔'},
+                    {'uri': TOOL_GDS_TOOL, 'name': '구드공 툴 DB 정리'},
                 ]
             },
             {

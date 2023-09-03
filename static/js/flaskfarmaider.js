@@ -236,6 +236,55 @@ function init_trash() {
     });
 }
 
+function init_gds_tool() {
+    init();
+    E_GDS_TOOL_REQUEST_SPAN = $('#tool_gds_tool_request_span');
+    E_GDS_TOOL_REQUEST_AUTO = $('#tool_gds_tool_request_auto');
+    E_GDS_TOOL_REQUEST_TOTAL = $('#tool_gds_tool_request_total');
+    E_GDS_TOOL_REQUEST_DEL = $('#tool_gds_tool_request_del');
+    E_GDS_TOOL_FP_SPAN = $('#tool_gds_tool_fp_span');
+    E_GDS_TOOL_FP_AUTO = $('#tool_gds_tool_fp_auto');
+    E_GDS_TOOL_FP_TOTAL = $('#tool_gds_tool_fp_total');
+    E_GDS_TOOL_FP_DEL = $('#tool_gds_tool_fp_del');
+
+    E_GDS_TOOL_REQUEST_SPAN.prop('value', TOOL_GDS_TOOL_REQUEST_SPAN);
+    E_GDS_TOOL_REQUEST_AUTO.bootstrapToggle(Boolean(TOOL_GDS_TOOL_REQUEST_AUTO) ? 'on' : 'off');
+    E_GDS_TOOL_REQUEST_TOTAL.text(TOOL_GDS_TOOL_REQUEST_TOTAL);
+    E_GDS_TOOL_FP_SPAN.prop('value', TOOL_GDS_TOOL_FP_SPAN);
+    E_GDS_TOOL_FP_AUTO.bootstrapToggle(Boolean(TOOL_GDS_TOOL_FP_AUTO) ? 'on' : 'off');
+    E_GDS_TOOL_FP_TOTAL.text(TOOL_GDS_TOOL_FP_TOTAL);
+
+    E_GDS_TOOL_REQUEST_DEL.on('click', function(e) {
+        span = E_GDS_TOOL_REQUEST_SPAN.prop('value');
+        confirm_modal('복사 요청 목록을 삭제할까요?',
+            '잔여 기간: ' + span,
+            function() {
+                globalSendCommandPage('delete', 'request', span, '', function(result) {
+                    if (result.success) {
+                        notify(result.data, 'success');
+                    } else {
+                        notify(result.data, 'warning');
+                    }
+                });
+        });
+    });
+
+    E_GDS_TOOL_FP_DEL.on('click', function(e) {
+        span = E_GDS_TOOL_FP_SPAN.prop('value');
+        confirm_modal('변경사항 목록을 삭제할까요?',
+            '잔여 기간: ' + span,
+            function() {
+                globalSendCommandPage('delete', 'fp', span, '', function(result) {
+                    if (result.success) {
+                        notify(result.data, 'success');
+                    } else {
+                        notify(result.data, 'warning');
+                    }
+                });
+        });
+    });
+}
+
 async function trash_get_list(page_no) {
     lib_id = E_TRASH_SECTIONS.prop('value');
     globalSendCommandPage('list', lib_id, page_no, 50, function(result) {
@@ -541,7 +590,7 @@ function make_list(data) {
             col_switch += '" type="checkbox" ' + ((model.is_include) ? 'checked' : '');
             col_switch += ' data-toggle="toggle" class="sch-switch" /></td>';
         }
-        col_status = '<td class="text-center">' + ((model.status == STATUS_KEYS[1]) ? '실행중' : '대기중') + '</td>';
+        col_status = '<td class="text-center">' + ((model.status == STATUS_KEYS[1]) ? '<sapn class="text-warning">실행중</span>' : '<span>대기중</span>') + '</td>';
         col_ftime = '<td class="text-center">' + model.ftime + '</td>';
 
         col_menu = '<td class="text-center"><button type="button" class="btn btn-outline-primary sch-context-menu"';
@@ -624,7 +673,9 @@ function make_list(data) {
                 disabled: function(){return $(this).hasClass('dir-file');},
                 callback: function(key, opt, e) {
                     data = opt.$trigger.data();
-                    confirm_modal('일정을 삭제할까요?', 'ID: ' + data.id + '<br />작업: ' + TASKS[data.task].name, function() {
+                    confirm_modal('일정을 삭제할까요?',
+                        'ID: ' + data.id + '<br />작업: ' + TASKS[data.task].name + '<br />내용: ' + data.desc,
+                        function() {
                         globalSendCommand("delete", data.id, null, null, function(result) {
                             if (result.success) {
                                 globalRequestSearch('1');
@@ -641,7 +692,9 @@ function make_list(data) {
                 icon: 'fa-play',
                 callback: function(key, opt, e) {
                     data = opt.$trigger.data();
-                    confirm_modal('일정을 실행할까요?', 'ID: ' + data.id + '<br />작업: ' + TASKS[data.task].name, function() {
+                    confirm_modal('일정을 실행할까요?',
+                        'ID: ' + data.id + '<br />작업: ' + TASKS[data.task].name + '<br />내용: ' + data.desc,
+                        function() {
                         globalSendCommand("execute", data.id, null, null, function(result) {
                             globalRequestSearch('1');
                             notify(result.data, 'success');

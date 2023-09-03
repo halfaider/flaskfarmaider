@@ -7,6 +7,7 @@ SETTING = 'setting'
 SCHEDULE = 'schedule'
 TOOL = 'tool'
 TOOL_TRASH = 'trash'
+TOOL_GDS_TOOL = 'gds_tool'
 MANUAL = 'manual'
 LOG = 'log'
 PKG_PATH = pathlib.Path(__file__).parent
@@ -80,7 +81,13 @@ SETTING_STARTUP_DEPENDENCIES = f'{SETTING}_startup_dependencies'
 
 SCHEDULE_WORKING_DIRECTORY = f'{SCHEDULE}_working_directory'
 SCHEDULE_LAST_LIST_OPTION = f'{SCHEDULE}_last_list_option'
+SCHEDULE_DB_VERSION = f'{SCHEDULE}_db_version'
+SCHEDULE_DB_VERSIONS = ['1', '2', '3', '4']
 
 TOOL_TRASH_TASK_STATUS = f'{TOOL}_{TOOL_TRASH}_task_status'
-
-DB_VERSIONS = ['1', '2', '3', '4']
+TOOL_GDS_TOOL_REQUEST_SPAN = f'{TOOL}_{TOOL_GDS_TOOL}_request_span'
+TOOL_GDS_TOOL_REQUEST_AUTO = f'{TOOL}_{TOOL_GDS_TOOL}_request_auto'
+TOOL_GDS_TOOL_REQUEST_TOTAL = f'{TOOL}_{TOOL_GDS_TOOL}_request_total'
+TOOL_GDS_TOOL_FP_SPAN = f'{TOOL}_{TOOL_GDS_TOOL}_fp_span'
+TOOL_GDS_TOOL_FP_AUTO = f'{TOOL}_{TOOL_GDS_TOOL}_fp_auto'
+TOOL_GDS_TOOL_FP_TOTAL = f'{TOOL}_{TOOL_GDS_TOOL}_fp_total'

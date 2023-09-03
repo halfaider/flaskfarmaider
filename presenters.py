@@ -6,14 +6,15 @@ from threading import Thread
 import sqlite3
 
 from .models import Job
-from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider
+from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider
 from .setup import PLUGIN, LOGGER, Response, render_template, jsonify, LocalProxy, PluginBase, PluginModuleBase, PluginPageBase
-from .constants import SETTING, FRAMEWORK, TASK_KEYS, SCAN_MODE_KEYS, SCHEDULE, SECTION_TYPE_KEYS, STATUSES, README, TOOL, DB_VERSIONS
-from .constants import TASKS, STATUS_KEYS, FF_SCHEDULE_KEYS, SCAN_MODES, SECTION_TYPES, FF_SCHEDULES, TOOL_TRASH, MANUAL
-from .constants import SETTING_DB_VERSION, SETTING_RCLONE_REMOTE_ADDR, SETTING_RCLONE_REMOTE_VFS, SETTING_RCLONE_REMOTE_USER
+from .constants import SETTING, FRAMEWORK, TASK_KEYS, SCAN_MODE_KEYS, SCHEDULE, SECTION_TYPE_KEYS, STATUSES, README, TOOL, SCHEDULE_DB_VERSIONS
+from .constants import TASKS, STATUS_KEYS, FF_SCHEDULE_KEYS, SCAN_MODES, SECTION_TYPES, FF_SCHEDULES, TOOL_TRASH, MANUAL, TOOL_GDS_TOOL
+from .constants import SETTING_DB_VERSION, SETTING_RCLONE_REMOTE_ADDR, SETTING_RCLONE_REMOTE_VFS, SETTING_RCLONE_REMOTE_USER, TOOL_GDS_TOOL_REQUEST_TOTAL
 from .constants import SETTING_RCLONE_REMOTE_PASS, SETTING_RCLONE_MAPPING, SETTING_PLEXMATE_MAX_SCAN_TIME, SETTING_PLEXMATE_TIMEOVER_RANGE
 from .constants import SETTING_PLEXMATE_PLEX_MAPPING, SETTING_STARTUP_EXECUTABLE, SETTING_STARTUP_COMMANDS, SETTING_STARTUP_TIMEOUT, SETTING_STARTUP_DEPENDENCIES
-from .constants import SCHEDULE_WORKING_DIRECTORY, SCHEDULE_LAST_LIST_OPTION, TOOL_TRASH_KEYS, TOOL_TRASHES, TOOL_TRASH_TASK_STATUS
+from .constants import SCHEDULE_WORKING_DIRECTORY, SCHEDULE_LAST_LIST_OPTION, TOOL_TRASH_KEYS, TOOL_TRASHES, TOOL_TRASH_TASK_STATUS, SCHEDULE_DB_VERSION
+from .constants import TOOL_GDS_TOOL_REQUEST_SPAN, TOOL_GDS_TOOL_REQUEST_AUTO, TOOL_GDS_TOOL_FP_SPAN, TOOL_GDS_TOOL_FP_AUTO, TOOL_GDS_TOOL_FP_TOTAL
 from . import migrations
 
 
@@ -304,7 +305,7 @@ class Setting(BaseModule):
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name=SETTING)
         self.db_default = {
-            SETTING_DB_VERSION: DB_VERSIONS[-1],
+            SETTING_DB_VERSION: '',
             SETTING_RCLONE_REMOTE_ADDR: 'http://172.17.0.1:5572',
             SETTING_RCLONE_REMOTE_VFS: '',
             SETTING_RCLONE_REMOTE_USER: '',
@@ -318,26 +319,6 @@ class Setting(BaseModule):
             SETTING_STARTUP_TIMEOUT: '300',
             SETTING_STARTUP_DEPENDENCIES: SettingAider().depends(),
         }
-
-    def migration(self):
-        '''override'''
-        with FRAMEWORK.app.app_context():
-            current_db_ver = PLUGIN.ModelSetting.get(SETTING_DB_VERSION)
-            db_file = FRAMEWORK.app.config['SQLALCHEMY_BINDS'][PLUGIN.package_name].replace('sqlite:///', '').split('?')[0]
-            LOGGER.debug(f'DB 버전: {current_db_ver}')
-            with sqlite3.connect(db_file) as conn:
-                conn.row_factory = sqlite3.Row
-                cs = conn.cursor()
-                table_jobs = f'{PLUGIN.package_name}_jobs'
-                # DB 볼륨 정리
-                cs.execute(f'VACUUM;').fetchall()
-                for ver in DB_VERSIONS[(DB_VERSIONS.index(current_db_ver)):]:
-                    migrations.migrate(ver, table_jobs, cs)
-                    current_db_ver = ver
-                conn.commit()
-                FRAMEWORK.db.session.flush()
-            LOGGER.debug(f'최종 DB 버전: {current_db_ver}')
-            PLUGIN.ModelSetting.set(SETTING_DB_VERSION, current_db_ver)
 
     def prerender(self, sub: str, req: LocalProxy) -> None:
         '''override'''
@@ -396,10 +377,36 @@ class Schedule(BaseModule):
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name=SCHEDULE)
         self.db_default = {
+            SCHEDULE_DB_VERSION: SCHEDULE_DB_VERSIONS[-1],
             f'{self.name}_working_directory': '/',
             f'{self.name}_last_list_option': ''
         }
         self.web_list_model = Job
+
+    def migration(self):
+        '''override'''
+        with FRAMEWORK.app.app_context():
+            set_db_ver = PLUGIN.ModelSetting.get(SETTING_DB_VERSION)
+            if set_db_ver:
+                current_db_ver = PLUGIN.ModelSetting.get(SETTING_DB_VERSION)
+            else:
+                current_db_ver = PLUGIN.ModelSetting.get(SCHEDULE_DB_VERSION)
+            db_file = FRAMEWORK.app.config['SQLALCHEMY_BINDS'][PLUGIN.package_name].replace('sqlite:///', '').split('?')[0]
+            LOGGER.debug(f'DB 버전: {current_db_ver}')
+            with sqlite3.connect(db_file) as conn:
+                conn.row_factory = sqlite3.Row
+                cs = conn.cursor()
+                table_jobs = f'{PLUGIN.package_name}_jobs'
+                # DB 볼륨 정리
+                cs.execute(f'VACUUM;').fetchall()
+                for ver in SCHEDULE_DB_VERSIONS[(SCHEDULE_DB_VERSIONS.index(current_db_ver)):]:
+                    migrations.migrate(ver, table_jobs, cs)
+                    current_db_ver = ver
+                conn.commit()
+                FRAMEWORK.db.session.flush()
+            LOGGER.debug(f'최종 DB 버전: {current_db_ver}')
+            PLUGIN.ModelSetting.set(SCHEDULE_DB_VERSION, current_db_ver)
+            PLUGIN.ModelSetting.set(SETTING_DB_VERSION, '')
 
     def get_template_args(self) -> dict[str, Any]:
         '''override'''
@@ -499,7 +506,7 @@ class Tool(BaseModule):
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name=TOOL, first_menu=TOOL_TRASH)
-        self.set_page_list([ToolTrash])
+        self.set_page_list([ToolTrash, ToolGDSTool])
 
 
 class ToolTrash(BasePage):
@@ -509,8 +516,6 @@ class ToolTrash(BasePage):
         self.db_default = {
             TOOL_TRASH_TASK_STATUS: STATUS_KEYS[0],
         }
-        PLUGIN.ModelSetting.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[0])
-
 
     def get_template_args(self) -> dict[str, Any]:
         '''override'''
@@ -577,3 +582,59 @@ class ToolTrash(BasePage):
             result, data = False, str(e)
         finally:
             return jsonify({'success': result, 'data': data})
+
+
+class ToolGDSTool(BasePage):
+
+    def __init__(self, plugin: PluginBase, parent: PluginModuleBase) -> None:
+        super().__init__(plugin, parent, name=TOOL_GDS_TOOL)
+        self.db_default = {
+            TOOL_GDS_TOOL_REQUEST_SPAN: '30',
+            TOOL_GDS_TOOL_REQUEST_AUTO: 'false',
+            TOOL_GDS_TOOL_FP_SPAN: '30',
+            TOOL_GDS_TOOL_FP_AUTO: 'false',
+        }
+
+    def get_template_args(self) -> dict[str, Any]:
+        '''override'''
+        args = super().get_template_args()
+        args[TOOL_GDS_TOOL_REQUEST_SPAN] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_REQUEST_SPAN)
+        args[TOOL_GDS_TOOL_REQUEST_AUTO] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_REQUEST_AUTO)
+        args[TOOL_GDS_TOOL_FP_SPAN] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_FP_SPAN)
+        args[TOOL_GDS_TOOL_FP_AUTO] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_FP_AUTO)
+        try:
+            gdsaider = GDSToolAider()
+            args[TOOL_GDS_TOOL_REQUEST_TOTAL] = gdsaider.get_total_records('request')
+            args[TOOL_GDS_TOOL_FP_TOTAL] = gdsaider.get_total_records('fp')
+        except:
+            LOGGER.error(traceback.format_exc())
+            args[TOOL_GDS_TOOL_REQUEST_TOTAL] = -1
+            args[TOOL_GDS_TOOL_FP_TOTAL] = -1
+        return args
+
+    def process_command(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: LocalProxy) -> Response:
+        '''override'''
+        LOGGER.debug(f'요청: {command}, {arg1}, {arg2}, {arg3}')
+        try:
+            if command == 'delete':
+                mod = arg1
+                span = int(arg2)
+                GDSToolAider().delete(mod, span)
+                result, data = True, f'DB 정리를 실행합니다.'
+            else:
+                result, data = False, f'알 수 없는 명령입니다: {command}'
+        except Exception as e:
+            LOGGER.error(traceback.format_exc())
+            result, data = False, str(e)
+        finally:
+            return jsonify({'success': result, 'data': data})
+
+    def plugin_load(self):
+        '''override'''
+        request_auto = True if PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_REQUEST_AUTO).lower() == 'true' else False
+        fp_auto = True if PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_FP_AUTO).lower() == 'true' else False
+        gdsaider = GDSToolAider()
+        if request_auto:
+            gdsaider.delete('request', PLUGIN.ModelSetting.get_int(TOOL_GDS_TOOL_REQUEST_SPAN))
+        if fp_auto:
+            gdsaider.delete('fp', PLUGIN.ModelSetting.get_int(TOOL_GDS_TOOL_FP_SPAN))

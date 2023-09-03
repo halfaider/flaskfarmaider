@@ -1,0 +1,60 @@
+{% extends 'flaskfarmaider.html' %}
+{% block content %}
+{{ macros.m_button_group([['globalSettingSaveBtn', '설정 저장']])}}
+{{ macros.m_row_start('5') }}
+{{ macros.m_row_end() }}
+
+<form id="setting">
+    <h4>복사 요청 목록</h4>
+    <h5>총 레코드: <span class="badge badge-light" id="tool_gds_tool_request_total">0</span></h5>
+    <div class="input-group row">
+        <label for="tool_gds_tool_request_span" class="col-3 col-form-label text-right font-weight-bold">잔여 기간</label>
+        <input type="text" class="form-control col-3" id="tool_gds_tool_request_span" name="tool_gds_tool_request_span" placeholder="days" />
+        <div class="input-group-append">
+            <button class="btn btn-warning" type="button" id="tool_gds_tool_request_del">삭제</button>
+        </div>
+    </div>
+    <div class="input-group row mb-3">
+        <div class="col-3"></div><div class=""><em>오늘부터 잔여 기간 까지만 남기고 삭제<br />전체 삭제는 0 입력</em></div>
+    </div>
+    <div class="input-group row">
+        <label for="tool_gds_tool_request_auto" class="col-3 col-form-label text-right font-weight-bold">자동 삭제</label>
+        <input id="tool_gds_tool_request_auto" name="tool_gds_tool_request_auto" type="checkbox" class="form-control" data-toggle="toggle" />
+    </div>
+    <div class="input-group row">
+        <div class="col-3"></div><div class=""><em>자동으로 기간 적용 삭제</em></div>
+    </div>
+    <br />
+    <br />
+    <h4>GDS 변경사항 목록</h4>
+    <h5>총 레코드: <span class="badge badge-light" id="tool_gds_tool_fp_total">0</span></h5>
+    <div class="input-group row">
+        <label for="tool_gds_tool_fp_span" class="col-3 col-form-label text-right font-weight-bold">잔여 기간</label>
+        <input type="text" class="form-control col-3" id="tool_gds_tool_fp_span" name="tool_gds_tool_fp_span" placeholder="days" />
+        <div class="input-group-append">
+            <button class="btn btn-warning" type="button" id="tool_gds_tool_fp_del">삭제</button>
+        </div>
+    </div>
+    <div class="input-group row mb-3">
+        <div class="col-3"></div><div class=""><em>오늘부터 잔여 기간 까지만 남기고 삭제<br />전체 삭제는 0 입력</em></div>
+    </div>
+    <div class="input-group row">
+        <label for="tool_gds_tool_fp_auto" class="col-3 col-form-label text-right font-weight-bold">자동 삭제</label>
+        <input id="tool_gds_tool_fp_auto" name="tool_gds_tool_fp_auto" type="checkbox" class="form-control" data-toggle="toggle" />
+    </div>
+    <div class="input-group row">
+        <div class="col-3"></div><div class=""><em>자동으로 기간 적용 삭제</em></div>
+    </div>
+</form>
+<script type="text/javascript">
+    var TOOL_GDS_TOOL_REQUEST_SPAN = JSON.parse('{{ args.tool_gds_tool_request_span|int }}');
+    var TOOL_GDS_TOOL_REQUEST_AUTO = JSON.parse('{{ args.tool_gds_tool_request_auto|lower }}');
+    var TOOL_GDS_TOOL_REQUEST_TOTAL = JSON.parse('{{ args.tool_gds_tool_request_total|int }}');
+    var TOOL_GDS_TOOL_FP_SPAN = JSON.parse('{{ args.tool_gds_tool_fp_span|int }}');
+    var TOOL_GDS_TOOL_FP_AUTO = JSON.parse('{{ args.tool_gds_tool_fp_auto|lower }}');
+    var TOOL_GDS_TOOL_FP_TOTAL = JSON.parse('{{ args.tool_gds_tool_fp_total|int }}');
+    $(function() {
+        init_gds_tool();
+    });
+</script>
+{% endblock %}
