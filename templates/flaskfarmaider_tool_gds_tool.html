@@ -5,45 +5,53 @@
 {{ macros.m_row_end() }}
 
 <form id="setting">
-    <h4>복사 요청 목록</h4>
-    <h5>총 레코드: <span class="badge badge-light" id="tool_gds_tool_request_total">0</span></h5>
-    <div class="input-group row">
-        <label for="tool_gds_tool_request_span" class="col-3 col-form-label text-right font-weight-bold">잔여 기간</label>
-        <input type="text" class="form-control col-3" id="tool_gds_tool_request_span" name="tool_gds_tool_request_span" placeholder="days" />
-        <div class="input-group-append">
-            <button class="btn btn-warning" type="button" id="tool_gds_tool_request_del">삭제</button>
+    <div class="row">
+        <div class="col">
+            <h3>복사 요청 목록</h3>
+            <h4>총 레코드: <span class="badge badge-info" id="tool_gds_tool_request_total">0</span></h4>
+            <br />
+            <br />
+            <div class="form-row">
+                <label for="tool_gds_tool_request_span" class="col-sm-4 col-form-label text-right font-weight-bold">잔여 기간</label>
+                <input type="text" class="col-sm-4 form-control col" id="tool_gds_tool_request_span" name="tool_gds_tool_request_span" placeholder="days" />
+                <div class="">
+                    <button class="btn btn-warning" type="button" id="tool_gds_tool_request_del">삭제</button>
+                </div>
+            </div>
+            <div class="form-row mb-3">
+                <div class="col-sm-4"></div><div class=""><em>오늘부터 잔여 기간(일) 까지만 남기고 삭제<br />전체 삭제는 0 입력</em></div>
+            </div>
+            <div class="form-row">
+                <label for="tool_gds_tool_request_auto" class="col-sm-4 col-form-label text-right font-weight-bold">자동 삭제</label>
+                <input id="tool_gds_tool_request_auto" name="tool_gds_tool_request_auto" type="checkbox" class="form-control" data-toggle="toggle" />
+            </div>
+            <div class="form-row">
+                <div class="col-sm-4"></div><div class=""><em>자동으로 기간 적용 삭제</em></div>
+            </div>
         </div>
-    </div>
-    <div class="input-group row mb-3">
-        <div class="col-3"></div><div class=""><em>오늘부터 잔여 기간 까지만 남기고 삭제<br />전체 삭제는 0 입력</em></div>
-    </div>
-    <div class="input-group row">
-        <label for="tool_gds_tool_request_auto" class="col-3 col-form-label text-right font-weight-bold">자동 삭제</label>
-        <input id="tool_gds_tool_request_auto" name="tool_gds_tool_request_auto" type="checkbox" class="form-control" data-toggle="toggle" />
-    </div>
-    <div class="input-group row">
-        <div class="col-3"></div><div class=""><em>자동으로 기간 적용 삭제</em></div>
-    </div>
-    <br />
-    <br />
-    <h4>GDS 변경사항 목록</h4>
-    <h5>총 레코드: <span class="badge badge-light" id="tool_gds_tool_fp_total">0</span></h5>
-    <div class="input-group row">
-        <label for="tool_gds_tool_fp_span" class="col-3 col-form-label text-right font-weight-bold">잔여 기간</label>
-        <input type="text" class="form-control col-3" id="tool_gds_tool_fp_span" name="tool_gds_tool_fp_span" placeholder="days" />
-        <div class="input-group-append">
-            <button class="btn btn-warning" type="button" id="tool_gds_tool_fp_del">삭제</button>
+        <div class="col">
+            <h3>GDS 변경사항 목록</h3>
+            <h4>총 레코드: <span class="badge badge-info" id="tool_gds_tool_fp_total">0</span></h4>
+            <br />
+            <br />
+            <div class="form-row">
+                <label for="tool_gds_tool_fp_span" class="col-sm-4 col-form-label text-right font-weight-bold">잔여 기간</label>
+                <input type="text" class="col-sm-4 form-control col" id="tool_gds_tool_fp_span" name="tool_gds_tool_fp_span" placeholder="days" />
+                <div class="">
+                    <button class="btn btn-warning" type="button" id="tool_gds_tool_fp_del">삭제</button>
+                </div>
+            </div>
+            <div class="form-row mb-3">
+                <div class="col-sm-4"></div><div class=""><em>오늘부터 잔여 기간 까지만 남기고 삭제<br />전체 삭제는 0 입력</em></div>
+            </div>
+            <div class="form-row">
+                <label for="tool_gds_tool_fp_auto" class="col-sm-4 col-form-label text-right font-weight-bold">자동 삭제</label>
+                <input id="tool_gds_tool_fp_auto" name="tool_gds_tool_fp_auto" type="checkbox" class="form-control" data-toggle="toggle" />
+            </div>
+            <div class="form-row">
+                <div class="col-sm-4"></div><div class=""><em>자동으로 기간 적용 삭제</em></div>
+            </div>
         </div>
-    </div>
-    <div class="input-group row mb-3">
-        <div class="col-3"></div><div class=""><em>오늘부터 잔여 기간 까지만 남기고 삭제<br />전체 삭제는 0 입력</em></div>
-    </div>
-    <div class="input-group row">
-        <label for="tool_gds_tool_fp_auto" class="col-3 col-form-label text-right font-weight-bold">자동 삭제</label>
-        <input id="tool_gds_tool_fp_auto" name="tool_gds_tool_fp_auto" type="checkbox" class="form-control" data-toggle="toggle" />
-    </div>
-    <div class="input-group row">
-        <div class="col-3"></div><div class=""><em>자동으로 기간 적용 삭제</em></div>
     </div>
 </form>
 <script type="text/javascript">
