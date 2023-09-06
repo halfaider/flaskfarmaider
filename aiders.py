@@ -33,12 +33,6 @@ class Aider:
     def get_readable_time(self, _time: float) -> str:
         return datetime.utcfromtimestamp(_time).strftime('%b %d %H:%M')
 
-    def deduplicate(self, items: list[str]) -> list[str]:
-        bucket = {}
-        for item in items:
-            bucket[item] = False
-        return list(bucket.keys())
-
     def parse_mappings(self, text: str) -> dict[str, str]:
         mappings = {}
         if text:
@@ -108,7 +102,7 @@ class JobAider(Aider):
             plexmateaider.check_scanning(PLUGIN.ModelSetting.get_int(SETTING_PLEXMATE_MAX_SCAN_TIME))
             plexmateaider.check_timeover(PLUGIN.ModelSetting.get(SETTING_PLEXMATE_TIMEOVER_RANGE))
             # refresh
-            targets = plexmateaider.get_scan_targets('READY')
+            targets = {s.target for s in plexmateaider.get_scan_items('READY')}
             if targets:
                 rcloneaider = RcloneAider()
                 for target in targets:
@@ -161,7 +155,7 @@ class JobAider(Aider):
                         if job.task == TOOL_TRASH_KEYS[1] or \
                         job.task == TOOL_TRASH_KEYS[3] or \
                         job.task == TOOL_TRASH_KEYS[4]:
-                            plexmateaider.scan(SCAN_MODE_KEYS[2], path)
+                            plexmateaider.scan(SCAN_MODE_KEYS[2], str(path), -1, job.section_id)
                     if job.task == TOOL_TRASH_KEYS[4] and \
                     PLUGIN.ModelSetting.get(TOOL_TRASH_TASK_STATUS) == STATUS_KEYS[1]:
                         plexmateaider.empty_trash(job.section_id)
@@ -340,10 +334,6 @@ class PlexmateAider(PluginAider):
     def get_scan_items(self, status: str) -> list[ModelBase]:
         return self.get_scan_model().get_list_by_status(status)
 
-    def get_scan_targets(self, status: str) -> list[str]:
-        targets = [scan_item.target for scan_item in self.get_scan_items(status)]
-        return self.deduplicate(targets)
-
     def get_sections(self) -> dict[str, Any]:
         sections = {}
         sections[SECTION_TYPE_KEYS[0]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=1)]
@@ -461,40 +451,47 @@ class PlexmateAider(PluginAider):
                     LOGGER.warning(f'READY 로 상태 변경: {over.id} {over.target}')
                     over.set_status('READY', save=True)
 
-    def scan(self, scan_mode: str, target: str = None, periodic_id: int = -1) -> None:
+    def web_scan(self, section_id: int, location: str = None) -> None:
+        section = self.plex_server.library.sectionByID(section_id)
+        max_seconds = 300
+        start = time.time()
+        section.update(path=location)
+        section.reload()
+        location = location if location else 'all'
+        LOGGER.debug(f'스캔 중: {section.title}: {location}')
+        '''
+        스캔 추적을 섹션 상태에 의존
+            다른 곳에서 동일 섹션을 스캔 시도할 경우?
+        '''
+        while section.refreshing:
+            if (time.time() - start) >= max_seconds:
+                break
+            time.sleep(1)
+            section.reload()
+        if time.time() - start > max_seconds:
+            LOGGER.warning(f'스캔 대기 시간 초과: {section.title}: {location} ... {(time.time() - start):.1f}s')
+        else:
+            LOGGER.info(f'스캔 완료: {section.title}: {location} ... {(time.time() - start):.1f}s')
+
+    def scan(self, scan_mode: str, target: str = None, periodic_id: int = -1, section_id: int = -1) -> None:
         if scan_mode == SCAN_MODE_KEYS[2]:
             mappings = self.parse_mappings(PLUGIN.ModelSetting.get(SETTING_PLEXMATE_PLEX_MAPPING))
             target = self.update_path(target, mappings)
-            rows = self.db.select('SELECT library_section_id, root_path FROM section_locations')
+            if section_id > 0:
+                locations = self.db.select(f'SELECT library_section_id, root_path FROM section_locations WHERE library_section_id = {section_id}')
+            else:
+                locations = self.db.select('SELECT library_section_id, root_path FROM section_locations')
             founds = {}
-            for row in rows:
-                root = row['root_path']
+            for location in locations:
+                root = f'{location["root_path"]}/'
                 longer = target if len(target) >= len(root) else root
                 shorter = target if len(target) < len(root) else root
                 if longer.startswith(shorter):
-                    founds[int(row['library_section_id'])] = longer
+                    founds[int(location['library_section_id'])] = longer
             if founds:
                 LOGGER.debug(f'섹션 ID 검색 결과: {list(founds.keys())}')
                 for section_id, location in founds.items():
-                    section = self.plex_server.library.sectionByID(section_id)
-                    max_seconds = 300
-                    start = time.time()
-                    section.update(path=location)
-                    section.reload()
-                    LOGGER.debug(f'스캔 중: {section.title}: {location}')
-                    '''
-                    스캔 추적을 섹션 상태에 의존
-                        다른 곳에서 동일 섹션을 스캔 시도할 경우?
-                    '''
-                    while section.refreshing:
-                        if (time.time() - start) >= max_seconds:
-                            break
-                        time.sleep(1)
-                        section.reload()
-                    if time.time() - start > max_seconds:
-                        LOGGER.warning(f'스캔 대기 시간 초과: {section.title}: {location} ... {(time.time() - start):.1f}s')
-                    else:
-                        LOGGER.info(f'스캔 완료: {section.title}: {location} ... {(time.time() - start):.1f}s')
+                    self.web_scan(section_id, location)
             else:
                 LOGGER.error(f'섹션 ID를 찾을 수 없습니다: {target}')
         elif scan_mode == SCAN_MODE_KEYS[1]:
