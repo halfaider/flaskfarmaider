@@ -503,13 +503,15 @@ function list_dir(result) {
         autohide: true,
         callback: function(command, opt) {
             path = opt.$trigger.data('path');
-            cmd = {
-                command: command,
-                path: path,
-                recursive: opt.inputs['recursive'].$input.prop('checked'),
-                scan_mode: opt.inputs['scan_mode'].$input.prop('value'),
-            }
-            browser_command(cmd);
+            confirm_modal(TASKS[command].name + ' 작업을 실행할까요?', path, function() {
+                cmd = {
+                    command: command,
+                    path: path,
+                    recursive: opt.inputs['recursive'].$input.prop('checked'),
+                    scan_mode: opt.inputs['scan_mode'].$input.prop('value'),
+                }
+                browser_command(cmd);
+            });
         },
         events: {
             show: function(opt) {
@@ -530,6 +532,11 @@ function list_dir(result) {
             [TASK_KEYS[2]]: {
                 name: TASKS[TASK_KEYS[2]].name,
                 icon: 'fa-search',
+                disabled: function(){return $(this).hasClass('restrict-context');},
+            },
+            [TASK_KEYS[6]]: {
+                name: TASKS[TASK_KEYS[6]].name,
+                icon: 'fa-undo',
                 disabled: function(){return $(this).hasClass('restrict-context');},
             },
             sep1: "---------",

@@ -15,7 +15,7 @@ README = PKG_PATH / 'README.md'
 DEPEND_SOURCE_YAML = PKG_PATH / 'files' / 'flaskfarmaider.yaml'
 DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/flaskfarmaider.yaml')
 
-TASK_KEYS = ('refresh_scan', 'refresh', 'scan', 'pm_ready_refresh', 'clear', 'startup', 'trash')
+TASK_KEYS = ('refresh_scan', 'refresh', 'scan', 'pm_ready_refresh', 'clear', 'startup', 'forget')
 TASKS = {
     TASK_KEYS[0]: {'key': TASK_KEYS[0], 'name': '새로고침 후 스캔', 'desc': 'Rclone 리모트 콘트롤 서버에 vfs/refresh 요청 후 플렉스 스캔', 'enable': False},
     TASK_KEYS[1]: {'key': TASK_KEYS[1], 'name': '새로고침', 'desc': 'Rclone 리모트 콘트롤 서버에 vfs/refresh 요청', 'enable': False},
@@ -23,7 +23,7 @@ TASKS = {
     TASK_KEYS[3]: {'key': TASK_KEYS[3], 'name': 'Plexmate Ready 새로고침', 'desc': 'Plexmate의 READY 상태인 항목들을 Rclone 리모트 서버에 vfs/refresh 요청', 'enable': False},
     TASK_KEYS[4]: {'key': TASK_KEYS[4], 'name': 'Plexmate 파일 정리', 'desc': 'Plexmate의 라이브러리 파일 정리를 일정으로 등록', 'enable': False},
     TASK_KEYS[5]: {'key': TASK_KEYS[5], 'name': '시작 스크립트', 'desc': 'Flaskfarm 시작시 필요한 OS 명령어를 실행', 'enable': False},
-    TASK_KEYS[6]: {'key': TASK_KEYS[6], 'name': '휴지통 스캔', 'desc': 'Plex 이용불가 파일을 조회 후 새로고침 및 스캔', 'enable': False},
+    TASK_KEYS[6]: {'key': TASK_KEYS[6], 'name': '경로 캐시 삭제', 'desc': 'Rclone 리모트 콘트롤 서버에 vfs/forget 요청', 'enable': False},
 }
 
 TOOL_TRASH_KEYS = ('trash_refresh', 'trash_scan', 'trash_empty', 'trash_refresh_scan', 'trash_refresh_scan_empty')
