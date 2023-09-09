@@ -3,6 +3,7 @@ from werkzeug.local import LocalProxy
 from flask_sqlalchemy.query import Query
 from sqlalchemy import desc, text
 from plexapi.server import PlexServer
+import flask_login
 
 from framework.init_main import Framework
 from framework.scheduler import Job as FrameworkJob
@@ -10,8 +11,9 @@ from plugin.create_plugin import create_plugin_instance
 from plugin.create_plugin import PluginBase
 from plugin.logic_module_base import PluginModuleBase, PluginPageBase
 from plugin.model_base import ModelBase
+from system.setup import P as system_plugin
 
-from .constants import SCHEDULE, SETTING, TOOL, TOOL_TRASH, MANUAL, LOG, TOOL_GDS_TOOL
+from .constants import SCHEDULE, SETTING, TOOL, TOOL_TRASH, MANUAL, LOG, TOOL_GDS_TOOL, TOOL_LOGIN_LOG
 
 config = {
     'filepath' : __file__,
@@ -36,6 +38,7 @@ config = {
                 'list': [
                     {'uri': TOOL_TRASH, 'name': 'Plex 휴지통 스캔'},
                     {'uri': TOOL_GDS_TOOL, 'name': '구드공 툴 DB 정리'},
+                    {'uri': TOOL_LOGIN_LOG, 'name': '로그인 로그'},
                 ]
             },
             {

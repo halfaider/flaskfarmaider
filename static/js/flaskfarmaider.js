@@ -248,10 +248,10 @@ function init_gds_tool() {
     E_GDS_TOOL_FP_DEL = $('#tool_gds_tool_fp_del');
 
     E_GDS_TOOL_REQUEST_SPAN.prop('value', TOOL_GDS_TOOL_REQUEST_SPAN);
-    E_GDS_TOOL_REQUEST_AUTO.bootstrapToggle(Boolean(TOOL_GDS_TOOL_REQUEST_AUTO) ? 'on' : 'off');
+    E_GDS_TOOL_REQUEST_AUTO.bootstrapToggle(TOOL_GDS_TOOL_REQUEST_AUTO ? 'on' : 'off');
     E_GDS_TOOL_REQUEST_TOTAL.text(TOOL_GDS_TOOL_REQUEST_TOTAL);
     E_GDS_TOOL_FP_SPAN.prop('value', TOOL_GDS_TOOL_FP_SPAN);
-    E_GDS_TOOL_FP_AUTO.bootstrapToggle(Boolean(TOOL_GDS_TOOL_FP_AUTO) ? 'on' : 'off');
+    E_GDS_TOOL_FP_AUTO.bootstrapToggle(TOOL_GDS_TOOL_FP_AUTO ? 'on' : 'off');
     E_GDS_TOOL_FP_TOTAL.text(TOOL_GDS_TOOL_FP_TOTAL);
 
     E_GDS_TOOL_REQUEST_DEL.on('click', function(e) {
@@ -281,6 +281,17 @@ function init_gds_tool() {
                         notify(result.data, 'warning');
                     }
                 });
+        });
+    });
+}
+
+function init_tool_login_log() {
+    init();
+    E_TOOL_LOGIN_LOG_ENABLE = $('#tool_login_log_enable');
+    E_TOOL_LOGIN_LOG_ENABLE.bootstrapToggle(TOOL_LOGIN_LOG_ENABLE ? 'on' : 'off');
+    E_TOOL_LOGIN_LOG_ENABLE.on('change', function(e) {
+        globalSendCommandPage('enable', $(this).prop('checked'), 0, 0, function(result) {
+            notify(result.data, 'info');
         });
     });
 }
