@@ -6,12 +6,21 @@
 
 <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js?autorun=true&lang=css&lang=yaml&skin=sunburst"></script>
 <script src="{{ url_for('static', filename='js/showdown_2.1.0.js') }}"></script>
-<script src="{{ url_for('static', filename='js/showdown-prettify.js') }}"></script>
+<!-- <script src="{{ url_for('static', filename='js/showdown-prettify.js') }}"></script> -->
 <link href="{{ url_for('static', filename='css/showdown.css') }}" rel="stylesheet">
-
+<style>
+    pre {
+        background-color: #000;
+        padding: 10px;
+    }
+    pre code {
+        color: #fff;
+    }
+</style>
 <script type="text/javascript">
     $(function() {
-        var converter = new showdown.Converter({extensions: ['prettify']});
+        //var converter = new showdown.Converter({extensions: ['prettify']});
+        var converter = new showdown.Converter();
         converter.setOption('tables', true);
         converter.setOption('strikethrough', true);
         converter.setOption('ghCodeBlocks',true);

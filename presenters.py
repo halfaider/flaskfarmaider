@@ -18,11 +18,6 @@ from .constants import TOOL_GDS_TOOL_REQUEST_SPAN, TOOL_GDS_TOOL_REQUEST_AUTO, T
 from . import migrations
 
 
-def thread_func(func, *args, **kwds):
-    th = Thread(target=func, args=args, kwargs=kwds, daemon=True)
-    th.start()
-    return th
-
 class Base():
 
     def __init__(self, *args, **kwds) -> None:
@@ -65,8 +60,7 @@ class Base():
                 'scan_mode': scan_mode,
                 'periodic_id': int(periodic_id) if periodic_id else -1,
             }
-            #JobAider().start_job(Job.get_job(info=job))
-            thread_func(JobAider().start_job, Job.get_job(info=job))
+            self.start_celery(JobAider().start_job, Job.get_job(info=job))
             result, msg = True, '작업을 실행했습니다.'
         else:
             result, msg = False, '경로 정보가 없습니다.'
@@ -197,9 +191,27 @@ class BaseModule(Base, PluginModuleBase):
         '''override'''
         pass
 
-    def start_celery(self, func: callable, on_message: callable = None, *args, page: PluginPageBase = None) -> Any:
+    def start_celery(self, func: callable, *args, on_message: callable = None, page: PluginPageBase = None) -> Any:
         '''override'''
-        return super().start_celery(func, on_message, *args, page)
+        # start_celery()로 실행할 경우 메인 스레드와 다른 인스턴스를 사용하므로 주의
+        if FRAMEWORK.config['use_celery']:
+            result = func.apply_async(args)
+            try:
+                if on_message != None:
+                    ret = result.get(on_message=on_message, propagate=True)
+                else:
+                    ret = result.get()
+            except:
+                ret = result.get()
+        else:
+            if on_message == None:
+                ret = func(*args)
+            else:
+                if page == None:
+                    ret = func(self, *args)
+                else:
+                    ret = func(page, *args)
+        return ret
 
 
 class BasePage(Base, PluginPageBase):
@@ -295,9 +307,9 @@ class BasePage(Base, PluginPageBase):
         '''override'''
         return super().db_delete(day)
 
-    def start_celery(self, func: callable, on_message: callable = None, *args) -> Any:
+    def start_celery(self, func: callable, *args, on_message: callable = None) -> Any:
         '''override'''
-        return super().start_celery(func, on_message, *args, page=self)
+        return self.parent.start_celery(func, *args, on_message, page=self)
 
 
 class Setting(BaseModule):
@@ -459,7 +471,7 @@ class Schedule(BaseModule):
                 else:
                     result, data = False, f'삭제할 수 없습니다: ID {arg1}'
             elif command == 'execute':
-                thread_func(JobAider().start_job, Job.get_job(int(arg1)))
+                self.start_celery(JobAider().start_job, Job.get_job(int(arg1)))
                 result, data = True, '일정을 실행헀습니다.'
             elif command == 'schedule':
                 active = True if arg2.lower() == 'true' else False
@@ -482,7 +494,7 @@ class Schedule(BaseModule):
         jobaider = JobAider()
         for job in jobs:
             if job.schedule_mode == FF_SCHEDULE_KEYS[1]:
-                jobaider.start_job(job)
+                self.start_celery(JobAider().start_job, job)
             elif job.schedule_mode == FF_SCHEDULE_KEYS[2] and job.schedule_auto_start:
                 jobaider.add_schedule(job.id)
 
@@ -573,7 +585,7 @@ class ToolTrash(BasePage):
                         job = Job.get_job()
                         job.task = command
                         job.section_id = int(arg1)
-                        thread_func(JobAider().start_job, job)
+                        self.start_celery(JobAider().start_job, job)
                         result, data = True, f'작업을 실행했습니다.'
                     else:
                         result, data = False, '작업이 실행중입니다.'

@@ -182,7 +182,8 @@ class JobAider(Aider):
             job = job or Job.get_by_id(id)
             schedule_id = cls.create_schedule_id(job.id)
             if not FRAMEWORK.scheduler.is_include(schedule_id):
-                sch = FrameworkJob(__package__, schedule_id, job.schedule_interval, cls.start_job, job.desc, args=(job,))
+                sch_mod = PLUGIN.logic.get_module(SCHEDULE)
+                sch = FrameworkJob(__package__, schedule_id, job.schedule_interval, sch_mod.start_celery, job.desc, args=(cls.start_job, job))
                 FRAMEWORK.scheduler.add_job_instance(sch)
             return True
         except Exception as e:
@@ -409,38 +410,49 @@ class PlexmateAider(PluginAider):
         '''
         SCANNING 항목 점검.
 
-        PLEX_MATE에서 특정 폴더가 비정상적으로 계속 SCANNING 상태이면 이후 동일 폴더에 대한 스캔 요청이 모두 무시됨.
-        예를 들어 .plexignore 가 있는 폴더는 PLEX_MATE 입장에서 스캔이 정상 종료되지 않기 때문에 해당 파일의 상태가 계속 SCANNING 으로 남게 됨.
-        이 상태에서 동일한 폴더에 위치한 다른 파일이 스캔에 추가되면 스캔을 시도하지 않고 FINISH_ALREADY_IN_QUEUE 로 종료됨.
+        배경:
+            PLEX_MATE에서 특정 폴더가 비정상적으로 계속 SCANNING 상태이면 이후 동일 폴더에 대한 스캔 요청이 모두 무시됨.
+            예를 들어 .plexignore 가 있는 폴더는 PLEX_MATE 입장에서 스캔이 정상 종료되지 않기 때문에 계속 SCANNING 상태로 유지됨.
+            이 상태에서 동일한 폴더에 새로운 미디어가 추가되면 스캔이 되지 않고 FINISH_ALREADY_IN_QUEUE 로 종료됨.
+        장애물:
+            flaskfarm 이 실행되면 celery 명령어가 도중에 실행되면서 결과적으로 두번 초기화가 이뤄짐.
+            이때 celery 에서 로딩한 Framework 인스턴스와 메인 스레드의 Framework 인스턴스가 달라짐.
+            plex_mate.task_scan.Task.filecheck_thread_function() 은 start_celery() 로 인해 apply_async() 로 실행됨.
+            그 결과 celery 에서 로딩한 Framework의 인스턴스를 참조하게 됨.
+            그래서 메인 스레드에서 ModelScanItem.queue_list 를 수정할 경우 효과가 없음.
+        대안:
+            1. plex_mate와 동일하게 apply_async() 로 작업을 실행
+            2. DB를 직접 조작하여 SCANNING 아이템 제거
+                - 스캔 오류라고 판단된 item을 db에서 삭제하고 동일한 id로 새로운 item을 db에 생성
+                - ModelScanItem.queue_list에는 기존 item의 객체가 아직 남아 있음.
+                - 다음 파일체크 단계에서 queue_list에 남아있는 기존 item 정보로 인해 새로운 item의 STATUS가 FINISH_ALREADY_IN_QUEUE로 변경됨.
+                - FINISH_* 상태가 되면 ModelScanItem.remove_in_queue()가 호출됨.
+                - 새로운 item 객체는 기존 item 객체의 id를 가지고 있기 때문에 queue_list에서 기존 item 객체가 제외됨.
+            3. plex_mate.mod_scan.ModuleScan.plugin_load() 함수에서 Task를 메인 스레드에서 시작
 
-        ModelScanItem.queue_list가 현재 스캔중인 아이템의 MODEL 객체가 담겨있는 LIST임.
-        클래스 변수라서 스크립트로 리스트의 내용을 조작해 보려고 시도했으나
-        런타임 중 plex_mate.task_scan.Task.filecheck_thread_function() 에서 참조하는 ModelScanItem 과
-        외부 스크립트에서 참조하는 ModelScanItem 의 메모리 주소가 다름을 확인함.
-        flask의 app_context, celery의 Task 데코레이터, 다른 플러그인에서 접근을 해 보았지만 효과가 없었음.
-        그래서 외부에서 접근한 ModelScanItem.queue_list는 항상 비어 있는 상태임.
+                def plugin_load(self):
+                    Task.start()
 
-        런타임 queue_list에서 스캔 오류 아이템을 제외시키기 위해 편법을 사용함.
-
-        - 스캔 오류라고 판단된 item을 db에서 삭제하고 동일한 id로 새로운 item을 db에 생성
-        - ModelScanItem.queue_list에는 기존 item의 객체가 아직 남아 있음.
-        - 다음 파일체크 단계에서 queue_list에 남아있는 기존 item 정보로 인해 새로운 item의 STATUS가 FINISH_ALREADY_IN_QUEUE로 변경됨.
-        - FINISH_* 상태가 되면 ModelScanItem.remove_in_queue()가 호출됨.
-        - 새로운 item 객체는 기존 item 객체의 id를 가지고 있기 때문에 queue_list에서 기존 item 객체가 제외됨.
-
-        주의: 계속 SCANNING 상태로 유지되는 항목은 확인 후 조치.
+        주의:
+            계속 SCANNING 상태로 유지되는 항목은 확인 후 조치.
         '''
-        model = self.get_scan_model()
         scans = self.get_scan_items('SCANNING')
         if scans:
+            model = self.get_scan_model()
             for scan in scans:
                 if int((datetime.now() - scan.process_start_time).total_seconds() / 60) >= max_scan_time:
                     LOGGER.warning(f'스캔 시간 {max_scan_time}분 초과: {scan.target}')
                     LOGGER.warning(f'스캔 QUEUE에서 제외: {scan.target}')
+                    # 대안 1
+                    scan.remove_in_queue(scan)
+                    scan.set_status('FINISH_TIMEOVER', save=True)
+                    '''
+                    # 대안 2
                     model.delete_by_id(scan.id)
                     new_item = model(scan.target)
                     new_item.id = scan.id
                     new_item.save()
+                    '''
 
     def check_timeover(self, item_range: str) -> None:
         '''
