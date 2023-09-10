@@ -60,7 +60,7 @@ class Base():
                 'scan_mode': scan_mode,
                 'periodic_id': int(periodic_id) if periodic_id else -1,
             }
-            self.start_celery(JobAider().start_job, Job.get_job(info=job))
+            JobAider().start_job.apply_async((Job.get_job(info=job),))
             result, msg = True, '작업을 실행했습니다.'
         else:
             result, msg = False, '경로 정보가 없습니다.'
@@ -193,7 +193,7 @@ class BaseModule(Base, PluginModuleBase):
 
     def start_celery(self, func: callable, *args, on_message: callable = None, page: PluginPageBase = None) -> Any:
         '''override'''
-        # start_celery()로 실행할 경우 메인 스레드와 다른 인스턴스를 사용하므로 주의
+        # 결과를 기다릴 필요가 없을 경우 바로 apply_async() 사용
         if FRAMEWORK.config['use_celery']:
             result = func.apply_async(args)
             try:
@@ -471,7 +471,7 @@ class Schedule(BaseModule):
                 else:
                     result, data = False, f'삭제할 수 없습니다: ID {arg1}'
             elif command == 'execute':
-                self.start_celery(JobAider().start_job, Job.get_job(int(arg1)))
+                JobAider().start_job.apply_async((Job.get_job(int(arg1)),))
                 result, data = True, '일정을 실행헀습니다.'
             elif command == 'schedule':
                 active = True if arg2.lower() == 'true' else False
@@ -494,7 +494,7 @@ class Schedule(BaseModule):
         jobaider = JobAider()
         for job in jobs:
             if job.schedule_mode == FF_SCHEDULE_KEYS[1]:
-                self.start_celery(JobAider().start_job, job)
+                JobAider().start_job.apply_async((job,))
             elif job.schedule_mode == FF_SCHEDULE_KEYS[2] and job.schedule_auto_start:
                 jobaider.add_schedule(job.id)
 
@@ -585,7 +585,7 @@ class ToolTrash(BasePage):
                         job = Job.get_job()
                         job.task = command
                         job.section_id = int(arg1)
-                        self.start_celery(JobAider().start_job, job)
+                        JobAider().start_job.apply_async((job,))
                         result, data = True, f'작업을 실행했습니다.'
                     else:
                         result, data = False, '작업이 실행중입니다.'
