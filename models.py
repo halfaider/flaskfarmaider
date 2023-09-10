@@ -5,8 +5,8 @@ import time
 from threading import Thread
 
 from .aiders import JobAider
-from .setup import PLUGIN, LOGGER, LocalProxy, Query, desc, ModelBase
-from .constants import FRAMEWORK, FF_SCHEDULE_KEYS, SCAN_MODE_KEYS, STATUS_KEYS, SCHEDULE, TASK_KEYS, TASKS
+from .setup import FRAMEWORK, PLUGIN, LOGGER, LocalProxy, Query, desc, ModelBase
+from .constants import FF_SCHEDULE_KEYS, SCAN_MODE_KEYS, STATUS_KEYS, SCHEDULE, TASK_KEYS, TASKS
 
 
 class Job(ModelBase):

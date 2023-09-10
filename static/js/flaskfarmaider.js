@@ -128,11 +128,9 @@ function init_schedule() {
         globalSendCommand('save', formdata, null, null, function(result) {
             if (result.success) {
                 E_MODAL.modal('hide');
-                notify(result.data, 'success');
                 globalRequestSearch(1);
-            } else {
-                notify(result.data, 'warning');
             }
+            notify(result.data, result.success ? 'success' : 'warning');
         });
     });
     E_ADD_BTN = $('#sch-add-btn');
@@ -216,27 +214,19 @@ function init_trash() {
     E_TRASH_BTN_STOP = $('#trash-btn-stop');
     E_TRASH_BTN_STOP.on('click', function(e) {
         globalSendCommandPage('stop', '', '', '', function(result) {
-            if (result.success) {
-                notify(result.data, 'success');
-            } else {
-                notify(result.data, 'warning');
-            }
+            notify(result.data, result.success ? 'success' : 'warning');
         });
     });
     E_TRASH_TASK = $('#trash-task');
     E_TRASH_BTN_EXCEUTE = $('#trash-btn-execute');
     E_TRASH_BTN_EXCEUTE.on('click', function(e) {
         globalSendCommandPage(E_TRASH_TASK.prop('value'), E_TRASH_SECTIONS.prop('value'), '', '', function(result) {
-            if (result.success) {
-                notify(result.data, 'success');
-            } else {
-                notify(result.data, 'warning');
-            }
+            notify(result.data, result.success ? 'success' : 'warning');
         });
     });
 }
 
-function init_gds_tool() {
+function init_etc_setting() {
     init();
     E_GDS_TOOL_REQUEST_SPAN = $('#tool_gds_tool_request_span');
     E_GDS_TOOL_REQUEST_AUTO = $('#tool_gds_tool_request_auto');
@@ -260,11 +250,7 @@ function init_gds_tool() {
             '잔여 기간: ' + span,
             function() {
                 globalSendCommandPage('delete', 'request', span, '', function(result) {
-                    if (result.success) {
-                        notify(result.data, 'success');
-                    } else {
-                        notify(result.data, 'warning');
-                    }
+                    notify(result.data, result.success ? 'success' : 'warning');
                 });
         });
     });
@@ -275,25 +261,13 @@ function init_gds_tool() {
             '잔여 기간: ' + span,
             function() {
                 globalSendCommandPage('delete', 'fp', span, '', function(result) {
-                    if (result.success) {
-                        notify(result.data, 'success');
-                    } else {
-                        notify(result.data, 'warning');
-                    }
+                    notify(result.data, result.success ? 'success' : 'warning');
                 });
         });
     });
-}
 
-function init_tool_login_log() {
-    init();
     E_TOOL_LOGIN_LOG_ENABLE = $('#tool_login_log_enable');
     E_TOOL_LOGIN_LOG_ENABLE.bootstrapToggle(TOOL_LOGIN_LOG_ENABLE ? 'on' : 'off');
-    E_TOOL_LOGIN_LOG_ENABLE.on('change', function(e) {
-        globalSendCommandPage('enable', $(this).prop('checked'), 0, 0, function(result) {
-            notify(result.data, 'info');
-        });
-    });
 }
 
 async function trash_get_list(page_no) {
@@ -336,11 +310,7 @@ function trash_make_list(data) {
             recursive = opt.inputs['recursive'].$input.prop('checked');
             scan_mode = opt.inputs['scan_mode'].$input.prop('value');
             globalSendCommandPage(command, path, recursive, scan_mode + "|-1", function(result) {
-                if (result.success) {
-                    notify(result.data, 'success');
-                } else {
-                    notify(result.data, 'warning');
-                }
+                notify(result.data, result.success ? 'success' : 'warning');
             });
         },
         items: {
@@ -365,12 +335,10 @@ function trash_make_list(data) {
                     confirm_modal('이 파일을 플렉스에서 삭제할까요?', data.path, function() {
                         globalSendCommandPage(command, data.metadata_item_id, data.id, '', function(result) {
                             if (result.success) {
-                                notify(result.data, 'success');
                                 page = $('ul.pagination li.active[aria-current=page]').first().text()
                                 trash_get_list(page ? page : 1);
-                            } else {
-                                notify(result.data, 'warning');
                             }
+                            notify(result.data, result.success ? 'success' : 'warning');
                         });
                     });
                 },
@@ -655,11 +623,7 @@ function make_list(data) {
         _id = $this.data('id');
         checked = $this.prop('checked');
         globalSendCommand('schedule', _id, checked, null, function(result) {
-            if (result.success) {
-                notify(result.data, 'success');
-            } else {
-                notify(result.data, 'warning');
-            }
+            notify(result.data, result.success ? 'success' : 'warning');
         });
     });
 
@@ -697,10 +661,8 @@ function make_list(data) {
                         globalSendCommand("delete", data.id, null, null, function(result) {
                             if (result.success) {
                                 globalRequestSearch('1');
-                                notify(result.data, 'success');
-                            } else {
-                                notify(result.data, 'warning');
                             }
+                            notify(result.data, result.success ? 'success' : 'warning');
                         });
                     });
                 }
@@ -715,7 +677,7 @@ function make_list(data) {
                         function() {
                         globalSendCommand("execute", data.id, null, null, function(result) {
                             globalRequestSearch('1');
-                            notify(result.data, 'success');
+                            notify(result.data, result.success ? 'success' : 'warning');
                         });
                     });
                 }

@@ -1,12 +1,10 @@
 import pathlib
 
-from .setup import Framework
-
-FRAMEWORK = Framework.get_instance()
 SETTING = 'setting'
 SCHEDULE = 'schedule'
 TOOL = 'tool'
 TOOL_TRASH = 'trash'
+TOOL_ETC_SETTING = F'etc_setting'
 TOOL_GDS_TOOL = 'gds_tool'
 TOOL_LOGIN_LOG = 'login_log'
 MANUAL = 'manual'
@@ -14,7 +12,6 @@ LOG = 'log'
 PKG_PATH = pathlib.Path(__file__).parent
 README = PKG_PATH / 'README.md'
 DEPEND_SOURCE_YAML = PKG_PATH / 'files' / 'flaskfarmaider.yaml'
-DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/flaskfarmaider.yaml')
 
 TASK_KEYS = ('refresh_scan', 'refresh', 'scan', 'pm_ready_refresh', 'clear', 'startup', 'forget')
 TASKS = {
@@ -93,3 +90,4 @@ TOOL_GDS_TOOL_FP_SPAN = f'{TOOL}_{TOOL_GDS_TOOL}_fp_span'
 TOOL_GDS_TOOL_FP_AUTO = f'{TOOL}_{TOOL_GDS_TOOL}_fp_auto'
 TOOL_GDS_TOOL_FP_TOTAL = f'{TOOL}_{TOOL_GDS_TOOL}_fp_total'
 TOOL_LOGIN_LOG_ENABLE = f'{TOOL}_{TOOL_LOGIN_LOG}_enable'
+TOOL_LOGIN_LOG_FILE = f'{TOOL}_{TOOL_LOGIN_LOG}_file'

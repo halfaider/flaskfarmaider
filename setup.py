@@ -1,3 +1,5 @@
+import pathlib
+
 from flask import Response, render_template, jsonify
 from werkzeug.local import LocalProxy
 from flask_sqlalchemy.query import Query
@@ -13,7 +15,7 @@ from plugin.logic_module_base import PluginModuleBase, PluginPageBase
 from plugin.model_base import ModelBase
 from system.setup import P as system_plugin
 
-from .constants import SCHEDULE, SETTING, TOOL, TOOL_TRASH, MANUAL, LOG, TOOL_GDS_TOOL, TOOL_LOGIN_LOG
+from .constants import SCHEDULE, SETTING, TOOL, TOOL_TRASH, MANUAL, LOG, TOOL_ETC_SETTING
 
 config = {
     'filepath' : __file__,
@@ -37,8 +39,7 @@ config = {
                 'name': '도구',
                 'list': [
                     {'uri': TOOL_TRASH, 'name': 'Plex 휴지통 스캔'},
-                    {'uri': TOOL_GDS_TOOL, 'name': '구드공 툴 DB 정리'},
-                    {'uri': TOOL_LOGIN_LOG, 'name': '로그인 로그'},
+                    {'uri': TOOL_ETC_SETTING, 'name': '기타 설정'},
                 ]
             },
             {
@@ -58,6 +59,8 @@ config = {
 P = create_plugin_instance(config)
 PLUGIN = P
 LOGGER = PLUGIN.logger
+FRAMEWORK = Framework.get_instance()
+DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/flaskfarmaider.yaml')
 
 from .presenters import Setting
 from .presenters import Schedule

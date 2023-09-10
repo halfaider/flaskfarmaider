@@ -4,13 +4,12 @@ from typing import Any
 from urllib.parse import parse_qs
 from threading import Thread
 import sqlite3
-import functools
 
 from .models import Job
 from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider
-from .setup import PLUGIN, LOGGER, Response, render_template, jsonify, LocalProxy, PluginBase, PluginModuleBase, PluginPageBase, system_plugin, flask_login
-from .constants import SETTING, FRAMEWORK, TASK_KEYS, SCAN_MODE_KEYS, SCHEDULE, SECTION_TYPE_KEYS, STATUSES, README, TOOL, SCHEDULE_DB_VERSIONS
-from .constants import TASKS, STATUS_KEYS, FF_SCHEDULE_KEYS, SCAN_MODES, SECTION_TYPES, FF_SCHEDULES, TOOL_TRASH, MANUAL, TOOL_GDS_TOOL, TOOL_LOGIN_LOG
+from .setup import FRAMEWORK, PLUGIN, LOGGER, Response, render_template, jsonify, LocalProxy, PluginBase, PluginModuleBase, PluginPageBase, system_plugin, flask_login
+from .constants import SETTING, TASK_KEYS, SCAN_MODE_KEYS, SCHEDULE, SECTION_TYPE_KEYS, STATUSES, README, TOOL, SCHEDULE_DB_VERSIONS, TOOL_LOGIN_LOG_FILE
+from .constants import TASKS, STATUS_KEYS, FF_SCHEDULE_KEYS, SCAN_MODES, SECTION_TYPES, FF_SCHEDULES, TOOL_TRASH, MANUAL, TOOL_ETC_SETTING
 from .constants import SETTING_DB_VERSION, SETTING_RCLONE_REMOTE_ADDR, SETTING_RCLONE_REMOTE_VFS, SETTING_RCLONE_REMOTE_USER, TOOL_GDS_TOOL_REQUEST_TOTAL
 from .constants import SETTING_RCLONE_REMOTE_PASS, SETTING_RCLONE_MAPPING, SETTING_PLEXMATE_MAX_SCAN_TIME, SETTING_PLEXMATE_TIMEOVER_RANGE, TOOL_LOGIN_LOG_ENABLE
 from .constants import SETTING_PLEXMATE_PLEX_MAPPING, SETTING_STARTUP_EXECUTABLE, SETTING_STARTUP_COMMANDS, SETTING_STARTUP_TIMEOUT, SETTING_STARTUP_DEPENDENCIES
@@ -367,7 +366,6 @@ class Setting(BaseModule):
 
     def setting_save_after(self, changes: list) -> None:
         '''override'''
-        LOGGER.debug(f'변경된 설정값: {changes}')
         for change in changes:
             if change == f'{self.name}_startup_dependencies':
                 SettingAider().depends(PLUGIN.ModelSetting.get(SETTING_STARTUP_DEPENDENCIES))
@@ -507,7 +505,12 @@ class Tool(BaseModule):
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name=TOOL, first_menu=TOOL_TRASH)
-        self.set_page_list([ToolTrash, ToolGDSTool, ToolLoginLog])
+        self.set_page_list([ToolTrash, ToolEtcSetting])
+
+    def setting_save_after(self, changes: list) -> None:
+        '''override'''
+        for page in self.page_list:
+            page.setting_save_after(changes)
 
 
 class ToolTrash(BasePage):
@@ -585,16 +588,19 @@ class ToolTrash(BasePage):
             return jsonify({'success': result, 'data': data})
 
 
-class ToolGDSTool(BasePage):
+class ToolEtcSetting(BasePage):
 
     def __init__(self, plugin: PluginBase, parent: PluginModuleBase) -> None:
-        super().__init__(plugin, parent, name=TOOL_GDS_TOOL)
+        super().__init__(plugin, parent, name=TOOL_ETC_SETTING)
         self.db_default = {
             TOOL_GDS_TOOL_REQUEST_SPAN: '30',
             TOOL_GDS_TOOL_REQUEST_AUTO: 'false',
             TOOL_GDS_TOOL_FP_SPAN: '30',
             TOOL_GDS_TOOL_FP_AUTO: 'false',
+            TOOL_LOGIN_LOG_ENABLE: 'false',
         }
+        self.system_route = system_plugin.logic.get_module('route')
+        self.system_route_process_command = self.system_route.process_command
 
     def get_template_args(self) -> dict[str, Any]:
         '''override'''
@@ -603,6 +609,8 @@ class ToolGDSTool(BasePage):
         args[TOOL_GDS_TOOL_REQUEST_AUTO] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_REQUEST_AUTO)
         args[TOOL_GDS_TOOL_FP_SPAN] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_FP_SPAN)
         args[TOOL_GDS_TOOL_FP_AUTO] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_FP_AUTO)
+        args[TOOL_LOGIN_LOG_ENABLE] = PLUGIN.ModelSetting.get(TOOL_LOGIN_LOG_ENABLE).lower()
+        args[TOOL_LOGIN_LOG_FILE] = f"{FRAMEWORK.config['path_data']}/log/{system_plugin.package_name}.log"
         try:
             gdsaider = GDSToolAider()
             args[TOOL_GDS_TOOL_REQUEST_TOTAL] = gdsaider.get_total_records('request')
@@ -639,54 +647,21 @@ class ToolGDSTool(BasePage):
             gdsaider.delete('request', PLUGIN.ModelSetting.get_int(TOOL_GDS_TOOL_REQUEST_SPAN))
         if fp_auto:
             gdsaider.delete('fp', PLUGIN.ModelSetting.get_int(TOOL_GDS_TOOL_FP_SPAN))
-
-
-class ToolLoginLog(BasePage):
-
-    def __init__(self, plugin: PluginBase, parent: PluginModuleBase) -> None:
-        super().__init__(plugin, parent, name=TOOL_LOGIN_LOG)
-        self.db_default = {
-            TOOL_LOGIN_LOG_ENABLE: 'false',
-        }
-        self.system_route = system_plugin.logic.get_module('route')
-        self.system_route_process_command = self.system_route.process_command
-
-    def get_template_args(self) -> dict[str, Any]:
-        '''override'''
-        args = super().get_template_args()
-        args[TOOL_LOGIN_LOG_ENABLE] = PLUGIN.ModelSetting.get(TOOL_LOGIN_LOG_ENABLE).lower()
-        args['tool_login_log_file'] = f"{FRAMEWORK.config['path_data']}/log/{system_plugin.package_name}.log"
-        return args
-
-    def plugin_load(self):
-        '''override'''
-        #로그인 로그 남기기
         if PLUGIN.ModelSetting.get(TOOL_LOGIN_LOG_ENABLE).lower() == 'true':
             self.system_route.process_command = self.process_command_route_system
 
-    def process_command(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: LocalProxy) -> Response:
+    def setting_save_after(self, changes: list) -> None:
         '''override'''
-        LOGGER.debug(f'요청: {command}, {arg1}, {arg2}, {arg3}')
-        try:
-            if command == 'enable':
-                enable = arg1
-                PLUGIN.ModelSetting.set(TOOL_LOGIN_LOG_ENABLE, enable)
+        for change in changes:
+            if change == TOOL_LOGIN_LOG_ENABLE:
+                enable = PLUGIN.ModelSetting.get(TOOL_LOGIN_LOG_ENABLE)
                 if enable.lower() == 'true':
                     self.system_route.process_command = self.process_command_route_system
-                    data = '로그를 활성화 합니다.'
                 else:
                     self.system_route.process_command = self.system_route_process_command
-                    data = '로그를 비활성화 합니다.'
-                result = True
-            else:
-                result, data = False, f'알 수 없는 명령입니다: {command}'
-        except Exception as e:
-            LOGGER.error(traceback.format_exc())
-            result, data = False, str(e)
-        finally:
-            return jsonify({'success': result, 'data': data})
 
     def process_command_route_system(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: LocalProxy) -> Response:
+        '''alternative of process_command in system.route'''
         if command == 'login':
             username = arg1
             password = arg2
