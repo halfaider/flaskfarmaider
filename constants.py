@@ -63,6 +63,27 @@ SECTION_TYPES = {
     SECTION_TYPE_KEYS[3]: {'key': SECTION_TYPE_KEYS[3], 'name': '사진', 'desc': None},
 }
 
+MEDIA_TYPE_VALUES = {
+    1: 'movie',
+    2: 'show',
+    3: 'season',
+    4: 'episode',
+    5: 'trailer',
+    6: 'comic',
+    7: 'person',
+    8: 'artist',
+    9: 'album',
+    10: 'track',
+    11: 'picture',
+    12: 'clip',
+    13: 'photo',
+    14: 'photoalbum',
+    15: 'playlist',
+    16: 'playlistFolder',
+    18: 'collection',
+    42: 'optimizedVersion'
+}
+
 SETTING_DB_VERSION = f'{SETTING}_db_version'
 SETTING_RCLONE_REMOTE_ADDR = f'{SETTING}_rclone_remote_addr'
 SETTING_RCLONE_REMOTE_VFS = f'{SETTING}_rclone_remote_vfs'
@@ -80,7 +101,7 @@ SETTING_STARTUP_DEPENDENCIES = f'{SETTING}_startup_dependencies'
 SCHEDULE_WORKING_DIRECTORY = f'{SCHEDULE}_working_directory'
 SCHEDULE_LAST_LIST_OPTION = f'{SCHEDULE}_last_list_option'
 SCHEDULE_DB_VERSION = f'{SCHEDULE}_db_version'
-SCHEDULE_DB_VERSIONS = ['1', '2', '3', '4']
+SCHEDULE_DB_VERSIONS = ['1', '2', '3', '4', '5']
 
 TOOL_TRASH_TASK_STATUS = f'{TOOL}_{TOOL_TRASH}_task_status'
 TOOL_GDS_TOOL_REQUEST_SPAN = f'{TOOL}_{TOOL_GDS_TOOL}_request_span'

@@ -43,7 +43,8 @@ function init_schedule() {
     SCH_FORM_DESC = build_sch_form_text('sch-description', '설명', '', 9, '일정 목록에 표시될 제목');
     SCH_FORM_GROUP_TASK = build_sch_form_group('sch-form-group-task', [SCH_FORM_TASK, SCH_FORM_DESC, SCH_FORM_LINE]);
     SCH_FORM_PATH = build_sch_form_text_btn('sch-target-path', '로컬 경로', '', 'sch-target-path-btn', '경로 탐색', 10, '새로고침/스캔 할 경로<br>Flaskfarm에서 접근 가능한 로컬 경로');
-    SCH_FORM_GROUP_PATH = build_sch_form_group('sch-form-group-path', [SCH_FORM_PATH, SCH_FORM_LINE]);
+    SCH_FORM_SECTION = build_sch_form_select('sch-target-section', '라이브러리 섹션', [{value: -1, name: '선택 안 함'}], 5, '새로고침/스캔 할 라이브러리 섹션<br>로컬 경로와 비교하여 하위인 경로가 선택됩니다.')
+    SCH_FORM_GROUP_PATH = build_sch_form_group('sch-form-group-path', [SCH_FORM_PATH, SCH_FORM_SECTION, SCH_FORM_LINE]);
     SCH_FORM_VFS = build_sch_form_text('sch-vfs', 'VFS 리모트', '', 5, 'rclone rc로 접근 가능한 리모트 이름<br>ex. gds:');
     SCH_FORM_RECURSIVE = build_sch_form_checkbox('sch-recursive', 'recursive', 'off', 9, 'rclone refresh의 --recursive 옵션 적용 여부');
     SCH_FORM_GROUP_RCLONE = build_sch_form_group('sch-form-group-rclone', [SCH_FORM_VFS, SCH_FORM_RECURSIVE, SCH_FORM_LINE]);
@@ -79,6 +80,16 @@ function init_schedule() {
             E_PATH.val(result);
         });
     });
+    E_TARGET_SECTION = $('#sch-target-section');
+    if (SECTIONS) {
+        for (key in SECTIONS) {
+            SECTIONS[key].forEach(function(item) {
+                E_TARGET_SECTION.append(
+                    $('<option></option>').prop('value', item.id).append(item.name)
+                );
+            });
+        }
+    }
 
     E_GROUP_PATH = $('#sch-form-group-path');
     E_SCH_SETTING.append(SCH_FORM_GROUP_RCLONE);
@@ -594,6 +605,7 @@ function make_list(data) {
         col_menu += '" data-clear_section="' + (model.clear_section ? model.clear_section : -1);
         col_menu += '" data-clear_level="' + (model.clear_level ? model.clear_level : 'start1');
         col_menu += '" data-clear_type="' + (model.clear_type ? model.clear_type : SECTION_TYPE_KEYS[0]);
+        col_menu += '" data-section_id="' + model.section_id;
 
         col_menu += '">메뉴</button></td>';
 
@@ -706,11 +718,13 @@ function disabled_by_scan_mode(mode) {
         case SCAN_MODE_KEYS[2]:
             E_PATH.prop('disabled', false);
             E_PATH_BTN.prop('disabled', false);
+            E_TARGET_SECTION.prop('disabled', false);
             E_SCAN_PERIODIC_ID.prop('disabled', true);
             break;
         case SCAN_MODE_KEYS[1]:
             E_PATH.prop('disabled', true);
             E_PATH_BTN.prop('disabled', true);
+            E_TARGET_SECTION.prop('disabled', true);
             E_SCAN_PERIODIC_ID.prop('disabled', false);
             break;
     }
@@ -722,7 +736,7 @@ function set_section_list(type, target) {
         SECTIONS[type].forEach(function(item) {
             target.append(
                 $('<option></option>').prop('value', item.id).append(item.name)
-            )
+            );
         });
     } else {
         console.error('type: ' + type);
@@ -777,6 +791,7 @@ function schedule_modal(from, data) {
         set_section_list(clear_type, E_CLEAR_SECTION);
         E_CLEAR_SECTION.prop('value', data.clear_section);
         E_CLEAR_LEVEL.prop('value', data.clear_level);
+        E_TARGET_SECTION.prop('value', data.section_id);
     } else {
         // 새로 추가
         set_form_by_task(TASK_KEYS[0]);
@@ -787,7 +802,7 @@ function schedule_modal(from, data) {
             // 브라우저에서 추가
             E_PATH.prop('value', data.target);
         } else {
-            E_PATH.prop('value', '');
+            E_PATH.prop('value', '/');
         }
         E_VFS.prop('value', VFS);
         E_RECUR.bootstrapToggle('off');

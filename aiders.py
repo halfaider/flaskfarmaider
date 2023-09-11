@@ -71,51 +71,49 @@ class JobAider(Aider):
     def start_job(self, job: ModelBase) -> None:
         # bind=True, self 는 task 의 instance
         try:
+            plexmateaider = PlexmateAider()
+            rcloneaider = RcloneAider()
             if job.id and job.id > 0:
                 job.set_status(STATUS_KEYS[1])
             if job.task == TASK_KEYS[0]:
                 '''refresh_scan'''
-                plexmateaider = PlexmateAider()
-                rcloneaider = RcloneAider()
                 # refresh
                 if job.scan_mode == SCAN_MODE_KEYS[1] and job.periodic_id > 0:
                     # 주기적 스캔 작업 새로고침
                     targets = plexmateaider.get_periodic_locations(job.periodic_id)
                     for target in targets:
-                        rcloneaider.vfs_refresh(target, job.recursive, job.vfs)
+                        rcloneaider.refresh(target, job.recursive, job.vfs)
+                    plexmateaider.scan(job.scan_mode, periodic_id=job.periodic_id)
                 else:
-                    rcloneaider.vfs_refresh(job.target, job.recursive, job.vfs)
-                # scan
-                plexmateaider.scan(job.scan_mode, job.target, job.periodic_id)
+                    targets = plexmateaider.get_targets(job.target, job.section_id)
+                    for location, section_id in targets.items():
+                        rcloneaider.refresh(location, job.recursive, job.vfs)
+                        plexmateaider.scan(job.scan_mode, location, section_id=section_id)
             elif job.task == TASK_KEYS[1]:
                 '''refresh'''
-                rcloneaider = RcloneAider()
-                rcloneaider.vfs_refresh(job.target, job.recursive, job.vfs)
-                pass
+                if job.section_id and job.section_id > 0:
+                    targets = plexmateaider.get_targets(job.target, job.section_id)
+                    for location, section_id in targets.items():
+                        rcloneaider.refresh(location, job.recursive, job.vfs)
+                else:
+                    rcloneaider.refresh(job.target, job.recursive, job.vfs)
             elif job.task == TASK_KEYS[2]:
                 '''scan'''
-                plexmateaider = PlexmateAider()
-                plexmateaider.scan(job.scan_mode, job.target, job.periodic_id)
+                plexmateaider.scan(job.scan_mode, job.target, job.periodic_id, job.section_id)
             elif job.task == TASK_KEYS[3]:
                 '''pm_ready_refresh'''
                 # plexmate
-                plexmateaider = PlexmateAider()
                 plexmateaider.check_scanning(CONFIG.get_int(SETTING_PLEXMATE_MAX_SCAN_TIME))
                 plexmateaider.check_timeover(CONFIG.get(SETTING_PLEXMATE_TIMEOVER_RANGE))
                 # refresh
                 targets = {s.target for s in plexmateaider.get_scan_items('READY')}
                 if targets:
-                    rcloneaider = RcloneAider()
                     for target in targets:
-                        response = rcloneaider.vfs_refresh(target, job.recursive, job.vfs)
-                        result, reason = rcloneaider.is_successful(response)
-                        if not result:
-                            LOGGER.warning(f'새로고침 실패: [{target}]: {reason}')
+                        rcloneaider.refresh(target, job.recursive, job.vfs)
                 else:
                     LOGGER.info(f'plex_mate: 새로고침 대상이 없습니다.')
             elif job.task == TASK_KEYS[4]:
                 '''clear'''
-                plexmateaider = PlexmateAider()
                 plexmateaider.clear_section(job.clear_section, job.clear_type, job.clear_level)
             elif job.task == TASK_KEYS[5]:
                 '''startup'''
@@ -131,13 +129,11 @@ class JobAider(Aider):
                     LOGGER.warning(f'실행할 수 없는 OS 환경입니다: {platform_name}')
             elif job.task == TASK_KEYS[6]:
                 '''forget'''
-                rcloneaider = RcloneAider()
                 rcloneaider.vfs_forget(job.target, job.vfs)
             elif job.task in TOOL_TRASH_KEYS:
                 '''trash_refresh_scan'''
                 CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[1])
                 try:
-                    plexmateaider = PlexmateAider()
                     if job.task == TOOL_TRASH_KEYS[2] and \
                     CONFIG.get(TOOL_TRASH_TASK_STATUS) == STATUS_KEYS[1]:
                         plexmateaider.empty_trash(job.section_id)
@@ -145,7 +141,6 @@ class JobAider(Aider):
                         # get trash items
                         trashes: dict = plexmateaider.get_trashes(job.section_id, 1, -1)
                         paths = {Path(row['file']).parent for row in trashes}
-                        rcloneaider = RcloneAider()
                         for path in paths:
                             if CONFIG.get(TOOL_TRASH_TASK_STATUS) != STATUS_KEYS[1]:
                                 LOGGER.info(f'작업을 중지합니다.')
@@ -153,7 +148,7 @@ class JobAider(Aider):
                             if job.task == TOOL_TRASH_KEYS[0] or \
                             job.task == TOOL_TRASH_KEYS[3] or \
                             job.task == TOOL_TRASH_KEYS[4]:
-                                rcloneaider.vfs_refresh(path, job.recursive, job.vfs)
+                                rcloneaider.refresh(path, job.recursive, job.vfs)
                             if job.task == TOOL_TRASH_KEYS[1] or \
                             job.task == TOOL_TRASH_KEYS[3] or \
                             job.task == TOOL_TRASH_KEYS[4]:
@@ -345,6 +340,7 @@ class PlexmateAider(PluginAider):
         sections[SECTION_TYPE_KEYS[0]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=1)]
         sections[SECTION_TYPE_KEYS[1]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=2)]
         sections[SECTION_TYPE_KEYS[2]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=8)]
+        sections[SECTION_TYPE_KEYS[3]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=13)]
         return sections
 
     def get_periodics(self) -> list[dict[str, Any]]:
@@ -468,46 +464,37 @@ class PlexmateAider(PluginAider):
                     LOGGER.warning(f'READY 로 상태 변경: {over.id} {over.target}')
                     over.set_status('READY', save=True)
 
-    def web_scan(self, section_id: int, location: str = None) -> None:
-        section = self.plex_server.library.sectionByID(section_id)
-        max_seconds = 300
-        start = time.time()
-        section.update(path=location)
-        section.refreshing = True
-        location = location if location else 'all'
-        LOGGER.debug(f'스캔 시작: {section.title}: {location}')
-        '''
-        스캔 추적을 섹션 상태에 의존
-            다른 곳에서 동일 섹션을 스캔 시도할 경우?
-        '''
-        while section.refreshing:
-            if (time.time() - start) >= max_seconds:
-                break
-            time.sleep(1)
-            section.reload()
-        if time.time() - start > max_seconds:
-            LOGGER.warning(f'스캔 대기 시간 초과: {section.title}: {location} ... {(time.time() - start):.1f}s')
+    def get_targets(self, target: str, section_id: int = -1) -> dict[str, int]:
+        mappings = self.parse_mappings(CONFIG.get(SETTING_PLEXMATE_PLEX_MAPPING))
+        target = self.update_path(target, mappings)
+        if section_id > 0:
+            locations = self.db.select(f'SELECT library_section_id, root_path FROM section_locations WHERE library_section_id = {section_id}')
         else:
-            LOGGER.info(f'스캔 완료: {section.title}: {location} ... {(time.time() - start):.1f}s')
+            locations = self.db.select('SELECT library_section_id, root_path FROM section_locations')
+        targets = {}
+        for location in locations:
+            root = f'{location["root_path"]}/'
+            longer = target if len(target) >= len(root) else root
+            shorter = target if len(target) < len(root) else root
+            if longer.startswith(shorter):
+                targets[longer] = int(location['library_section_id'])
+        return targets
+
+    def web_scan(self, section_id: int, location: str = None) -> None:
+        '''
+        웹 스캔의 activity 추적은 정확하지 않아 명령만 전달하는 방식으로 실행
+        정확한 추적은 바이너리 스캔의 activity 옵션으로 가능해 보임
+        '''
+        section = self.plex_server.library.sectionByID(section_id)
+        section.update(path=location)
+        LOGGER.info(f'스캔 전송: {section.title}: {location}')
 
     def scan(self, scan_mode: str, target: str = None, periodic_id: int = -1, section_id: int = -1) -> None:
         if scan_mode == SCAN_MODE_KEYS[2]:
-            mappings = self.parse_mappings(CONFIG.get(SETTING_PLEXMATE_PLEX_MAPPING))
-            target = self.update_path(target, mappings)
-            if section_id > 0:
-                locations = self.db.select(f'SELECT library_section_id, root_path FROM section_locations WHERE library_section_id = {section_id}')
-            else:
-                locations = self.db.select('SELECT library_section_id, root_path FROM section_locations')
-            founds = {}
-            for location in locations:
-                root = f'{location["root_path"]}/'
-                longer = target if len(target) >= len(root) else root
-                shorter = target if len(target) < len(root) else root
-                if longer.startswith(shorter):
-                    founds[longer] = int(location['library_section_id'])
-            if founds:
-                LOGGER.debug(f'섹션 ID 검색 결과: {set(founds.values())}')
-                for location, section_id in founds.items():
+            targets = self.get_targets(target, section_id)
+            if targets:
+                LOGGER.debug(f'섹션 ID 검색 결과: {set(targets.values())}')
+                for location, section_id in targets.items():
                     self.web_scan(section_id, location)
             else:
                 LOGGER.error(f'섹션 ID를 찾을 수 없습니다: {target}')
@@ -704,6 +691,12 @@ class RcloneAider(Aider):
         if not result:
             LOGGER.error(f'캐시삭제 실패: {reason}: {local_path}')
         return response
+
+    def refresh(self, target: str, recursive: bool = False, fs: str = None) -> None:
+        response = self.vfs_refresh(target, recursive, fs)
+        result, reason = self.is_successful(response)
+        if not result:
+            LOGGER.warning(f'새로고침 실패: [{target}]: {reason}')
 
     def is_successful(self, response: Response) -> tuple[bool, str]:
         if not str(response.status_code).startswith('2'):

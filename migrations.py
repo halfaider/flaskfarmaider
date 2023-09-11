@@ -11,6 +11,8 @@ def migrate(ver: str, table, cs: sqlite3.Cursor) -> None:
         migrate_v3(cs, table)
     elif ver == '3':
         migrate_v4(cs, table)
+    elif ver == '4':
+        migrate_v5(cs, table)
 
 
 def migrate_v2(cs: sqlite3.Cursor, table: str) -> None:
@@ -110,5 +112,13 @@ def migrate_v4(cs: sqlite3.Cursor, table: str) -> None:
     LOGGER.debug('DB 버전 4 로 마이그레이션')
     try:
         cs.execute(f'ALTER TABLE "{table}" DROP COLUMN "journal"').fetchall()
+    except Exception as e:
+        LOGGER.error(e)
+
+
+def migrate_v5(cs: sqlite3.Cursor, table: str) -> None:
+    LOGGER.debug('DB 버전 5 로 마이그레이션')
+    try:
+        cs.execute(f'ALTER TABLE "{table}" ADD COLUMN "section_id" INTEGER').fetchall()
     except Exception as e:
         LOGGER.error(e)

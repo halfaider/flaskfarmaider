@@ -33,9 +33,10 @@ class Job(ModelBase):
     clear_type = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     clear_section = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
     clear_level = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    section_id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
 
     def __init__(self, task: str = '', schedule_mode: str = FF_SCHEDULE_KEYS[0], schedule_auto_start: bool = False,
-                 desc: str = '', target: str = '', recursive: bool = False,
+                 desc: str = '', target: str = '', recursive: bool = False, section_id: int = -1,
                  vfs: str = '', scan_mode: str = SCAN_MODE_KEYS[0], periodic_id: int = -1,
                  clear_type: str = '', clear_level: str = '', clear_section: int = -1):
         self.ctime = datetime.now()
@@ -53,6 +54,7 @@ class Job(ModelBase):
         self.clear_type = clear_type
         self.clear_level = clear_level
         self.clear_section = clear_section
+        self.section_id = section_id
 
     def update(self, info: dict) -> ModelBase:
         self.task = info.get('task', self.task)
@@ -67,6 +69,7 @@ class Job(ModelBase):
         self.clear_type = info.get('clear_type', self.clear_type)
         self.clear_level = info.get('clear_level', self.clear_level)
         self.clear_section = info.get('clear_section', self.clear_section)
+        self.section_id = info.get('section_id', self.section_id)
         return self
 
     @classmethod
@@ -99,9 +102,10 @@ class Job(ModelBase):
             model.clear_type = formdata.get('sch-clear-type')[0] if formdata.get('sch-clear-type') else ''
             model.clear_level = formdata.get('sch-clear-level')[0] if formdata.get('sch-clear-level') else ''
             model.clear_section = int(formdata.get('sch-clear-section')[0]) if formdata.get('sch-clear-section') else -1
+            model.section_id = int(formdata.get('sch-target-section')[0]) if formdata.get('sch-target-section') else -1
 
             def re_add(job):
-                schedule_id = JobAider.create_schedule_id(model.id)
+                schedule_id = JobAider.create_schedule_id(job.id)
                 counter = 0
                 if FRAMEWORK.scheduler.is_include(schedule_id):
                     while FRAMEWORK.scheduler.is_include(schedule_id):
@@ -109,9 +113,9 @@ class Job(ModelBase):
                         time.sleep(1)
                         if counter > 60:
                             break
-                    if model.schedule_mode == FF_SCHEDULE_KEYS[2]:
+                    if job.schedule_mode == FF_SCHEDULE_KEYS[2]:
                         LOGGER.debug(f'일정을 재등록합니다: {schedule_id}')
-                        JobAider.add_schedule(model.id)
+                        JobAider.add_schedule(job.id)
 
             th = Thread(target=re_add, args=(model,))
             th.start()
