@@ -418,7 +418,7 @@ function copy_to_clipboard(text) {
     notify('클립보드에 복사하였습니다.', 'success');
 }
 
-function browser_command(cmd) {
+async function browser_command(cmd) {
     globalSendCommand(cmd.command, cmd.path, cmd.recursive, cmd.scan_mode + "|-1", function(result) {
         if (result.success) {
             if (cmd.command == 'list') {

@@ -5,7 +5,7 @@ import time
 from threading import Thread
 
 from .aiders import JobAider
-from .setup import FRAMEWORK, PLUGIN, LOGGER, LocalProxy, Query, desc, ModelBase
+from .setup import FRAMEWORK, PLUGIN, LOGGER, LocalProxy, Query, desc, ModelBase, CONFIG
 from .constants import FF_SCHEDULE_KEYS, SCAN_MODE_KEYS, STATUS_KEYS, SCHEDULE, TASK_KEYS, TASKS
 
 
@@ -185,7 +185,7 @@ class Job(ModelBase):
                 item['is_running'] = True if FRAMEWORK.scheduler.is_running(JobAider.create_schedule_id(item['id'])) else False
                 ret['list'].append(item)
             ret['paging'] = cls.get_paging_info(count, page, page_size)
-            PLUGIN.ModelSetting.set(f'{SCHEDULE}_last_list_option', f'{order}|{page}|{search}|{option1}|{option2}')
+            CONFIG.set(f'{SCHEDULE}_last_list_option', f'{order}|{page}|{search}|{option1}|{option2}')
             return ret
         except:
             LOGGER.error(traceback.format_exc())

@@ -7,7 +7,8 @@ import sqlite3
 
 from .models import Job
 from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider
-from .setup import FRAMEWORK, PLUGIN, LOGGER, Response, render_template, jsonify, LocalProxy, PluginBase, PluginModuleBase, PluginPageBase, system_plugin, flask_login
+from .setup import Response, render_template, jsonify, LocalProxy, PluginBase, PluginModuleBase, PluginPageBase, system_plugin, flask_login
+from .setup import FRAMEWORK, PLUGIN, LOGGER, CELERY_ACTIVE, CONFIG
 from .constants import SETTING, TASK_KEYS, SCAN_MODE_KEYS, SCHEDULE, SECTION_TYPE_KEYS, STATUSES, README, TOOL, SCHEDULE_DB_VERSIONS, TOOL_LOGIN_LOG_FILE
 from .constants import TASKS, STATUS_KEYS, FF_SCHEDULE_KEYS, SCAN_MODES, SECTION_TYPES, FF_SCHEDULES, TOOL_TRASH, MANUAL, TOOL_ETC_SETTING
 from .constants import SETTING_DB_VERSION, SETTING_RCLONE_REMOTE_ADDR, SETTING_RCLONE_REMOTE_VFS, SETTING_RCLONE_REMOTE_USER, TOOL_GDS_TOOL_REQUEST_TOTAL
@@ -25,9 +26,9 @@ class Base():
 
     def set_recent_menu(self, req: LocalProxy) -> None:
         current_menu = '|'.join(req.path[1:].split('/')[1:])
-        if not current_menu == PLUGIN.ModelSetting.get('recent_menu_plugin'):
+        if not current_menu == CONFIG.get('recent_menu_plugin'):
             LOGGER.debug(f'현재 메뉴 위치 저장: {current_menu}')
-            PLUGIN.ModelSetting.set('recent_menu_plugin', current_menu)
+            CONFIG.set('recent_menu_plugin', current_menu)
 
     def get_template_args(self) -> dict[str, Any]:
         args = {
@@ -60,11 +61,18 @@ class Base():
                 'scan_mode': scan_mode,
                 'periodic_id': int(periodic_id) if periodic_id else -1,
             }
-            JobAider().start_job.apply_async((Job.get_job(info=job),))
+            self.run_async(JobAider().start_job, (Job.get_job(info=job),))
             result, msg = True, '작업을 실행했습니다.'
         else:
             result, msg = False, '경로 정보가 없습니다.'
         return result, msg
+
+    def run_async(self, func: callable, args: tuple = (), kwargs: dict = {}, **opts) -> None:
+        if CELERY_ACTIVE:
+            func.apply_async(args=args, kwargs=kwargs, **opts)
+        else:
+            th = Thread(target=func, args=args, kwargs=kwargs, daemon=True)
+            th.start()
 
 
 class BaseModule(Base, PluginModuleBase):
@@ -193,7 +201,6 @@ class BaseModule(Base, PluginModuleBase):
 
     def start_celery(self, func: callable, *args, on_message: callable = None, page: PluginPageBase = None) -> Any:
         '''override'''
-        # 결과를 기다릴 필요가 없을 경우 바로 apply_async() 사용
         if FRAMEWORK.config['use_celery']:
             result = func.apply_async(args)
             try:
@@ -336,23 +343,23 @@ class Setting(BaseModule):
         '''override'''
         super().prerender(sub, req)
         # yaml 파일 우선
-        PLUGIN.ModelSetting.set(SETTING_STARTUP_DEPENDENCIES, SettingAider().depends())
+        CONFIG.set(SETTING_STARTUP_DEPENDENCIES, SettingAider().depends())
 
     def get_template_args(self) -> dict[str, Any]:
         '''override'''
         args = super().get_template_args()
-        args[SETTING_RCLONE_REMOTE_ADDR] = PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_ADDR)
-        args[SETTING_RCLONE_REMOTE_VFS] = PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_VFS)
-        args[SETTING_RCLONE_REMOTE_USER] = PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_USER)
-        args[SETTING_RCLONE_REMOTE_PASS] = PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_PASS)
-        args[SETTING_RCLONE_MAPPING] = PLUGIN.ModelSetting.get(SETTING_RCLONE_MAPPING)
-        args[SETTING_PLEXMATE_MAX_SCAN_TIME] = PLUGIN.ModelSetting.get(SETTING_PLEXMATE_MAX_SCAN_TIME)
-        args[SETTING_PLEXMATE_TIMEOVER_RANGE] = PLUGIN.ModelSetting.get(SETTING_PLEXMATE_TIMEOVER_RANGE)
-        args[SETTING_PLEXMATE_PLEX_MAPPING] = PLUGIN.ModelSetting.get(SETTING_PLEXMATE_PLEX_MAPPING)
-        args[SETTING_STARTUP_EXECUTABLE] = PLUGIN.ModelSetting.get(SETTING_STARTUP_EXECUTABLE)
-        args[SETTING_STARTUP_COMMANDS] = PLUGIN.ModelSetting.get(SETTING_STARTUP_COMMANDS)
-        args[SETTING_STARTUP_TIMEOUT] = PLUGIN.ModelSetting.get(SETTING_STARTUP_TIMEOUT)
-        args[SETTING_STARTUP_DEPENDENCIES] = PLUGIN.ModelSetting.get(SETTING_STARTUP_DEPENDENCIES)
+        args[SETTING_RCLONE_REMOTE_ADDR] = CONFIG.get(SETTING_RCLONE_REMOTE_ADDR)
+        args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
+        args[SETTING_RCLONE_REMOTE_USER] = CONFIG.get(SETTING_RCLONE_REMOTE_USER)
+        args[SETTING_RCLONE_REMOTE_PASS] = CONFIG.get(SETTING_RCLONE_REMOTE_PASS)
+        args[SETTING_RCLONE_MAPPING] = CONFIG.get(SETTING_RCLONE_MAPPING)
+        args[SETTING_PLEXMATE_MAX_SCAN_TIME] = CONFIG.get(SETTING_PLEXMATE_MAX_SCAN_TIME)
+        args[SETTING_PLEXMATE_TIMEOVER_RANGE] = CONFIG.get(SETTING_PLEXMATE_TIMEOVER_RANGE)
+        args[SETTING_PLEXMATE_PLEX_MAPPING] = CONFIG.get(SETTING_PLEXMATE_PLEX_MAPPING)
+        args[SETTING_STARTUP_EXECUTABLE] = CONFIG.get(SETTING_STARTUP_EXECUTABLE)
+        args[SETTING_STARTUP_COMMANDS] = CONFIG.get(SETTING_STARTUP_COMMANDS)
+        args[SETTING_STARTUP_TIMEOUT] = CONFIG.get(SETTING_STARTUP_TIMEOUT)
+        args[SETTING_STARTUP_DEPENDENCIES] = CONFIG.get(SETTING_STARTUP_DEPENDENCIES)
         return args
 
     def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: LocalProxy) -> Response:
@@ -380,7 +387,7 @@ class Setting(BaseModule):
         '''override'''
         for change in changes:
             if change == f'{self.name}_startup_dependencies':
-                SettingAider().depends(PLUGIN.ModelSetting.get(SETTING_STARTUP_DEPENDENCIES))
+                SettingAider().depends(CONFIG.get(SETTING_STARTUP_DEPENDENCIES))
 
 
 class Schedule(BaseModule):
@@ -397,11 +404,11 @@ class Schedule(BaseModule):
     def migration(self):
         '''override'''
         with FRAMEWORK.app.app_context():
-            set_db_ver = PLUGIN.ModelSetting.get(SETTING_DB_VERSION)
+            set_db_ver = CONFIG.get(SETTING_DB_VERSION)
             if set_db_ver:
-                current_db_ver = PLUGIN.ModelSetting.get(SETTING_DB_VERSION)
+                current_db_ver = CONFIG.get(SETTING_DB_VERSION)
             else:
-                current_db_ver = PLUGIN.ModelSetting.get(SCHEDULE_DB_VERSION)
+                current_db_ver = CONFIG.get(SCHEDULE_DB_VERSION)
             db_file = FRAMEWORK.app.config['SQLALCHEMY_BINDS'][PLUGIN.package_name].replace('sqlite:///', '').split('?')[0]
             LOGGER.debug(f'DB 버전: {current_db_ver}')
             with sqlite3.connect(db_file) as conn:
@@ -416,15 +423,15 @@ class Schedule(BaseModule):
                 conn.commit()
                 FRAMEWORK.db.session.flush()
             LOGGER.debug(f'최종 DB 버전: {current_db_ver}')
-            PLUGIN.ModelSetting.set(SCHEDULE_DB_VERSION, current_db_ver)
-            PLUGIN.ModelSetting.set(SETTING_DB_VERSION, '')
+            CONFIG.set(SCHEDULE_DB_VERSION, current_db_ver)
+            CONFIG.set(SETTING_DB_VERSION, '')
 
     def get_template_args(self) -> dict[str, Any]:
         '''override'''
         args = super().get_template_args()
-        args[f'{self.name}_working_directory'] = PLUGIN.ModelSetting.get(SCHEDULE_WORKING_DIRECTORY)
-        args[f'{self.name}_last_list_option'] = PLUGIN.ModelSetting.get(SCHEDULE_LAST_LIST_OPTION)
-        args['rclone_remote_vfs'] = PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_VFS)
+        args[f'{self.name}_working_directory'] = CONFIG.get(SCHEDULE_WORKING_DIRECTORY)
+        args[f'{self.name}_last_list_option'] = CONFIG.get(SCHEDULE_LAST_LIST_OPTION)
+        args['rclone_remote_vfs'] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
         try:
             plexmateaider = PlexmateAider()
             args['periodics'] = plexmateaider.get_periodics()
@@ -453,7 +460,7 @@ class Schedule(BaseModule):
             if command == 'list':
                 browseraider = BrowserAider()
                 dir_list = json.dumps(browseraider.get_dir(arg1))
-                PLUGIN.ModelSetting.set(SCHEDULE_WORKING_DIRECTORY, arg1)
+                CONFIG.set(SCHEDULE_WORKING_DIRECTORY, arg1)
                 if dir_list:
                     result, data = True, dir_list
                 else:
@@ -471,7 +478,7 @@ class Schedule(BaseModule):
                 else:
                     result, data = False, f'삭제할 수 없습니다: ID {arg1}'
             elif command == 'execute':
-                JobAider().start_job.apply_async((Job.get_job(int(arg1)),))
+                self.run_async(JobAider.start_job, (Job.get_job(int(arg1)),))
                 result, data = True, '일정을 실행헀습니다.'
             elif command == 'schedule':
                 active = True if arg2.lower() == 'true' else False
@@ -494,7 +501,7 @@ class Schedule(BaseModule):
         jobaider = JobAider()
         for job in jobs:
             if job.schedule_mode == FF_SCHEDULE_KEYS[1]:
-                JobAider().start_job.apply_async((job,))
+                self.run_async(JobAider().start_job, (job,))
             elif job.schedule_mode == FF_SCHEDULE_KEYS[2] and job.schedule_auto_start:
                 jobaider.add_schedule(job.id)
 
@@ -551,14 +558,14 @@ class ToolTrash(BasePage):
         args['tool_trash_keys'] = TOOL_TRASH_KEYS
         args['tool_trashes'] = TOOL_TRASHES
         args['status_keys'] = STATUS_KEYS
-        args[TOOL_TRASH_TASK_STATUS.lower()] = PLUGIN.ModelSetting.get(TOOL_TRASH_TASK_STATUS)
+        args[TOOL_TRASH_TASK_STATUS.lower()] = CONFIG.get(TOOL_TRASH_TASK_STATUS)
         return args
 
     def process_command(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: LocalProxy) -> Response:
         '''override'''
         LOGGER.debug(f'요청: {command}, {arg1}, {arg2}, {arg3}')
         try:
-            status = PLUGIN.ModelSetting.get(TOOL_TRASH_TASK_STATUS)
+            status = CONFIG.get(TOOL_TRASH_TASK_STATUS)
             if command == 'status':
                 result, data = True, status
             elif command == 'list':
@@ -569,7 +576,7 @@ class ToolTrash(BasePage):
                 result, data = True, plexmateaider.get_trash_list(section_id, page_no, limit)
             elif command == 'stop':
                 if status == STATUS_KEYS[1] or status == STATUS_KEYS[3]:
-                    PLUGIN.ModelSetting.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[3])
+                    CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[3])
                     result, data = True, "작업을 멈추는 중입니다."
                 else:
                     result, data = False, "실행중이 아닙니다."
@@ -585,7 +592,7 @@ class ToolTrash(BasePage):
                         job = Job.get_job()
                         job.task = command
                         job.section_id = int(arg1)
-                        JobAider().start_job.apply_async((job,))
+                        self.run_async(JobAider().start_job, (job,))
                         result, data = True, f'작업을 실행했습니다.'
                     else:
                         result, data = False, '작업이 실행중입니다.'
@@ -617,11 +624,11 @@ class ToolEtcSetting(BasePage):
     def get_template_args(self) -> dict[str, Any]:
         '''override'''
         args = super().get_template_args()
-        args[TOOL_GDS_TOOL_REQUEST_SPAN] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_REQUEST_SPAN)
-        args[TOOL_GDS_TOOL_REQUEST_AUTO] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_REQUEST_AUTO)
-        args[TOOL_GDS_TOOL_FP_SPAN] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_FP_SPAN)
-        args[TOOL_GDS_TOOL_FP_AUTO] = PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_FP_AUTO)
-        args[TOOL_LOGIN_LOG_ENABLE] = PLUGIN.ModelSetting.get(TOOL_LOGIN_LOG_ENABLE).lower()
+        args[TOOL_GDS_TOOL_REQUEST_SPAN] = CONFIG.get(TOOL_GDS_TOOL_REQUEST_SPAN)
+        args[TOOL_GDS_TOOL_REQUEST_AUTO] = CONFIG.get(TOOL_GDS_TOOL_REQUEST_AUTO)
+        args[TOOL_GDS_TOOL_FP_SPAN] = CONFIG.get(TOOL_GDS_TOOL_FP_SPAN)
+        args[TOOL_GDS_TOOL_FP_AUTO] = CONFIG.get(TOOL_GDS_TOOL_FP_AUTO)
+        args[TOOL_LOGIN_LOG_ENABLE] = CONFIG.get(TOOL_LOGIN_LOG_ENABLE).lower()
         args[TOOL_LOGIN_LOG_FILE] = f"{FRAMEWORK.config['path_data']}/log/{system_plugin.package_name}.log"
         try:
             gdsaider = GDSToolAider()
@@ -652,21 +659,21 @@ class ToolEtcSetting(BasePage):
 
     def plugin_load(self):
         '''override'''
-        request_auto = True if PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_REQUEST_AUTO).lower() == 'true' else False
-        fp_auto = True if PLUGIN.ModelSetting.get(TOOL_GDS_TOOL_FP_AUTO).lower() == 'true' else False
+        request_auto = True if CONFIG.get(TOOL_GDS_TOOL_REQUEST_AUTO).lower() == 'true' else False
+        fp_auto = True if CONFIG.get(TOOL_GDS_TOOL_FP_AUTO).lower() == 'true' else False
         gdsaider = GDSToolAider()
         if request_auto:
-            gdsaider.delete('request', PLUGIN.ModelSetting.get_int(TOOL_GDS_TOOL_REQUEST_SPAN))
+            gdsaider.delete('request', CONFIG.get_int(TOOL_GDS_TOOL_REQUEST_SPAN))
         if fp_auto:
-            gdsaider.delete('fp', PLUGIN.ModelSetting.get_int(TOOL_GDS_TOOL_FP_SPAN))
-        if PLUGIN.ModelSetting.get(TOOL_LOGIN_LOG_ENABLE).lower() == 'true':
+            gdsaider.delete('fp', CONFIG.get_int(TOOL_GDS_TOOL_FP_SPAN))
+        if CONFIG.get(TOOL_LOGIN_LOG_ENABLE).lower() == 'true':
             self.system_route.process_command = self.process_command_route_system
 
     def setting_save_after(self, changes: list) -> None:
         '''override'''
         for change in changes:
             if change == TOOL_LOGIN_LOG_ENABLE:
-                enable = PLUGIN.ModelSetting.get(TOOL_LOGIN_LOG_ENABLE)
+                enable = CONFIG.get(TOOL_LOGIN_LOG_ENABLE)
                 if enable.lower() == 'true':
                     self.system_route.process_command = self.process_command_route_system
                 else:

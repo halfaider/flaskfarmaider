@@ -17,7 +17,7 @@ import locale
 import requests
 from requests import Response
 
-from .setup import FRAMEWORK, PLUGIN, LOGGER, PluginModuleBase, ModelBase, FrameworkJob, PlexServer, DEPEND_USER_YAML
+from .setup import FRAMEWORK, PLUGIN, LOGGER, PluginModuleBase, ModelBase, FrameworkJob, PlexServer, DEPEND_USER_YAML, CONFIG
 from .constants import TASK_KEYS, SCAN_MODE_KEYS, DEPEND_SOURCE_YAML, SECTION_TYPE_KEYS
 from .constants import SETTING_PLEXMATE_MAX_SCAN_TIME, SETTING_PLEXMATE_TIMEOVER_RANGE, SETTING_RCLONE_REMOTE_VFS, SETTING_STARTUP_EXECUTABLE
 from .constants import SETTING_RCLONE_REMOTE_ADDR, SETTING_RCLONE_REMOTE_USER, SETTING_RCLONE_REMOTE_PASS, SETTING_RCLONE_MAPPING
@@ -100,8 +100,8 @@ class JobAider(Aider):
                 '''pm_ready_refresh'''
                 # plexmate
                 plexmateaider = PlexmateAider()
-                plexmateaider.check_scanning(PLUGIN.ModelSetting.get_int(SETTING_PLEXMATE_MAX_SCAN_TIME))
-                plexmateaider.check_timeover(PLUGIN.ModelSetting.get(SETTING_PLEXMATE_TIMEOVER_RANGE))
+                plexmateaider.check_scanning(CONFIG.get_int(SETTING_PLEXMATE_MAX_SCAN_TIME))
+                plexmateaider.check_timeover(CONFIG.get(SETTING_PLEXMATE_TIMEOVER_RANGE))
                 # refresh
                 targets = {s.target for s in plexmateaider.get_scan_items('READY')}
                 if targets:
@@ -135,11 +135,11 @@ class JobAider(Aider):
                 rcloneaider.vfs_forget(job.target, job.vfs)
             elif job.task in TOOL_TRASH_KEYS:
                 '''trash_refresh_scan'''
-                PLUGIN.ModelSetting.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[1])
+                CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[1])
                 try:
                     plexmateaider = PlexmateAider()
                     if job.task == TOOL_TRASH_KEYS[2] and \
-                    PLUGIN.ModelSetting.get(TOOL_TRASH_TASK_STATUS) == STATUS_KEYS[1]:
+                    CONFIG.get(TOOL_TRASH_TASK_STATUS) == STATUS_KEYS[1]:
                         plexmateaider.empty_trash(job.section_id)
                     else:
                         # get trash items
@@ -147,7 +147,7 @@ class JobAider(Aider):
                         paths = {Path(row['file']).parent for row in trashes}
                         rcloneaider = RcloneAider()
                         for path in paths:
-                            if PLUGIN.ModelSetting.get(TOOL_TRASH_TASK_STATUS) != STATUS_KEYS[1]:
+                            if CONFIG.get(TOOL_TRASH_TASK_STATUS) != STATUS_KEYS[1]:
                                 LOGGER.info(f'작업을 중지합니다.')
                                 break
                             if job.task == TOOL_TRASH_KEYS[0] or \
@@ -159,12 +159,12 @@ class JobAider(Aider):
                             job.task == TOOL_TRASH_KEYS[4]:
                                 plexmateaider.scan(SCAN_MODE_KEYS[2], str(path), -1, job.section_id)
                         if job.task == TOOL_TRASH_KEYS[4] and \
-                        PLUGIN.ModelSetting.get(TOOL_TRASH_TASK_STATUS) == STATUS_KEYS[1]:
+                        CONFIG.get(TOOL_TRASH_TASK_STATUS) == STATUS_KEYS[1]:
                             plexmateaider.empty_trash(job.section_id)
                 except:
                     LOGGER.error(traceback.format_exc())
                 finally:
-                    PLUGIN.ModelSetting.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[0])
+                    CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[0])
         except:
             LOGGER.error(traceback.format_exc())
         finally:
@@ -492,7 +492,7 @@ class PlexmateAider(PluginAider):
 
     def scan(self, scan_mode: str, target: str = None, periodic_id: int = -1, section_id: int = -1) -> None:
         if scan_mode == SCAN_MODE_KEYS[2]:
-            mappings = self.parse_mappings(PLUGIN.ModelSetting.get(SETTING_PLEXMATE_PLEX_MAPPING))
+            mappings = self.parse_mappings(CONFIG.get(SETTING_PLEXMATE_PLEX_MAPPING))
             target = self.update_path(target, mappings)
             if section_id > 0:
                 locations = self.db.select(f'SELECT library_section_id, root_path FROM section_locations WHERE library_section_id = {section_id}')
@@ -634,14 +634,14 @@ class RcloneAider(Aider):
         LOGGER.debug(f'{command}: {data}')
         return self.request(
             "JSON",
-            f'{PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_ADDR)}/{command}',
+            f'{CONFIG.get(SETTING_RCLONE_REMOTE_ADDR)}/{command}',
             data=data,
-            auth=(PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_USER), PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_PASS))
+            auth=(CONFIG.get(SETTING_RCLONE_REMOTE_USER), CONFIG.get(SETTING_RCLONE_REMOTE_PASS))
         )
 
     def _vfs_refresh(self, remote_path: str, recursive: bool = False, fs: str = None, forget: bool = False) -> Response:
         data = {
-            'fs': fs or PLUGIN.ModelSetting.get(SETTING_RCLONE_REMOTE_VFS),
+            'fs': fs or CONFIG.get(SETTING_RCLONE_REMOTE_VFS),
             'dir': remote_path
         }
         if forget:
@@ -676,7 +676,7 @@ class RcloneAider(Aider):
             while not test_dirs[-1].exists():
                 test_dirs.append(test_dirs[-1].parent)
             LOGGER.debug(f"경로 검사: {str(test_dirs)}")
-            mappings = self.parse_mappings(PLUGIN.ModelSetting.get(SETTING_RCLONE_MAPPING))
+            mappings = self.parse_mappings(CONFIG.get(SETTING_RCLONE_MAPPING))
             while test_dirs:
                 # vfs/refresh 후
                 response = self._vfs_refresh(self.update_path(str(test_dirs[-1]), mappings), recursive, fs)
@@ -698,7 +698,7 @@ class RcloneAider(Aider):
         return response
 
     def vfs_forget(self, local_path: str, fs: str = None) -> Response:
-        mappings = self.parse_mappings(PLUGIN.ModelSetting.get(SETTING_RCLONE_MAPPING))
+        mappings = self.parse_mappings(CONFIG.get(SETTING_RCLONE_MAPPING))
         response = self._vfs_refresh(self.update_path(local_path, mappings), fs=fs, forget=True)
         result, reason = self.is_successful(response)
         if not result:
@@ -735,7 +735,7 @@ class StatupAider(Aider):
                 stdout: int = subprocess.PIPE, stderr: int = subprocess.STDOUT,
                 encoding: str = locale.getpreferredencoding(),
                 **kwds: dict[str, Any]) -> CompletedProcess:
-        startup_executable = PLUGIN.ModelSetting.get(SETTING_STARTUP_EXECUTABLE)
+        startup_executable = CONFIG.get(SETTING_STARTUP_EXECUTABLE)
         startup_executable = True if startup_executable.lower() == 'true' else False
         if not startup_executable:
             msg = f'실행이 허용되지 않았어요.'
@@ -758,7 +758,7 @@ class StatupAider(Aider):
         require_plugins, require_packages, require_commands = self.get_require_plugins(plugins_installed, depends)
 
         # 1. Commands from the setting
-        executable_commands = PLUGIN.ModelSetting.get(SETTING_STARTUP_COMMANDS).splitlines()
+        executable_commands = CONFIG.get(SETTING_STARTUP_COMMANDS).splitlines()
         # 2. Commands of installing required packages
         executable_commands.extend(self.get_commands_from_packages(require_packages))
         # 3. Commands from plugin dependencies
@@ -774,12 +774,12 @@ class StatupAider(Aider):
         self.execute(executable_commands, require_plugins, depends)
 
     def execute(self, commands: list[str], require_plugins: set[str] = {}, depends: dict[str, Any] = {}) -> None:
-        startup_executable = PLUGIN.ModelSetting.get(SETTING_STARTUP_EXECUTABLE)
+        startup_executable = CONFIG.get(SETTING_STARTUP_EXECUTABLE)
         startup_executable = True if startup_executable.lower() == 'true' else False
         if startup_executable:
             for command in commands:
                 command = shlex.split(command)
-                result: CompletedProcess = self.sub_run(*command, timeout=PLUGIN.ModelSetting.get_int(SETTING_STARTUP_TIMEOUT))
+                result: CompletedProcess = self.sub_run(*command, timeout=CONFIG.get_int(SETTING_STARTUP_TIMEOUT))
                 if result.returncode == 0:
                     msg = '성공'
                 else:

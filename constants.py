@@ -91,3 +91,42 @@ TOOL_GDS_TOOL_FP_AUTO = f'{TOOL}_{TOOL_GDS_TOOL}_fp_auto'
 TOOL_GDS_TOOL_FP_TOTAL = f'{TOOL}_{TOOL_GDS_TOOL}_fp_total'
 TOOL_LOGIN_LOG_ENABLE = f'{TOOL}_{TOOL_LOGIN_LOG}_enable'
 TOOL_LOGIN_LOG_FILE = f'{TOOL}_{TOOL_LOGIN_LOG}_file'
+
+OPTS = {
+    'filepath' : __file__,
+    'use_db': True,
+    'use_default_setting': True,
+    'home_module': SCHEDULE,
+    'menu': {
+        'uri': __package__,
+        'name': 'FLASKFARMAIDER',
+        'list': [
+            {
+                'uri': SETTING,
+                'name': '설정',
+            },
+            {
+                'uri': SCHEDULE,
+                'name': '일정',
+            },
+            {
+                'uri': TOOL,
+                'name': '도구',
+                'list': [
+                    {'uri': TOOL_TRASH, 'name': 'Plex 휴지통 스캔'},
+                    {'uri': TOOL_ETC_SETTING, 'name': '기타 설정'},
+                ]
+            },
+            {
+                'uri': MANUAL,
+                'name': '도움말',
+            },
+            {
+                'uri': LOG,
+                'name': '로그',
+            },
+        ]
+    },
+    'setting_menu': None,
+    'default_route': 'normal',
+}
