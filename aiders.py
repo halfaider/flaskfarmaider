@@ -504,10 +504,10 @@ class PlexmateAider(PluginAider):
                 longer = target if len(target) >= len(root) else root
                 shorter = target if len(target) < len(root) else root
                 if longer.startswith(shorter):
-                    founds[int(location['library_section_id'])] = longer
+                    founds[longer] = int(location['library_section_id'])
             if founds:
-                LOGGER.debug(f'섹션 ID 검색 결과: {list(founds.keys())}')
-                for section_id, location in founds.items():
+                LOGGER.debug(f'섹션 ID 검색 결과: {set(founds.values())}')
+                for location, section_id in founds.items():
                     self.web_scan(section_id, location)
             else:
                 LOGGER.error(f'섹션 ID를 찾을 수 없습니다: {target}')
