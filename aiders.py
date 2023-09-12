@@ -68,7 +68,7 @@ class JobAider(Aider):
         super().__init__()
 
     @FRAMEWORK.celery.task(bind=True)
-    def start_job(self, job: ModelBase) -> None:
+    def start_job(self, job: ModelBase) -> dict:
         # bind=True, self 는 task 의 instance
         try:
             plexmateaider = PlexmateAider()
@@ -82,21 +82,21 @@ class JobAider(Aider):
                     # 주기적 스캔 작업 새로고침
                     targets = plexmateaider.get_periodic_locations(job.periodic_id)
                     for target in targets:
-                        rcloneaider.refresh(target, job.recursive, job.vfs)
+                        rcloneaider.vfs_refresh(target, job.recursive, job.vfs)
                     plexmateaider.scan(job.scan_mode, periodic_id=job.periodic_id)
                 else:
                     targets = plexmateaider.get_targets(job.target, job.section_id)
                     for location, section_id in targets.items():
-                        rcloneaider.refresh(location, job.recursive, job.vfs)
+                        rcloneaider.vfs_refresh(location, job.recursive, job.vfs)
                         plexmateaider.scan(job.scan_mode, location, section_id=section_id)
             elif job.task == TASK_KEYS[1]:
                 '''refresh'''
                 if job.section_id and job.section_id > 0:
                     targets = plexmateaider.get_targets(job.target, job.section_id)
                     for location, section_id in targets.items():
-                        rcloneaider.refresh(location, job.recursive, job.vfs)
+                        rcloneaider.vfs_refresh(location, job.recursive, job.vfs)
                 else:
-                    rcloneaider.refresh(job.target, job.recursive, job.vfs)
+                    rcloneaider.vfs_refresh(job.target, job.recursive, job.vfs)
             elif job.task == TASK_KEYS[2]:
                 '''scan'''
                 plexmateaider.scan(job.scan_mode, job.target, job.periodic_id, job.section_id)
@@ -109,7 +109,7 @@ class JobAider(Aider):
                 targets = {s.target for s in plexmateaider.get_scan_items('READY')}
                 if targets:
                     for target in targets:
-                        rcloneaider.refresh(target, job.recursive, job.vfs)
+                        rcloneaider.vfs_refresh(target, job.recursive, job.vfs)
                 else:
                     LOGGER.info(f'plex_mate: 새로고침 대상이 없습니다.')
             elif job.task == TASK_KEYS[4]:
@@ -148,7 +148,7 @@ class JobAider(Aider):
                             if job.task == TOOL_TRASH_KEYS[0] or \
                             job.task == TOOL_TRASH_KEYS[3] or \
                             job.task == TOOL_TRASH_KEYS[4]:
-                                rcloneaider.refresh(path, job.recursive, job.vfs)
+                                rcloneaider.vfs_refresh(path, job.recursive, job.vfs)
                             if job.task == TOOL_TRASH_KEYS[1] or \
                             job.task == TOOL_TRASH_KEYS[3] or \
                             job.task == TOOL_TRASH_KEYS[4]:
@@ -165,6 +165,9 @@ class JobAider(Aider):
         finally:
             if job.id and job.id > 0:
                 job.set_status(STATUS_KEYS[2])
+            job = job.as_dict()
+            job['msg'] = f'작업이 끝났습니다.'
+            return job
 
     @classmethod
     def create_schedule_id(cls, job_id: int, middle: str = SCHEDULE) -> str:
@@ -178,7 +181,7 @@ class JobAider(Aider):
             schedule_id = cls.create_schedule_id(job.id)
             if not FRAMEWORK.scheduler.is_include(schedule_id):
                 sch_mod = PLUGIN.logic.get_module(SCHEDULE)
-                sch = FrameworkJob(__package__, schedule_id, job.schedule_interval, sch_mod.start_celery, job.desc, args=(cls.start_job, job))
+                sch = FrameworkJob(__package__, schedule_id, job.schedule_interval, sch_mod.run_async, job.desc, args=(cls.start_job, (job,)))
                 FRAMEWORK.scheduler.add_job_instance(sch)
             return True
         except Exception as e:
@@ -192,18 +195,17 @@ class JobAider(Aider):
         is_include = FRAMEWORK.scheduler.is_include(schedule_id)
         job = Job.get_by_id(job_id)
         schedule_mode = job.schedule_mode if job else FF_SCHEDULE_KEYS[0]
-        if schedule_mode == FF_SCHEDULE_KEYS[2]:
-            if active and is_include:
-                result, data = False, f'이미 일정에 등록되어 있습니다.'
-            elif active and not is_include:
-                result = cls.add_schedule(job_id)
-                data = '일정에 등록했습니다.' if result else '일정에 등록하지 못했어요.'
-            elif not active and is_include:
-                result, data = FRAMEWORK.scheduler.remove_job(schedule_id), '일정에서 제외했습니다.'
-            else:
-                result, data = False, '등록되지 않은 일정입니다.'
+        if active and is_include:
+            result, data = False, f'이미 일정에 등록되어 있습니다.'
+        elif not active and is_include:
+            result, data = FRAMEWORK.scheduler.remove_job(schedule_id), '일정에서 제외했습니다.'
+        elif not active and not is_include:
+            result, data = False, '등록되지 않은 일정입니다.'
+        elif active and not is_include and schedule_mode == FF_SCHEDULE_KEYS[2]:
+            result = cls.add_schedule(job_id)
+            data = '일정에 등록했습니다.' if result else '일정에 등록하지 못했어요.'
         else:
-            result, data = False, f'등록할 수 없는 일정 방식입니다.'
+            result, data = False, '등록할 수 없는 일정 방식입니다.'
         return result, data
 
 
@@ -691,12 +693,6 @@ class RcloneAider(Aider):
         if not result:
             LOGGER.error(f'캐시삭제 실패: {reason}: {local_path}')
         return response
-
-    def refresh(self, target: str, recursive: bool = False, fs: str = None) -> None:
-        response = self.vfs_refresh(target, recursive, fs)
-        result, reason = self.is_successful(response)
-        if not result:
-            LOGGER.warning(f'새로고침 실패: [{target}]: {reason}')
 
     def is_successful(self, response: Response) -> tuple[bool, str]:
         if not str(response.status_code).startswith('2'):

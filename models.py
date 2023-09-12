@@ -1,8 +1,6 @@
 from datetime import datetime
 import traceback
 from typing import Any
-import time
-from threading import Thread
 
 from .aiders import JobAider
 from .setup import FRAMEWORK, PLUGIN, LOGGER, LocalProxy, Query, desc, ModelBase, CONFIG
@@ -104,21 +102,6 @@ class Job(ModelBase):
             model.clear_section = int(formdata.get('sch-clear-section')[0]) if formdata.get('sch-clear-section') else -1
             model.section_id = int(formdata.get('sch-target-section')[0]) if formdata.get('sch-target-section') else -1
 
-            def re_add(job):
-                schedule_id = JobAider.create_schedule_id(job.id)
-                counter = 0
-                if FRAMEWORK.scheduler.is_include(schedule_id):
-                    while FRAMEWORK.scheduler.is_include(schedule_id):
-                        FRAMEWORK.scheduler.remove_job(schedule_id)
-                        time.sleep(1)
-                        if counter > 60:
-                            break
-                    if job.schedule_mode == FF_SCHEDULE_KEYS[2]:
-                        LOGGER.debug(f'일정을 재등록합니다: {schedule_id}')
-                        JobAider.add_schedule(job.id)
-
-            th = Thread(target=re_add, args=(model,))
-            th.start()
             model.save()
         except:
             LOGGER.error(traceback.format_exc())
@@ -134,6 +117,7 @@ class Job(ModelBase):
             job = Job().update(info)
         else:
             job = Job()
+            job.id = id
         return job
 
     @classmethod

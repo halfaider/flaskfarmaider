@@ -202,6 +202,16 @@ function init_schedule() {
         recursive: false,
         scan_mode: SCAN_MODE_KEYS[0],
     });
+
+    socket = io.connect(window.location.href)
+    socket.on('result', function(data) {
+        if (data) {
+            if (data.data.msg) {
+                notify(data.data.msg, 'info');
+            }
+            toggle_schedule_status(data.data.id, data.data.status);
+        }
+    });
 }
 
 function init_trash() {
@@ -587,7 +597,7 @@ function make_list(data) {
             col_switch += '" type="checkbox" ' + ((model.is_include) ? 'checked' : '');
             col_switch += ' data-toggle="toggle" class="sch-switch" /></td>';
         }
-        col_status = '<td class="text-center">' + ((model.status == STATUS_KEYS[1]) ? '<sapn class="text-warning">실행중</span>' : '<span>대기중</span>') + '</td>';
+        col_status = '<td class="text-center">' + ((model.status == STATUS_KEYS[1]) ? '<span class="text-warning status">실행중</span>' : '<span class="status">대기중</span>') + '</td>';
         col_ftime = '<td class="text-center">' + model.ftime + '</td>';
 
         col_menu = '<td class="text-center"><button type="button" class="btn btn-outline-primary sch-context-menu"';
@@ -687,15 +697,28 @@ function make_list(data) {
                     confirm_modal('일정을 실행할까요?',
                         'ID: ' + data.id + '<br />작업: ' + TASKS[data.task].name + '<br />내용: ' + data.desc,
                         function() {
-                        globalSendCommand("execute", data.id, null, null, function(result) {
-                            globalRequestSearch('1');
-                            notify(result.data, result.success ? 'success' : 'warning');
-                        });
-                    });
+                            toggle_schedule_status(data.id, STATUS_KEYS[1]);
+                            globalSendCommand("execute", data.id, null, null, function(result) {
+                                //globalRequestSearch('1');
+                                notify(result.data, result.success ? 'success' : 'warning');
+                            });
+                        }
+                    );
                 }
             },
         },
     });
+}
+
+function toggle_schedule_status(id, status) {
+    element = $('#list-' + id + ' span.status:first');
+    if (status == STATUS_KEYS[0]) {
+        element.prop('class', 'status');
+        element.text('대기중');
+    } else {
+        element.prop('class', 'status text-warning');
+        element.text('실행중');
+    }
 }
 
 function disabled_by_schedule_mode(mode) {

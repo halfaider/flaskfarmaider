@@ -13,6 +13,8 @@ def migrate(ver: str, table, cs: sqlite3.Cursor) -> None:
         migrate_v4(cs, table)
     elif ver == '4':
         migrate_v5(cs, table)
+    elif ver == '5':
+        migrate_v6(cs, table)
 
 
 def migrate_v2(cs: sqlite3.Cursor, table: str) -> None:
@@ -119,6 +121,16 @@ def migrate_v4(cs: sqlite3.Cursor, table: str) -> None:
 def migrate_v5(cs: sqlite3.Cursor, table: str) -> None:
     LOGGER.debug('DB 버전 5 로 마이그레이션')
     try:
-        cs.execute(f'ALTER TABLE "{table}" ADD COLUMN "section_id" INTEGER').fetchall()
+        cs.execute(f'ALTER TABLE "{table}" ADD COLUMN "section_id" INTEGER DEFAULT -1 NOT NULL').fetchall()
+    except Exception as e:
+        LOGGER.error(e)
+
+
+def migrate_v6(cs: sqlite3.Cursor, table: str) -> None:
+    try:
+        rows = cs.execute(f'SELECT id, section_id FROM {table}').fetchall()
+        for row in rows:
+            if not row['section_id']:
+                cs.execute(f'UPDATE {table} SET section_id = -1 WHERE id = {row["id"]}').fetchall()
     except Exception as e:
         LOGGER.error(e)

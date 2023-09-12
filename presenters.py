@@ -4,11 +4,12 @@ from typing import Any
 from urllib.parse import parse_qs
 from threading import Thread
 import sqlite3
+import time
 
 from .models import Job
 from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider
 from .setup import Response, render_template, jsonify, LocalProxy, PluginBase, PluginModuleBase, PluginPageBase, system_plugin, flask_login
-from .setup import FRAMEWORK, PLUGIN, LOGGER, CELERY_ACTIVE, CONFIG
+from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG, default_route_socketio_module
 from .constants import SETTING, TASK_KEYS, SCAN_MODE_KEYS, SCHEDULE, SECTION_TYPE_KEYS, STATUSES, README, TOOL, SCHEDULE_DB_VERSIONS, TOOL_LOGIN_LOG_FILE
 from .constants import TASKS, STATUS_KEYS, FF_SCHEDULE_KEYS, SCAN_MODES, SECTION_TYPES, FF_SCHEDULES, TOOL_TRASH, MANUAL, TOOL_ETC_SETTING
 from .constants import SETTING_DB_VERSION, SETTING_RCLONE_REMOTE_ADDR, SETTING_RCLONE_REMOTE_VFS, SETTING_RCLONE_REMOTE_USER, TOOL_GDS_TOOL_REQUEST_TOTAL
@@ -19,15 +20,40 @@ from .constants import TOOL_GDS_TOOL_REQUEST_SPAN, TOOL_GDS_TOOL_REQUEST_AUTO, T
 from . import migrations
 
 
+class ThreadHasReturn(Thread):
+
+    def __init__(self, group=None, target: callable = None, name: str = None, args: tuple | list = (), kwargs: dict = {}, daemon: bool = None, callback: callable = None):
+        Thread.__init__(self, group, target, name, args, kwargs, daemon=daemon)
+        self._return = None
+        self.callback = callback
+
+    def run(self) -> None:
+        if self._target:
+            self._return = self._target(*self._args, **self._kwargs)
+        if self.callback:
+            self.callback(self.get_return())
+
+    def join(self, *args) -> dict:
+        Thread.join(self, *args)
+        return self.get_return()
+
+    def get_return(self) -> dict:
+        # celery status: SUCCESS, STARTED, REVOKED, RETRY, RECEIVED, PENDING, FAILURE
+        return {
+            'status': 'SUCCESS',
+            'result': self._return,
+        }
+
+
 class Base():
 
     def __init__(self, *args, **kwds) -> None:
         super().__init__(*args, **kwds)
+        default_route_socketio_module(self)
 
     def set_recent_menu(self, req: LocalProxy) -> None:
         current_menu = '|'.join(req.path[1:].split('/')[1:])
         if not current_menu == CONFIG.get('recent_menu_plugin'):
-            LOGGER.debug(f'현재 메뉴 위치 저장: {current_menu}')
             CONFIG.set('recent_menu_plugin', current_menu)
 
     def get_template_args(self) -> dict[str, Any]:
@@ -68,11 +94,20 @@ class Base():
         return result, msg
 
     def run_async(self, func: callable, args: tuple = (), kwargs: dict = {}, **opts) -> None:
+        from .setup import CELERY_ACTIVE
         if CELERY_ACTIVE:
-            func.apply_async(args=args, kwargs=kwargs, **opts)
+            result = func.apply_async(args=args, kwargs=kwargs, link=self.celery_link.s(), **opts)
+            Thread(target=result.get, kwargs={'on_message': self.callback_sio, 'propagate': False}, daemon=True).start()
         else:
-            th = Thread(target=func, args=args, kwargs=kwargs, daemon=True)
+            th = ThreadHasReturn(target=func, args=args, kwargs=kwargs, daemon=True, callback=self.callback_sio)
             th.start()
+
+    @FRAMEWORK.celery.task()
+    def celery_link(result) -> None:
+        pass
+
+    def callback_sio(self, data: dict) -> None:
+        self.socketio_callback('result', {'status': data.get('status'), 'data': data.get('result')})
 
 
 class BaseModule(Base, PluginModuleBase):
@@ -466,8 +501,35 @@ class Schedule(BaseModule):
                 else:
                     result, data = False, '폴더 목록을 생성할 수 없습니다.'
             elif command == 'save':
-                job = Job.update_formdata(parse_qs(arg1))
+                query = parse_qs(arg1)
+                old_job = Job.get_job(int(query.get('id')[0]))
+                job = Job.update_formdata(query)
                 if job.id > 0:
+                    def re_add(job):
+                        msg = ''
+                        schedule_id = JobAider.create_schedule_id(job.id)
+                        if FRAMEWORK.scheduler.is_include(schedule_id) and \
+                            (old_job.schedule_mode != job.schedule_mode or \
+                            old_job.schedule_interval != job.schedule_interval):
+                            for _ in range(0, 60):
+                                FRAMEWORK.scheduler.remove_job(schedule_id)
+                                if not FRAMEWORK.scheduler.is_include(schedule_id):
+                                    break
+                                time.sleep(1)
+                            if job.schedule_mode == FF_SCHEDULE_KEYS[2]:
+                                if FRAMEWORK.scheduler.is_include(schedule_id):
+                                    msg = f'일정을 재등록 하지 못 했습니다: {schedule_id}'
+                                else:
+                                    JobAider.add_schedule(job.id)
+                                    msg = f'일정을 재등록 했습니다: {schedule_id}'
+                                LOGGER.debug(msg)
+                        job = job.as_dict()
+                        job['is_include'] = FRAMEWORK.scheduler.is_include(schedule_id)
+                        job['msg'] = msg
+                        return job
+                    if old_job.id > 0:
+                        th = ThreadHasReturn(target=re_add, args=(job,), daemon=True, callback=self.callback_sio)
+                        th.start()
                     result, data = True, '저장했습니다.'
                 else:
                     result, data = False, '저장할 수 없습니다.'
@@ -479,7 +541,7 @@ class Schedule(BaseModule):
                     result, data = False, f'삭제할 수 없습니다: ID {arg1}'
             elif command == 'execute':
                 self.run_async(JobAider.start_job, (Job.get_job(int(arg1)),))
-                result, data = True, '일정을 실행헀습니다.'
+                result, data = True, '일정을 실행했습니다.'
             elif command == 'schedule':
                 active = True if arg2.lower() == 'true' else False
                 result, data = JobAider.set_schedule(int(arg1), active)
