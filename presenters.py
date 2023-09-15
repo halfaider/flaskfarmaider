@@ -182,7 +182,7 @@ class BaseModule(Base, PluginModuleBase):
         '''override'''
         pass
 
-    def setting_save_after(self, change_list):
+    def setting_save_after(self, change_list: list) -> None:
         '''override'''
         pass
 
@@ -321,7 +321,7 @@ class BasePage(Base, PluginPageBase):
         '''override'''
         pass
 
-    def setting_save_after(self, change_list):
+    def setting_save_after(self, change_list: list) -> None:
         '''override'''
         pass
 
@@ -742,7 +742,7 @@ class ToolEtcSetting(BasePage):
                     self.system_route.process_command = self.system_route_process_command
 
     def process_command_route_system(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: LocalProxy) -> Response:
-        '''alternative of process_command in system.route'''
+        '''alternative of system.route.process_command()'''
         if command == 'login':
             username = arg1
             password = arg2

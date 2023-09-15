@@ -16,7 +16,7 @@
 <div class="tab-content" id="nav-tabContent">
 {{ macros.m_tab_content_start('rcloneremote', true) }}
     {{ macros.setting_input_text_and_buttons(module_name + '_rclone_remote_addr', 'Rclone Remote 주소 (필수)', [['btn_test_connection_rclone', '접속 확인']], value=args[module_name + '_rclone_remote_addr'], desc=['rclone remote의 주소', 'ex. http://172.17.0.1:5572'], col='8') }}
-    {{ macros.setting_input_text(module_name + '_rclone_remote_vfs', '리모트', args[module_name + '_rclone_remote_vfs'], col='3', desc=['"접속 확인" 성공시 첫번째 vfs가 자동으로 입력됩니다.']) }}
+    {{ macros.setting_input_text(module_name + '_rclone_remote_vfs', 'vfs 리모트', args[module_name + '_rclone_remote_vfs'], col='3', desc=['"접속 확인" 성공시 첫번째 vfs가 자동으로 입력됩니다.']) }}
     {{ macros.m_hr() }}
     {{ macros.setting_input_text(module_name + '_rclone_remote_user', 'User (선택)', value=args[module_name + '_rclone_remote_user'], col='3', desc=['Remote 접속에 필요한 사용자 이름','--rc-user=username', '사용하지 않을 경우 공백으로 남겨두세요.']) }}
     {{ macros.m_hr() }}

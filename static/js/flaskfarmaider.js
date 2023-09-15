@@ -46,7 +46,7 @@ function init_schedule() {
     SCH_FORM_SECTION = build_sch_form_select('sch-target-section', '라이브러리 섹션', [{value: -1, name: '선택 안 함'}], 5, '새로고침/스캔 할 라이브러리 섹션<br>로컬 경로와 비교하여 하위인 경로가 선택됩니다.')
     SCH_FORM_GROUP_PATH = build_sch_form_group('sch-form-group-path', [SCH_FORM_PATH, SCH_FORM_SECTION, SCH_FORM_LINE]);
     SCH_FORM_VFS = build_sch_form_text('sch-vfs', 'VFS 리모트', '', 5, 'rclone rc로 접근 가능한 리모트 이름<br>ex. gds:');
-    SCH_FORM_RECURSIVE = build_sch_form_checkbox('sch-recursive', 'recursive', 'off', 9, 'rclone refresh의 --recursive 옵션 적용 여부');
+    SCH_FORM_RECURSIVE = build_sch_form_checkbox('sch-recursive', 'recursive', 'off', 9, 'rclone vfs/refresh의 --recursive 옵션 적용 여부<br>On: 지정된 경로의 모든 하위 경로도 vfs/refresh<br>Off: 지정된 경로만 vfs/refresh');
     SCH_FORM_GROUP_RCLONE = build_sch_form_group('sch-form-group-rclone', [SCH_FORM_VFS, SCH_FORM_RECURSIVE, SCH_FORM_LINE]);
     SCH_FORM_SCAN_TYPE = build_sch_form_radio('sch-scan-mode', '스캔 방식', SCAN_OPTS, 9, '');
     SCH_FORM_SCAN_PERIODIC = build_sch_form_select('sch-scan-mode-periodic-id', '주기적 스캔 작업', [], 9, 'Plexmate 플러그인의 주기적 스캔 작업 목록')
@@ -626,7 +626,7 @@ function make_list(data) {
         row_sub += '</div></div></td></tr>';
         row_group = '<tr id="list-' + model.id + '" class="" role="button" data-toggle="collapse" data-target="#collapse-' + model.id;
         row_group += '" aria-expanded="true" aria-controls="collapse-' + model.id + '">';
-        row_group += col_id + col_task + col_interval + col_title + col_switch + col_status + col_ftime + col_menu +'</tr>' + row_sub;
+        row_group += col_id + col_task + col_title + col_switch + col_status + col_interval + col_ftime + col_menu +'</tr>' + row_sub;
         $('#sch-list-table tbody').append(row_group);
     }
 

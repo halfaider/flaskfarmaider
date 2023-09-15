@@ -54,7 +54,7 @@ class Job(ModelBase):
         self.clear_section = clear_section
         self.section_id = section_id
 
-    def update(self, info: dict) -> ModelBase:
+    def update(self, info: dict) -> 'Job':
         self.task = info.get('task', self.task)
         self.schedule_mode = info.get('schedule_mode', self.schedule_mode)
         self.schedule_auto_start = info.get('schedule_auto_start', self.schedule_auto_start)
@@ -71,7 +71,7 @@ class Job(ModelBase):
         return self
 
     @classmethod
-    def update_formdata(cls, formdata: dict[str, list]) -> ModelBase:
+    def update_formdata(cls, formdata: dict[str, list]) -> 'Job':
         _id = int(formdata.get('id')[0]) if formdata.get('id') else -1
         if _id == -1:
             model = Job()
@@ -110,7 +110,7 @@ class Job(ModelBase):
             return model
 
     @classmethod
-    def get_job(cls, id: int = -1, info: dict = None) -> ModelBase:
+    def get_job(cls, id: int = -1, info: dict = None) -> 'Job':
         if id > 0:
             job = cls.get_by_id(id)
         elif info:

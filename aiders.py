@@ -91,7 +91,8 @@ class JobAider(Aider):
                         plexmateaider.scan(job.scan_mode, location, section_id=section_id)
             elif job.task == TASK_KEYS[1]:
                 '''refresh'''
-                if job.section_id and job.section_id > 0:
+                # section_id DB 패치가 안 됐을 경우 대비
+                if job.section_id and int(job.section_id) > 0:
                     targets = plexmateaider.get_targets(job.target, job.section_id)
                     for location, section_id in targets.items():
                         rcloneaider.vfs_refresh(location, job.recursive, job.vfs)
@@ -412,25 +413,20 @@ class PlexmateAider(PluginAider):
             PLEX_MATE에서 특정 폴더가 비정상적으로 계속 SCANNING 상태이면 이후 동일 폴더에 대한 스캔 요청이 모두 무시됨.
             예를 들어 .plexignore 가 있는 폴더는 PLEX_MATE 입장에서 스캔이 정상 종료되지 않기 때문에 계속 SCANNING 상태로 유지됨.
             이 상태에서 동일한 폴더에 새로운 미디어가 추가되면 스캔이 되지 않고 FINISH_ALREADY_IN_QUEUE 로 종료됨.
-        장애물:
-            flaskfarm 이 실행되면 celery 명령어가 도중에 실행되면서 결과적으로 두번 초기화가 이뤄짐.
-            이때 celery 에서 로딩한 Framework 인스턴스와 메인 스레드의 Framework 인스턴스가 달라짐.
-            plex_mate.task_scan.Task.filecheck_thread_function() 은 start_celery() 로 인해 apply_async() 로 실행됨.
-            그 결과 celery 에서 로딩한 Framework의 인스턴스를 참조하게 됨.
-            그래서 메인 스레드에서 ModelScanItem.queue_list 를 수정할 경우 효과가 없음.
+        검토:
+            flaskfarm은 파이썬으로 실행되는 프로세스와 셀러리로 실행되는 프로세스 2개로 작동 함.
+            그래서 셀러리에서 로딩한 Framework 인스턴스와 파이썬으로 로딩한 Framework 인스턴스가 다름.
+            plex_mate.task_scan.Task.filecheck_thread_function() 은 start_celery() 로 인해 셀러리 apply_async() 로 실행됨.
+            즉, 파일 체크 스레드는 셀러리 프로세스로 실행됨.
+            파일 체크 스레드가 참조하는 ModelScanItem.queue_list에 접근하려면 셀러리로 실행 되어야 함.
         대안:
-            1. plex_mate와 동일하게 apply_async() 로 작업을 실행
+            1. plex_mate와 동일하게 셀러리 task 로 작업을 실행
             2. DB를 직접 조작하여 SCANNING 아이템 제거
                 - 스캔 오류라고 판단된 item을 db에서 삭제하고 동일한 id로 새로운 item을 db에 생성
                 - ModelScanItem.queue_list에는 기존 item의 객체가 아직 남아 있음.
                 - 다음 파일체크 단계에서 queue_list에 남아있는 기존 item 정보로 인해 새로운 item의 STATUS가 FINISH_ALREADY_IN_QUEUE로 변경됨.
                 - FINISH_* 상태가 되면 ModelScanItem.remove_in_queue()가 호출됨.
                 - 새로운 item 객체는 기존 item 객체의 id를 가지고 있기 때문에 queue_list에서 기존 item 객체가 제외됨.
-            3. plex_mate.mod_scan.ModuleScan.plugin_load() 함수에서 Task를 메인 스레드에서 시작
-
-                def plugin_load(self):
-                    Task.start()
-
         주의:
             계속 SCANNING 상태로 유지되는 항목은 확인 후 조치.
         '''
@@ -468,18 +464,19 @@ class PlexmateAider(PluginAider):
 
     def get_targets(self, target: str, section_id: int = -1) -> dict[str, int]:
         mappings = self.parse_mappings(CONFIG.get(SETTING_PLEXMATE_PLEX_MAPPING))
-        target = self.update_path(target, mappings)
-        if section_id > 0:
+        target = Path(self.update_path(target, mappings))
+        # section_id DB 패치가 안 됐을 경우 대비
+        if section_id and int(section_id) > 0:
             locations = self.db.select(f'SELECT library_section_id, root_path FROM section_locations WHERE library_section_id = {section_id}')
         else:
             locations = self.db.select('SELECT library_section_id, root_path FROM section_locations')
         targets = {}
         for location in locations:
-            root = f'{location["root_path"]}/'
-            longer = target if len(target) >= len(root) else root
-            shorter = target if len(target) < len(root) else root
-            if longer.startswith(shorter):
-                targets[longer] = int(location['library_section_id'])
+            root = Path(f'{location["root_path"]}')
+            if target.is_relative_to(root):
+                targets[str(target)] = int(location['library_section_id'])
+            elif root.is_relative_to(target):
+                targets[str(root)] = int(location['library_section_id'])
         return targets
 
     def web_scan(self, section_id: int, location: str = None) -> None:
