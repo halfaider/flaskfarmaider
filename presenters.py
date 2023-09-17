@@ -11,7 +11,7 @@ from flask import Response, render_template, jsonify
 from flask.wrappers import Request
 import flask_login
 
-from .setup import PluginBase, PluginModuleBase, PluginPageBase, system_plugin, default_route_socketio_module
+from .setup import PluginBase, PluginModuleBase, PluginPageBase, system_plugin, default_route_socketio_module, ModelBase, FrameworkJob
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
 from .models import Job
 from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider
@@ -88,8 +88,7 @@ class Base():
                 'scan_mode': scan_mode,
                 'periodic_id': int(periodic_id) if periodic_id else -1,
             }
-            job_aider = JobAider()
-            self.run_async(job_aider.start_job, (job_aider, Job.get_job(info=job)))
+            self.run_async(self.start_job, (Job.get_job(info=job),))
             result, msg = True, '작업을 실행했습니다.'
         else:
             result, msg = False, '경로 정보가 없습니다.'
@@ -104,9 +103,31 @@ class Base():
             th = ThreadHasReturn(target=func, args=args, kwargs=kwargs, daemon=True, callback=self.callback_sio)
             th.start()
 
-    @FRAMEWORK.celery.task()
+    @FRAMEWORK.celery.task
     def celery_link(result) -> None:
         pass
+
+    @FRAMEWORK.celery.task(bind=True)
+    def start_job(self, job: ModelBase) -> dict:
+        try:
+            if job.id and job.id > 0:
+                job.set_status(STATUS_KEYS[1])
+            if job.task in TOOL_TRASH_KEYS:
+                CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[1])
+            job_aider = JobAider()
+            job_aider.starts.get(job.task)(job)
+            msg = '작업이 끝났습니다.'
+        except Exception as e:
+            LOGGER.error(traceback.format_exc())
+            msg = str(e)
+        finally:
+            if job.id and job.id > 0:
+                job.set_status(STATUS_KEYS[2])
+            if job.task in TOOL_TRASH_KEYS:
+                CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[0])
+            job = job.as_dict()
+            job['msg'] = msg
+            return job
 
     def callback_sio(self, data: dict) -> None:
         self.socketio_callback('result', {'status': data.get('status'), 'data': data.get('result')})
@@ -130,6 +151,62 @@ class Base():
 
     def returns(self, success: str, msg: str = None, title: str = None, modal: str = None, json: dict = None, reload: bool = False, data: dict = None) -> dict:
         return {'ret': success, 'msg': msg, 'title': title, 'modal': modal, 'json': json, 'reload': reload, 'data': data}
+
+    def create_schedule_id(self, job_id: int, middle: str = SCHEDULE) -> str:
+        return f'{PLUGIN.package_name}_{middle}_{job_id}'
+
+    def add_schedule(self, id: int, job: ModelBase = None) -> bool:
+        try:
+            job = job or Job.get_by_id(id)
+            schedule_id = self.create_schedule_id(job.id)
+            if not FRAMEWORK.scheduler.is_include(schedule_id):
+                sch = FrameworkJob(__package__, schedule_id, job.schedule_interval, self.run_async, job.desc, args=(self.start_job, (job,)))
+                FRAMEWORK.scheduler.add_job_instance(sch)
+            return True
+        except:
+            LOGGER.error(traceback.format_exc())
+            return False
+
+    def set_schedule(self, job_id: int | str, active: bool = False) -> tuple[bool, str]:
+        schedule_id = self.create_schedule_id(job_id)
+        is_include = FRAMEWORK.scheduler.is_include(schedule_id)
+        job = Job.get_by_id(job_id)
+        schedule_mode = job.schedule_mode if job else FF_SCHEDULE_KEYS[0]
+        if active and is_include:
+            result, data = False, f'이미 일정에 등록되어 있습니다.'
+        elif not active and is_include:
+            result, data = FRAMEWORK.scheduler.remove_job(schedule_id), '일정에서 제외했습니다.'
+        elif not active and not is_include:
+            result, data = False, '등록되지 않은 일정입니다.'
+        elif active and not is_include and schedule_mode == FF_SCHEDULE_KEYS[2]:
+            result = self.add_schedule(job_id)
+            data = '일정에 등록했습니다.' if result else '일정에 등록하지 못했어요.'
+        else:
+            result, data = False, '등록할 수 없는 일정 방식입니다.'
+        return result, data
+
+    def schedule_reload(self, job: Job, old_job: Job) -> Job:
+        msg = ''
+        schedule_id = self.create_schedule_id(job.id)
+        if FRAMEWORK.scheduler.is_include(schedule_id) and \
+            (old_job.schedule_mode != job.schedule_mode or \
+            old_job.schedule_interval != job.schedule_interval):
+            for _ in range(0, 60):
+                FRAMEWORK.scheduler.remove_job(schedule_id)
+                if not FRAMEWORK.scheduler.is_include(schedule_id):
+                    break
+                time.sleep(1)
+            if job.schedule_mode == FF_SCHEDULE_KEYS[2]:
+                if FRAMEWORK.scheduler.is_include(schedule_id):
+                    msg = f'일정을 재등록 하지 못 했습니다: {schedule_id}'
+                else:
+                    self.add_schedule(job.id)
+                    msg = f'일정을 재등록 했습니다: {schedule_id}'
+                LOGGER.debug(msg)
+        job = job.as_dict()
+        job['is_include'] = FRAMEWORK.scheduler.is_include(schedule_id)
+        job['msg'] = msg
+        return job
 
 
 class BaseModule(PluginModuleBase, Base):
@@ -519,12 +596,11 @@ class Schedule(BaseModule):
     def plugin_load(self) -> None:
         '''override'''
         jobs = Job.get_list()
-        job_aider = JobAider()
         for job in jobs:
             if job.schedule_mode == FF_SCHEDULE_KEYS[1]:
-                self.run_async(job_aider.start_job, (job_aider, job))
+                self.run_async(self.start_job, (job,))
             elif job.schedule_mode == FF_SCHEDULE_KEYS[2] and job.schedule_auto_start:
-                job_aider.add_schedule(job.id)
+                self.add_schedule(job.id)
 
     def command_list(self, request: Request) -> dict:
         path = request.form.get('arg1')
@@ -549,45 +625,21 @@ class Schedule(BaseModule):
     def command_delete(self, request: Request) -> dict:
         job_id = int(request.form.get('arg1'))
         if Job.delete_by_id(job_id):
-            JobAider.set_schedule(job_id, False)
+            self.set_schedule(job_id, False)
             return self.returns('success', f'삭제 했습니다: ID {job_id}')
         else:
             return self.returns('warning',  f'삭제할 수 없습니다: ID {job_id}')
 
     def command_execute(self, request: Request) -> dict:
         job_id = int(request.form.get('arg1'))
-        job_aider = JobAider()
-        self.run_async(job_aider.start_job, (job_aider, Job.get_job(job_id)))
+        self.run_async(self.start_job, (Job.get_job(job_id),))
         return self.returns('success', '일정을 실행했습니다.')
 
     def command_schedule(self, request: Request) -> dict:
         job_id = int(request.form.get('arg1'))
         active = True if request.form.get('arg2').lower() == 'true' else False
-        result, msg = JobAider.set_schedule(job_id, active)
+        result, msg = self.set_schedule(job_id, active)
         return self.returns('success' if result else 'warning', msg)
-
-    def schedule_reload(self, job: Job, old_job: Job) -> Job:
-        msg = ''
-        schedule_id = JobAider.create_schedule_id(job.id)
-        if FRAMEWORK.scheduler.is_include(schedule_id) and \
-            (old_job.schedule_mode != job.schedule_mode or \
-            old_job.schedule_interval != job.schedule_interval):
-            for _ in range(0, 60):
-                FRAMEWORK.scheduler.remove_job(schedule_id)
-                if not FRAMEWORK.scheduler.is_include(schedule_id):
-                    break
-                time.sleep(1)
-            if job.schedule_mode == FF_SCHEDULE_KEYS[2]:
-                if FRAMEWORK.scheduler.is_include(schedule_id):
-                    msg = f'일정을 재등록 하지 못 했습니다: {schedule_id}'
-                else:
-                    JobAider.add_schedule(job.id)
-                    msg = f'일정을 재등록 했습니다: {schedule_id}'
-                LOGGER.debug(msg)
-        job = job.as_dict()
-        job['is_include'] = FRAMEWORK.scheduler.is_include(schedule_id)
-        job['msg'] = msg
-        return job
 
 
 class Manual(BaseModule):
@@ -674,8 +726,7 @@ class ToolTrash(BasePage):
             job = Job.get_job()
             job.task = command
             job.section_id = int(request.form.get('arg1'))
-            job_aider = JobAider()
-            self.run_async(job_aider.start_job, (job_aider, job))
+            self.run_async(self.start_job, (job,))
             return self.returns('success', f'작업을 실행했습니다.')
         else:
             return super().command_default(request)

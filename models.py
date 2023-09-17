@@ -8,7 +8,6 @@ from sqlalchemy import desc
 
 from .setup import ModelBase
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
-from .aiders import JobAider
 from .constants import *
 
 
@@ -153,32 +152,34 @@ class Job(ModelBase):
         return self
 
     @classmethod
-    def web_list(cls, req: Request) -> dict[str, Any] | None:
+    def web_list(cls, request: Request) -> dict[str, Any] | None:
         '''override'''
+        returns = {}
+        returns['list'] = []
         try:
-            ret = {}
             page = 1
             page_size = 30
             search = ''
-            if 'page' in req.form:
-                page = int(req.form['page'])
-            if 'keyword' in req.form:
-                search = req.form['keyword'].strip()
-            option1 = req.form.get('option1', 'all')
-            option2 = req.form.get('option2', 'all')
-            order = req.form.get('order') or 'desc'
-            query = cls.make_query(req, order=order, search=search, option1=option1, option2=option2)
-            count = query.count()
-            query = query.limit(page_size).offset((page-1)*page_size)
+            if 'page' in request.form:
+                page = int(request.form['page'])
+            if 'keyword' in request.form:
+                search = request.form['keyword'].strip()
+            option1 = request.form.get('option1', 'all')
+            option2 = request.form.get('option2', 'all')
+            order = request.form.get('order') or 'desc'
+            query = cls.make_query(request, order, search, option1, option2)
+            query = query.limit(page_size).offset((page - 1) * page_size)
             lists = query.all()
-            ret['list'] = []
+            sch_mod = PLUGIN.logic.get_module(SCHEDULE)
             for item in lists:
                 item = item.as_dict()
-                item['is_include'] = True if FRAMEWORK.scheduler.is_include(JobAider.create_schedule_id(item['id'])) else False
-                item['is_running'] = True if FRAMEWORK.scheduler.is_running(JobAider.create_schedule_id(item['id'])) else False
-                ret['list'].append(item)
-            ret['paging'] = cls.get_paging_info(count, page, page_size)
+                sch_id = sch_mod.create_schedule_id(item['id'])
+                item['is_include'] = True if FRAMEWORK.scheduler.is_include(sch_id) else False
+                item['is_running'] = True if FRAMEWORK.scheduler.is_running(sch_id) else False
+                returns['list'].append(item)
+            returns['paging'] = cls.get_paging_info(query.count(), page, page_size)
             CONFIG.set(f'{SCHEDULE}_last_list_option', f'{order}|{page}|{search}|{option1}|{option2}')
-            return ret
         except:
             LOGGER.error(traceback.format_exc())
+        finally:
+            return returns

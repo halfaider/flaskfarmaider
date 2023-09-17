@@ -18,8 +18,8 @@ import requests
 from requests import Response
 from plexapi.server import PlexServer
 
-from .setup import PluginModuleBase, ModelBase, FrameworkJob
-from .setup import FRAMEWORK, PLUGIN, LOGGER,  DEPEND_USER_YAML, CONFIG
+from .setup import PluginModuleBase, ModelBase
+from .setup import FRAMEWORK, LOGGER,  DEPEND_USER_YAML, CONFIG
 from .constants import *
 
 
@@ -165,7 +165,6 @@ class JobAider(Aider):
         else:
             rclone_aider.vfs_refresh(job.target, job.recursive, job.vfs)
 
-
     def start_refresh_scan(self, job: ModelBase) -> None:
         '''refresh_scan'''
         # refresh
@@ -182,66 +181,6 @@ class JobAider(Aider):
             for location, section_id in targets.items():
                 rclone_aider.vfs_refresh(location, job.recursive, job.vfs)
                 plex_aider.scan(job.scan_mode, location, section_id=section_id)
-
-    @FRAMEWORK.celery.task
-    def start_job(self, job: ModelBase) -> dict:
-        try:
-            if job.id and job.id > 0:
-                job.set_status(STATUS_KEYS[1])
-            if job.task in TOOL_TRASH_KEYS:
-                CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[1])
-            self.starts.get(job.task)(job)
-            msg = '작업이 끝났습니다.'
-        except Exception as e:
-            LOGGER.error(traceback.format_exc())
-            msg = str(e)
-        finally:
-            if job.id and job.id > 0:
-                job.set_status(STATUS_KEYS[2])
-            if job.task in TOOL_TRASH_KEYS:
-                CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[0])
-            job = job.as_dict()
-            job['msg'] = msg
-            return job
-
-    @classmethod
-    def create_schedule_id(cls, job_id: int, middle: str = SCHEDULE) -> str:
-        return f'{PLUGIN.package_name}_{middle}_{job_id}'
-
-    @classmethod
-    def add_schedule(cls, id: int, job: ModelBase = None) -> bool:
-        try:
-            from .models import Job
-            job = job or Job.get_by_id(id)
-            schedule_id = cls.create_schedule_id(job.id)
-            if not FRAMEWORK.scheduler.is_include(schedule_id):
-                sch_mod = PLUGIN.logic.get_module(SCHEDULE)
-                sch = FrameworkJob(__package__, schedule_id, job.schedule_interval, sch_mod.run_async, job.desc, args=(cls.start_job, (job,)))
-                FRAMEWORK.scheduler.add_job_instance(sch)
-            return True
-        except:
-            LOGGER.error(traceback.format_exc())
-            return False
-
-    @classmethod
-    def set_schedule(cls, job_id: int | str, active: bool = False) -> tuple[bool, str]:
-        from .models import Job
-        schedule_id = cls.create_schedule_id(job_id)
-        is_include = FRAMEWORK.scheduler.is_include(schedule_id)
-        job = Job.get_by_id(job_id)
-        schedule_mode = job.schedule_mode if job else FF_SCHEDULE_KEYS[0]
-        if active and is_include:
-            result, data = False, f'이미 일정에 등록되어 있습니다.'
-        elif not active and is_include:
-            result, data = FRAMEWORK.scheduler.remove_job(schedule_id), '일정에서 제외했습니다.'
-        elif not active and not is_include:
-            result, data = False, '등록되지 않은 일정입니다.'
-        elif active and not is_include and schedule_mode == FF_SCHEDULE_KEYS[2]:
-            result = cls.add_schedule(job_id)
-            data = '일정에 등록했습니다.' if result else '일정에 등록하지 못했어요.'
-        else:
-            result, data = False, '등록할 수 없는 일정 방식입니다.'
-        return result, data
 
 
 class SettingAider(Aider):
