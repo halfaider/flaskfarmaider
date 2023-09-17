@@ -2,13 +2,6 @@ import pathlib
 import time
 import threading
 
-from flask import Response, render_template, jsonify
-from werkzeug.local import LocalProxy
-from flask_sqlalchemy.query import Query
-from sqlalchemy import desc, text
-from plexapi.server import PlexServer
-import flask_login
-
 from framework.init_main import Framework
 from framework.scheduler import Job as FrameworkJob
 from plugin.create_plugin import create_plugin_instance
@@ -20,6 +13,7 @@ from system.setup import P as system_plugin
 
 from .constants import OPTS
 
+
 PLUGIN = P = create_plugin_instance(OPTS)
 LOGGER = PLUGIN.logger
 CONFIG = PLUGIN.ModelSetting
@@ -28,11 +22,13 @@ DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/flaskfarmai
 CELERY_INSPECT = FRAMEWORK.celery.control.inspect()
 CELERY_ACTIVE = False
 
+
 def check_celery():
     global CELERY_ACTIVE
     while True:
         CELERY_ACTIVE = True if CELERY_INSPECT.active() else False
         time.sleep(5)
+
 
 threading.Thread(target=check_celery, daemon=True).start()
 

@@ -2,9 +2,14 @@ from datetime import datetime
 import traceback
 from typing import Any
 
+from flask.wrappers import Request
+from flask_sqlalchemy.query import Query
+from sqlalchemy import desc
+
+from .setup import ModelBase
+from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
 from .aiders import JobAider
-from .setup import FRAMEWORK, PLUGIN, LOGGER, LocalProxy, Query, desc, ModelBase, CONFIG
-from .constants import FF_SCHEDULE_KEYS, SCAN_MODE_KEYS, STATUS_KEYS, SCHEDULE, TASK_KEYS, TASKS
+from .constants import *
 
 
 class Job(ModelBase):
@@ -121,7 +126,7 @@ class Job(ModelBase):
         return job
 
     @classmethod
-    def make_query(cls, request: LocalProxy, order: str ='desc', search: str = '', option1: str = 'all', option2: str = 'all') -> Query:
+    def make_query(cls, request: Request, order: str ='desc', search: str = '', option1: str = 'all', option2: str = 'all') -> Query:
         '''override'''
         with FRAMEWORK.app.app_context():
             query = cls.make_query_search(FRAMEWORK.db.session.query(cls), search, cls.target)
@@ -148,7 +153,7 @@ class Job(ModelBase):
         return self
 
     @classmethod
-    def web_list(cls, req: LocalProxy) -> dict[str, Any] | None:
+    def web_list(cls, req: Request) -> dict[str, Any] | None:
         '''override'''
         try:
             ret = {}

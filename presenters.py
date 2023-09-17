@@ -5,19 +5,18 @@ from urllib.parse import parse_qs
 from threading import Thread
 import sqlite3
 import time
+import functools
 
+from flask import Response, render_template, jsonify
+from flask.wrappers import Request
+import flask_login
+
+from .setup import PluginBase, PluginModuleBase, PluginPageBase, system_plugin, default_route_socketio_module
+from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
 from .models import Job
 from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider
-from .setup import Response, render_template, jsonify, LocalProxy, PluginBase, PluginModuleBase, PluginPageBase, system_plugin, flask_login
-from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG, default_route_socketio_module
-from .constants import SETTING, TASK_KEYS, SCAN_MODE_KEYS, SCHEDULE, SECTION_TYPE_KEYS, STATUSES, README, TOOL, SCHEDULE_DB_VERSIONS, TOOL_LOGIN_LOG_FILE
-from .constants import TASKS, STATUS_KEYS, FF_SCHEDULE_KEYS, SCAN_MODES, SECTION_TYPES, FF_SCHEDULES, TOOL_TRASH, MANUAL, TOOL_ETC_SETTING
-from .constants import SETTING_DB_VERSION, SETTING_RCLONE_REMOTE_ADDR, SETTING_RCLONE_REMOTE_VFS, SETTING_RCLONE_REMOTE_USER, TOOL_GDS_TOOL_REQUEST_TOTAL
-from .constants import SETTING_RCLONE_REMOTE_PASS, SETTING_RCLONE_MAPPING, SETTING_PLEXMATE_MAX_SCAN_TIME, SETTING_PLEXMATE_TIMEOVER_RANGE, TOOL_LOGIN_LOG_ENABLE
-from .constants import SETTING_PLEXMATE_PLEX_MAPPING, SETTING_STARTUP_EXECUTABLE, SETTING_STARTUP_COMMANDS, SETTING_STARTUP_TIMEOUT, SETTING_STARTUP_DEPENDENCIES
-from .constants import SCHEDULE_WORKING_DIRECTORY, SCHEDULE_LAST_LIST_OPTION, TOOL_TRASH_KEYS, TOOL_TRASHES, TOOL_TRASH_TASK_STATUS, SCHEDULE_DB_VERSION
-from .constants import TOOL_GDS_TOOL_REQUEST_SPAN, TOOL_GDS_TOOL_REQUEST_AUTO, TOOL_GDS_TOOL_FP_SPAN, TOOL_GDS_TOOL_FP_AUTO, TOOL_GDS_TOOL_FP_TOTAL
-from . import migrations
+from .migrations import migrate
+from .constants import *
 
 
 class ThreadHasReturn(Thread):
@@ -47,11 +46,13 @@ class ThreadHasReturn(Thread):
 
 class Base():
 
-    def __init__(self, *args, **kwds) -> None:
-        super().__init__(*args, **kwds)
+    def __init__(self) -> None:
         default_route_socketio_module(self)
+        self.commands = {
+            'default': self.command_default,
+        }
 
-    def set_recent_menu(self, req: LocalProxy) -> None:
+    def set_recent_menu(self, req: Request) -> None:
         current_menu = '|'.join(req.path[1:].split('/')[1:])
         if not current_menu == CONFIG.get('recent_menu_plugin'):
             CONFIG.set('recent_menu_plugin', current_menu)
@@ -64,7 +65,7 @@ class Base():
         }
         return args
 
-    def prerender(self, sub: str, req: LocalProxy) -> None:
+    def prerender(self, sub: str, req: Request) -> None:
         self.set_recent_menu(req)
 
     def task_command(self, task: str, target: str, recursive: str, scan: str) -> tuple[bool, str]:
@@ -87,7 +88,8 @@ class Base():
                 'scan_mode': scan_mode,
                 'periodic_id': int(periodic_id) if periodic_id else -1,
             }
-            self.run_async(JobAider().start_job, (Job.get_job(info=job),))
+            job_aider = JobAider()
+            self.run_async(job_aider.start_job, (job_aider, Job.get_job(info=job)))
             result, msg = True, '작업을 실행했습니다.'
         else:
             result, msg = False, '경로 정보가 없습니다.'
@@ -109,12 +111,33 @@ class Base():
     def callback_sio(self, data: dict) -> None:
         self.socketio_callback('result', {'status': data.get('status'), 'data': data.get('result')})
 
+    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, request: Request) -> Response:
+        try:
+            data = self.commands.get(command, self.commands.get('default'))(request)
+        except Exception as e:
+            LOGGER.error(traceback.format_exc())
+            data = self.returns('warning', str(e))
+        finally:
+            return jsonify(data)
 
-class BaseModule(Base, PluginModuleBase):
+    def command_default(self, request: Request) -> dict:
+        command = request.form.get('command')
+        if command in TASK_KEYS:
+            result, msg = self.task_command(command, request.form.get('arg1'), request.form.get('arg2'), request.form.get('arg3'))
+        else:
+            result, msg = False, f'알 수 없는 명령입니다: {command}'
+        return self.returns('success' if result else 'warning', msg)
+
+    def returns(self, success: str, msg: str = None, title: str = None, modal: str = None, json: dict = None, reload: bool = False, data: dict = None) -> dict:
+        return {'ret': success, 'msg': msg, 'title': title, 'modal': modal, 'json': json, 'reload': reload, 'data': data}
+
+
+class BaseModule(PluginModuleBase, Base):
 
     def __init__(self, plugin: PluginBase, first_menu: str = None, name: str = None, scheduler_desc: str = None) -> None:
         '''mod_ins = mod(self) in PluginBase.set_module_list()'''
-        super().__init__(plugin, first_menu=first_menu, name=name, scheduler_desc=scheduler_desc)
+        PluginModuleBase.__init__(self, plugin, first_menu=first_menu, name=name, scheduler_desc=scheduler_desc)
+        Base.__init__(self)
         self.db_default = {}
 
     def get_module(self, module_name: str) -> PluginModuleBase | None:
@@ -129,7 +152,7 @@ class BaseModule(Base, PluginModuleBase):
         '''override'''
         return super().get_page(page_name)
 
-    def process_menu(self, sub: str, req: LocalProxy) -> Response:
+    def process_menu(self, sub: str, req: Request) -> Response:
         '''override'''
         self.prerender(sub, req)
         try:
@@ -146,19 +169,19 @@ class BaseModule(Base, PluginModuleBase):
             LOGGER.error(traceback.format_exc())
             return render_template('sample.html', title=f"process_menu() - {PLUGIN.package_name}/{self.name}/{sub}")
 
-    def process_ajax(self, sub: str, req: LocalProxy):
+    def process_ajax(self, sub: str, req: Request):
         '''override'''
         pass
 
-    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: LocalProxy) -> Response:
+    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: Request) -> Response:
+        '''override'''
+        return Base.process_command(self, command, arg1, arg2, arg3, req)
+
+    def process_api(self, sub: str, req: Request):
         '''override'''
         pass
 
-    def process_api(self, sub: str, req: LocalProxy):
-        '''override'''
-        pass
-
-    def process_normal(self, sub: str, req: LocalProxy):
+    def process_normal(self, sub: str, req: Request):
         '''override'''
         pass
 
@@ -256,38 +279,39 @@ class BaseModule(Base, PluginModuleBase):
         return ret
 
 
-class BasePage(Base, PluginPageBase):
+class BasePage(PluginPageBase, Base):
 
     def __init__(self, plugin: PluginBase, parent: PluginModuleBase, name: str = None, scheduler_desc: str = None) -> None:
         '''mod_ins = mod(self.P, self) in PluginModuleBase.set_page_list()'''
-        super().__init__(plugin, parent, name=name, scheduler_desc=scheduler_desc)
+        PluginPageBase.__init__(self, plugin, parent, name=name, scheduler_desc=scheduler_desc)
+        Base.__init__(self)
         self.db_default = {}
 
-    def process_menu(self, req: LocalProxy) -> Response:
+    def process_menu(self, req: Request) -> Response:
         '''override'''
         self.prerender(self.name, req)
         try:
             args = self.get_template_args()
             return render_template(f'{PLUGIN.package_name}_{self.parent.name}_{self.name}.html', args=args)
-        except Exception as e:
+        except:
             self.P.logger.error(traceback.format_exc())
             return render_template('sample.html', title=f"process_menu() - {PLUGIN.package_name}/{self.parent.name}/{self.name}")
 
-    def process_ajax(self, sub: str, req: LocalProxy):
+    def process_ajax(self, sub: str, req: Request):
         '''override'''
         pass
 
-    def process_api(self, sub: str, req: LocalProxy):
+    def process_api(self, sub: str, req: Request):
         '''override'''
         pass
 
-    def process_normal(self, sub: str, req: LocalProxy):
+    def process_normal(self, sub: str, req: Request):
         '''override'''
         pass
 
-    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: LocalProxy) -> Response:
+    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: Request) -> Response:
         '''override'''
-        pass
+        return Base.process_command(self, command, arg1, arg2, arg3, req)
 
     def plugin_load(self):
         '''override'''
@@ -373,8 +397,9 @@ class Setting(BaseModule):
             SETTING_STARTUP_TIMEOUT: '300',
             SETTING_STARTUP_DEPENDENCIES: SettingAider().depends(),
         }
+        self.commands.update({'command_test_connection': self.command_test_conn})
 
-    def prerender(self, sub: str, req: LocalProxy) -> None:
+    def prerender(self, sub: str, req: Request) -> None:
         '''override'''
         super().prerender(sub, req)
         # yaml 파일 우선
@@ -397,26 +422,21 @@ class Setting(BaseModule):
         args[SETTING_STARTUP_DEPENDENCIES] = CONFIG.get(SETTING_STARTUP_DEPENDENCIES)
         return args
 
-    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: LocalProxy) -> Response:
-        '''ovverride'''
-        ret = {'ret':'success', 'title': 'Rclone Remote'}
-        try:
-            if command == 'command_test_connection':
-                response = SettingAider().remote_command('vfs/list', arg1, arg2, arg3)
-                if int(str(response.status_code)[0]) == 2:
-                    ret['vfses'] = response.json()['vfses']
-                else:
-                    ret['ret'] = 'failed'
-                ret['modal'] = response.text
-            elif command == 'save':
-                self.depends()
-        except:
-            tb = traceback.format_exc()
-            LOGGER.error(tb)
-            ret['ret'] = 'failed'
-            ret['modal'] = str(tb)
-        finally:
-            return jsonify(ret)
+    def command_test_conn(self, request: Request) -> dict:
+        response = SettingAider().remote_command('vfs/list', request.form.get('arg1'), request.form.get('arg2'), request.form.get('arg3'))
+        data = {'title': 'Rclone Remote', 'modal': response.text}
+        if int(str(response.status_code)[0]) == 2:
+            data['ret'] = 'success'
+            data['msg'] = '접속에 성공했습니다.'
+            data['vfses'] = response.json()['vfses']
+        else:
+            data['ret'] = 'warning'
+            data['msg'] = '접속에 실패했습니다.'
+        return data
+
+    def command_default(self, request: Request) -> tuple[bool, str]:
+        '''override'''
+        return super().command_default(request)
 
     def setting_save_after(self, changes: list) -> None:
         '''override'''
@@ -435,6 +455,15 @@ class Schedule(BaseModule):
             f'{self.name}_last_list_option': ''
         }
         self.web_list_model = Job
+        self.commands.update(
+            {
+                'list': self.command_list,
+                'save': self.command_save,
+                'delete': self.command_delete,
+                'execute': self.command_execute,
+                'schedule': self.command_schedule,
+            }
+        )
 
     def migration(self):
         '''override'''
@@ -453,7 +482,7 @@ class Schedule(BaseModule):
                 # DB 볼륨 정리
                 cs.execute(f'VACUUM;').fetchall()
                 for ver in SCHEDULE_DB_VERSIONS[(SCHEDULE_DB_VERSIONS.index(current_db_ver)):]:
-                    migrations.migrate(ver, table_jobs, cs)
+                    migrate(ver, table_jobs, cs)
                     current_db_ver = ver
                 conn.commit()
                 FRAMEWORK.db.session.flush()
@@ -487,85 +516,78 @@ class Schedule(BaseModule):
         args['section_types'] = SECTION_TYPES
         return args
 
-    def process_command(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: LocalProxy) -> Response:
-        '''override'''
-        LOGGER.debug(f'요청: {command}, {arg1}, {arg2}, {arg3}')
-        try:
-            # 일정 리스트는 Job.web_list()
-            if command == 'list':
-                browseraider = BrowserAider()
-                dir_list = json.dumps(browseraider.get_dir(arg1))
-                CONFIG.set(SCHEDULE_WORKING_DIRECTORY, arg1)
-                if dir_list:
-                    result, data = True, dir_list
-                else:
-                    result, data = False, '폴더 목록을 생성할 수 없습니다.'
-            elif command == 'save':
-                query = parse_qs(arg1)
-                old_job = Job.get_job(int(query.get('id')[0]))
-                job = Job.update_formdata(query)
-                if job.id > 0:
-                    def re_add(job):
-                        msg = ''
-                        schedule_id = JobAider.create_schedule_id(job.id)
-                        if FRAMEWORK.scheduler.is_include(schedule_id) and \
-                            (old_job.schedule_mode != job.schedule_mode or \
-                            old_job.schedule_interval != job.schedule_interval):
-                            for _ in range(0, 60):
-                                FRAMEWORK.scheduler.remove_job(schedule_id)
-                                if not FRAMEWORK.scheduler.is_include(schedule_id):
-                                    break
-                                time.sleep(1)
-                            if job.schedule_mode == FF_SCHEDULE_KEYS[2]:
-                                if FRAMEWORK.scheduler.is_include(schedule_id):
-                                    msg = f'일정을 재등록 하지 못 했습니다: {schedule_id}'
-                                else:
-                                    JobAider.add_schedule(job.id)
-                                    msg = f'일정을 재등록 했습니다: {schedule_id}'
-                                LOGGER.debug(msg)
-                        job = job.as_dict()
-                        job['is_include'] = FRAMEWORK.scheduler.is_include(schedule_id)
-                        job['msg'] = msg
-                        return job
-                    if old_job.id > 0:
-                        th = ThreadHasReturn(target=re_add, args=(job,), daemon=True, callback=self.callback_sio)
-                        th.start()
-                    result, data = True, '저장했습니다.'
-                else:
-                    result, data = False, '저장할 수 없습니다.'
-            elif command == 'delete':
-                if Job.delete_by_id(arg1):
-                    JobAider.set_schedule(int(arg1), False)
-                    result, data = True, f'삭제 했습니다: ID {arg1}'
-                else:
-                    result, data = False, f'삭제할 수 없습니다: ID {arg1}'
-            elif command == 'execute':
-                self.run_async(JobAider.start_job, (Job.get_job(int(arg1)),))
-                result, data = True, '일정을 실행했습니다.'
-            elif command == 'schedule':
-                active = True if arg2.lower() == 'true' else False
-                result, data = JobAider.set_schedule(int(arg1), active)
-            elif command in TASK_KEYS:
-                result, data = self.task_command(command, arg1, arg2, arg3)
-            elif command == 'test':
-                result, data = True, '테스트 작업'
-            else:
-                result, data = False, f'알 수 없는 명령입니다: {command}'
-        except Exception as e:
-            LOGGER.error(traceback.format_exc())
-            result, data = False, str(e)
-        finally:
-            return jsonify({'success': result, 'data': data})
-
     def plugin_load(self) -> None:
         '''override'''
         jobs = Job.get_list()
-        jobaider = JobAider()
+        job_aider = JobAider()
         for job in jobs:
             if job.schedule_mode == FF_SCHEDULE_KEYS[1]:
-                self.run_async(JobAider().start_job, (job,))
+                self.run_async(job_aider.start_job, (job_aider, job))
             elif job.schedule_mode == FF_SCHEDULE_KEYS[2] and job.schedule_auto_start:
-                jobaider.add_schedule(job.id)
+                job_aider.add_schedule(job.id)
+
+    def command_list(self, request: Request) -> dict:
+        path = request.form.get('arg1')
+        dir_list = json.dumps(BrowserAider().get_dir(path))
+        CONFIG.set(SCHEDULE_WORKING_DIRECTORY, path)
+        if dir_list:
+            return self.returns('success', data=dir_list)
+        else:
+            return self.returns('warning', '폴더 목록을 생성할 수 없습니다.')
+
+    def command_save(self, request: Request) -> dict:
+        query = parse_qs(request.form.get('arg1'))
+        old_job = Job.get_job(int(query.get('id')[0]))
+        job = Job.update_formdata(query)
+        if old_job.id > 0:
+            th = ThreadHasReturn(target=self.schedule_reload, args=(job, old_job), daemon=True, callback=self.callback_sio)
+            th.start()
+            return self.returns('success', '저장했습니다.')
+        else:
+            return self.returns('warning', '저장할 수 없습니다.')
+
+    def command_delete(self, request: Request) -> dict:
+        job_id = int(request.form.get('arg1'))
+        if Job.delete_by_id(job_id):
+            JobAider.set_schedule(job_id, False)
+            return self.returns('success', f'삭제 했습니다: ID {job_id}')
+        else:
+            return self.returns('warning',  f'삭제할 수 없습니다: ID {job_id}')
+
+    def command_execute(self, request: Request) -> dict:
+        job_id = int(request.form.get('arg1'))
+        job_aider = JobAider()
+        self.run_async(job_aider.start_job, (job_aider, Job.get_job(job_id)))
+        return self.returns('success', '일정을 실행했습니다.')
+
+    def command_schedule(self, request: Request) -> dict:
+        job_id = int(request.form.get('arg1'))
+        active = True if request.form.get('arg2').lower() == 'true' else False
+        result, msg = JobAider.set_schedule(job_id, active)
+        return self.returns('success' if result else 'warning', msg)
+
+    def schedule_reload(self, job: Job, old_job: Job) -> Job:
+        msg = ''
+        schedule_id = JobAider.create_schedule_id(job.id)
+        if FRAMEWORK.scheduler.is_include(schedule_id) and \
+            (old_job.schedule_mode != job.schedule_mode or \
+            old_job.schedule_interval != job.schedule_interval):
+            for _ in range(0, 60):
+                FRAMEWORK.scheduler.remove_job(schedule_id)
+                if not FRAMEWORK.scheduler.is_include(schedule_id):
+                    break
+                time.sleep(1)
+            if job.schedule_mode == FF_SCHEDULE_KEYS[2]:
+                if FRAMEWORK.scheduler.is_include(schedule_id):
+                    msg = f'일정을 재등록 하지 못 했습니다: {schedule_id}'
+                else:
+                    JobAider.add_schedule(job.id)
+                    msg = f'일정을 재등록 했습니다: {schedule_id}'
+                LOGGER.debug(msg)
+        job = job.as_dict()
+        job['is_include'] = FRAMEWORK.scheduler.is_include(schedule_id)
+        job['msg'] = msg
+        return job
 
 
 class Manual(BaseModule):
@@ -601,6 +623,62 @@ class ToolTrash(BasePage):
         self.db_default = {
             TOOL_TRASH_TASK_STATUS: STATUS_KEYS[0],
         }
+        self.commands.update(
+            {
+                'status': self.command_status,
+                'list': self.command_list,
+                'stop': self.command_stop,
+                'delete': self.command_delete,
+            }
+        )
+
+    def check_status(func: callable):
+        @functools.wraps(func)
+        def wrap(*args, **kwds) -> dict:
+            status = CONFIG.get(TOOL_TRASH_TASK_STATUS)
+            if status == STATUS_KEYS[0]:
+                return func(*args, **kwds)
+            else:
+                return {'ret': 'warning', 'msg': '작업이 실행중입니다.'}
+        return wrap
+
+    def command_status(self, request: Request) -> dict:
+        return self.returns('success', data={'status': CONFIG.get(TOOL_TRASH_TASK_STATUS)})
+
+    def command_list(self, request: Request) -> dict:
+        section_id = int(request.form.get('arg1'))
+        page_no = int(request.form.get('arg2'))
+        limit = int(request.form.get('arg3'))
+        return self.returns('success', data=PlexmateAider().get_trash_list(section_id, page_no, limit))
+
+    def command_stop(self, request: Request) -> dict:
+        status = CONFIG.get(TOOL_TRASH_TASK_STATUS)
+        if status == STATUS_KEYS[1] or status == STATUS_KEYS[3]:
+            CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[3])
+            return self.returns('success', '작업을 멈추는 중입니다.')
+        else:
+            return self.returns('warning', '실행중이 아닙니다.')
+
+    @check_status
+    def command_delete(self, request: Request) -> dict:
+        metadata_id = int(request.form.get('arg1'))
+        mediaitem_id = int(request.form.get('arg2'))
+        result, msg = PlexmateAider().delete_media(metadata_id, mediaitem_id)
+        return self.returns('success' if result else 'warning', msg)
+
+    @check_status
+    def command_default(self, request: Request) -> dict:
+        '''override'''
+        command = request.form.get('command')
+        if command in TOOL_TRASH_KEYS:
+            job = Job.get_job()
+            job.task = command
+            job.section_id = int(request.form.get('arg1'))
+            job_aider = JobAider()
+            self.run_async(job_aider.start_job, (job_aider, job))
+            return self.returns('success', f'작업을 실행했습니다.')
+        else:
+            return super().command_default(request)
 
     def get_template_args(self) -> dict[str, Any]:
         '''override'''
@@ -623,51 +701,6 @@ class ToolTrash(BasePage):
         args[TOOL_TRASH_TASK_STATUS.lower()] = CONFIG.get(TOOL_TRASH_TASK_STATUS)
         return args
 
-    def process_command(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: LocalProxy) -> Response:
-        '''override'''
-        LOGGER.debug(f'요청: {command}, {arg1}, {arg2}, {arg3}')
-        try:
-            status = CONFIG.get(TOOL_TRASH_TASK_STATUS)
-            if command == 'status':
-                result, data = True, status
-            elif command == 'list':
-                section_id = int(arg1)
-                page_no = int(arg2)
-                limit = int(arg3)
-                plexmateaider = PlexmateAider()
-                result, data = True, plexmateaider.get_trash_list(section_id, page_no, limit)
-            elif command == 'stop':
-                if status == STATUS_KEYS[1] or status == STATUS_KEYS[3]:
-                    CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[3])
-                    result, data = True, "작업을 멈추는 중입니다."
-                else:
-                    result, data = False, "실행중이 아닙니다."
-            elif status == STATUS_KEYS[0]:
-                if command == 'delete':
-                    metadata_id = int(arg1)
-                    mediaitem_id = int(arg2)
-                    result, data = True, PlexmateAider().delete_media(metadata_id, mediaitem_id)
-                elif command in TASK_KEYS:
-                    result, data = self.task_command(command, arg1, arg2, arg3)
-                elif command in TOOL_TRASH_KEYS:
-                    if status == STATUS_KEYS[0]:
-                        job = Job.get_job()
-                        job.task = command
-                        job.section_id = int(arg1)
-                        self.run_async(JobAider().start_job, (job,))
-                        result, data = True, f'작업을 실행했습니다.'
-                    else:
-                        result, data = False, '작업이 실행중입니다.'
-                else:
-                    result, data = False, f'알 수 없는 명령입니다: {command}'
-            else:
-                result, data = False, '작업이 실행중입니다.'
-        except Exception as e:
-            LOGGER.error(traceback.format_exc())
-            result, data = False, str(e)
-        finally:
-            return jsonify({'success': result, 'data': data})
-
 
 class ToolEtcSetting(BasePage):
 
@@ -682,6 +715,7 @@ class ToolEtcSetting(BasePage):
         }
         self.system_route = system_plugin.logic.get_module('route')
         self.system_route_process_command = self.system_route.process_command
+        self.commands['delete'] = self.command_delete
 
     def get_template_args(self) -> dict[str, Any]:
         '''override'''
@@ -702,22 +736,11 @@ class ToolEtcSetting(BasePage):
             args[TOOL_GDS_TOOL_FP_TOTAL] = -1
         return args
 
-    def process_command(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: LocalProxy) -> Response:
-        '''override'''
-        LOGGER.debug(f'요청: {command}, {arg1}, {arg2}, {arg3}')
-        try:
-            if command == 'delete':
-                mod = arg1
-                span = int(arg2)
-                GDSToolAider().delete(mod, span)
-                result, data = True, f'DB 정리를 실행합니다.'
-            else:
-                result, data = False, f'알 수 없는 명령입니다: {command}'
-        except Exception as e:
-            LOGGER.error(traceback.format_exc())
-            result, data = False, str(e)
-        finally:
-            return jsonify({'success': result, 'data': data})
+    def command_delete(self, request: Request) -> dict:
+        mod = request.form.get('arg1')
+        span = int(request.form.get('arg2'))
+        GDSToolAider().delete(mod, span)
+        return self.returns('success', 'DB 정리를 실행합니다.')
 
     def plugin_load(self):
         '''override'''
@@ -741,7 +764,7 @@ class ToolEtcSetting(BasePage):
                 else:
                     self.system_route.process_command = self.system_route_process_command
 
-    def process_command_route_system(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: LocalProxy) -> Response:
+    def process_command_route_system(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: Request) -> Response:
         '''alternative of system.route.process_command()'''
         if command == 'login':
             username = arg1

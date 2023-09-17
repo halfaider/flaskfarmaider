@@ -137,11 +137,10 @@ function init_schedule() {
         formdata = getFormdata('#sch-setting');
         formdata += '&id=' + id;
         globalSendCommand('save', formdata, null, null, function(result) {
-            if (result.success) {
+            if (result.ret == 'success') {
                 E_MODAL.modal('hide');
                 globalRequestSearch(1);
             }
-            notify(result.data, result.success ? 'success' : 'warning');
         });
     });
     E_ADD_BTN = $('#sch-add-btn');
@@ -204,12 +203,12 @@ function init_schedule() {
     });
 
     socket = io.connect(window.location.href)
-    socket.on('result', function(data) {
-        if (data) {
-            if (data.data.msg) {
-                notify(data.data.msg, 'info');
+    socket.on('result', function(result) {
+        if (result) {
+            if (result.data.msg) {
+                notify(result.data.msg, 'info');
             }
-            toggle_schedule_status(data.data.id, data.data.status);
+            toggle_schedule_status(result.data.id, result.data.status);
         }
     });
 }
@@ -234,16 +233,12 @@ function init_trash() {
     console.log(TOOL_TRASH_TASK_STATUS);
     E_TRASH_BTN_STOP = $('#trash-btn-stop');
     E_TRASH_BTN_STOP.on('click', function(e) {
-        globalSendCommandPage('stop', '', '', '', function(result) {
-            notify(result.data, result.success ? 'success' : 'warning');
-        });
+        globalSendCommandPage('stop', '', '', '', null);
     });
     E_TRASH_TASK = $('#trash-task');
     E_TRASH_BTN_EXCEUTE = $('#trash-btn-execute');
     E_TRASH_BTN_EXCEUTE.on('click', function(e) {
-        globalSendCommandPage(E_TRASH_TASK.prop('value'), E_TRASH_SECTIONS.prop('value'), '', '', function(result) {
-            notify(result.data, result.success ? 'success' : 'warning');
-        });
+        globalSendCommandPage(E_TRASH_TASK.prop('value'), E_TRASH_SECTIONS.prop('value'), '', '', null);
     });
 }
 
@@ -270,9 +265,7 @@ function init_etc_setting() {
         confirm_modal('복사 요청 목록을 삭제할까요?',
             '잔여 기간: ' + span,
             function() {
-                globalSendCommandPage('delete', 'request', span, '', function(result) {
-                    notify(result.data, result.success ? 'success' : 'warning');
-                });
+                globalSendCommandPage('delete', 'request', span, '', null);
         });
     });
 
@@ -281,9 +274,7 @@ function init_etc_setting() {
         confirm_modal('변경사항 목록을 삭제할까요?',
             '잔여 기간: ' + span,
             function() {
-                globalSendCommandPage('delete', 'fp', span, '', function(result) {
-                    notify(result.data, result.success ? 'success' : 'warning');
-                });
+                globalSendCommandPage('delete', 'fp', span, '', null);
         });
     });
 
@@ -291,14 +282,10 @@ function init_etc_setting() {
     E_TOOL_LOGIN_LOG_ENABLE.bootstrapToggle(TOOL_LOGIN_LOG_ENABLE ? 'on' : 'off');
 }
 
-async function trash_get_list(page_no) {
+function trash_get_list(page_no) {
     lib_id = E_TRASH_SECTIONS.prop('value');
     globalSendCommandPage('list', lib_id, page_no, 50, function(result) {
-        if (result.success) {
-            trash_make_list(result.data);
-        } else {
-            notify(result.data, 'warning');
-        }
+        trash_make_list(result.data);
     });
 }
 
@@ -330,9 +317,7 @@ function trash_make_list(data) {
             path = path.replace(path.replace(/^.*[\\\/]/, ''), '');
             recursive = opt.inputs['recursive'].$input.prop('checked');
             scan_mode = opt.inputs['scan_mode'].$input.prop('value');
-            globalSendCommandPage(command, path, recursive, scan_mode + "|-1", function(result) {
-                notify(result.data, result.success ? 'success' : 'warning');
-            });
+            globalSendCommandPage(command, path, recursive, scan_mode + "|-1", null);
         },
         items: {
             [TASK_KEYS[0]]: {
@@ -355,11 +340,10 @@ function trash_make_list(data) {
                     data = opt.$trigger.data();
                     confirm_modal('이 파일을 플렉스에서 삭제할까요?', data.path, function() {
                         globalSendCommandPage(command, data.metadata_item_id, data.id, '', function(result) {
-                            if (result.success) {
+                            if (result.ret == 'success') {
                                 page = $('ul.pagination li.active[aria-current=page]').first().text()
                                 trash_get_list(page ? page : 1);
                             }
-                            notify(result.data, result.success ? 'success' : 'warning');
                         });
                     });
                 },
@@ -439,17 +423,11 @@ function copy_to_clipboard(text) {
     notify('클립보드에 복사하였습니다.', 'success');
 }
 
-async function browser_command(cmd) {
+function browser_command(cmd) {
     globalSendCommand(cmd.command, cmd.path, cmd.recursive, cmd.scan_mode + "|-1", function(result) {
-        if (result.success) {
-            if (cmd.command == 'list') {
-                E_WORKING_DIR.prop('value', cmd.path);
-                list_dir(JSON.parse(result.data));
-            } else {
-                notify(result.data, 'success');
-            }
-        } else {
-            notify(result.data, 'warning');
+        if (result.ret == 'success' && cmd.command == 'list') {
+            E_WORKING_DIR.prop('value', cmd.path);
+            list_dir(JSON.parse(result.data));
         }
     });
 }
@@ -624,7 +602,7 @@ function make_list(data) {
         row_sub += '" data-parent="#sch-accordion"><div class="">';
         row_sub += '';
         row_sub += '</div></div></td></tr>';
-        row_group = '<tr id="list-' + model.id + '" class="" role="button" data-toggle="collapse" data-target="#collapse-' + model.id;
+        row_group = '<tr id="list-' + model.id + '" class="" data-toggle="collapse" data-target="#collapse-' + model.id;
         row_group += '" aria-expanded="true" aria-controls="collapse-' + model.id + '">';
         row_group += col_id + col_task + col_title + col_switch + col_status + col_interval + col_ftime + col_menu +'</tr>' + row_sub;
         $('#sch-list-table tbody').append(row_group);
@@ -644,9 +622,7 @@ function make_list(data) {
         }
         _id = $this.data('id');
         checked = $this.prop('checked');
-        globalSendCommand('schedule', _id, checked, null, function(result) {
-            notify(result.data, result.success ? 'success' : 'warning');
-        });
+        globalSendCommand('schedule', _id, checked, null, null);
     });
 
     $('.sch-switch ~ div.toggle-group').on('click', function(e) {
@@ -681,10 +657,9 @@ function make_list(data) {
                         'ID: ' + data.id + '<br />작업: ' + TASKS[data.task].name + '<br />내용: ' + data.desc,
                         function() {
                         globalSendCommand("delete", data.id, null, null, function(result) {
-                            if (result.success) {
+                            if (result.ret == 'success') {
                                 globalRequestSearch('1');
                             }
-                            notify(result.data, result.success ? 'success' : 'warning');
                         });
                     });
                 }
@@ -698,10 +673,7 @@ function make_list(data) {
                         'ID: ' + data.id + '<br />작업: ' + TASKS[data.task].name + '<br />내용: ' + data.desc,
                         function() {
                             toggle_schedule_status(data.id, STATUS_KEYS[1]);
-                            globalSendCommand("execute", data.id, null, null, function(result) {
-                                //globalRequestSearch('1');
-                                notify(result.data, result.success ? 'success' : 'warning');
-                            });
+                            globalSendCommand("execute", data.id, null, null, null);
                         }
                     );
                 }
