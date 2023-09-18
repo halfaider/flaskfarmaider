@@ -45,9 +45,10 @@ class ThreadHasReturn(Thread):
         }
 
 
-class Base():
+class Base:
 
-    def __init__(self) -> None:
+    def __init__(self, *args, **kwds) -> None:
+        super().__init__(*args, **kwds)
         default_route_socketio_module(self)
         self.commands = {
             'default': self.command_default,
@@ -208,12 +209,10 @@ class Base():
         return job
 
 
-class BaseModule(PluginModuleBase, Base):
+class BaseModule(Base, PluginModuleBase):
 
     def __init__(self, plugin: PluginBase, first_menu: str = None, name: str = None, scheduler_desc: str = None) -> None:
-        '''mod_ins = mod(self) in PluginBase.set_module_list()'''
-        PluginModuleBase.__init__(self, plugin, first_menu=first_menu, name=name, scheduler_desc=scheduler_desc)
-        Base.__init__(self)
+        super().__init__(plugin, first_menu, name, scheduler_desc)
         self.db_default = {}
 
     def get_module(self, module_name: str) -> PluginModuleBase | None:
@@ -355,12 +354,10 @@ class BaseModule(PluginModuleBase, Base):
         return ret
 
 
-class BasePage(PluginPageBase, Base):
+class BasePage(Base, PluginPageBase):
 
     def __init__(self, plugin: PluginBase, parent: PluginModuleBase, name: str = None, scheduler_desc: str = None) -> None:
-        '''mod_ins = mod(self.P, self) in PluginModuleBase.set_page_list()'''
-        PluginPageBase.__init__(self, plugin, parent, name=name, scheduler_desc=scheduler_desc)
-        Base.__init__(self)
+        super().__init__(plugin, parent, name, scheduler_desc)
         self.db_default = {}
 
     def process_menu(self, req: Request) -> Response:
