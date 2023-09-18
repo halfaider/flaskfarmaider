@@ -244,53 +244,53 @@ class BaseModule(Base, PluginModuleBase):
             LOGGER.error(traceback.format_exc())
             return render_template('sample.html', title=f"process_menu() - {PLUGIN.package_name}/{self.name}/{sub}")
 
-    def process_ajax(self, sub: str, req: Request):
+    def process_ajax(self, sub: str, req: Request) -> Response:
         '''override'''
-        pass
+        return super().process_ajax(sub, req)
 
     def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: Request) -> Response:
         '''override'''
         return super().process_command(command, arg1, arg2, arg3, req)
 
-    def process_api(self, sub: str, req: Request):
+    def process_api(self, sub: str, req: Request) -> Response:
         '''override'''
-        pass
+        return super().process_api(sub, req)
 
-    def process_normal(self, sub: str, req: Request):
+    def process_normal(self, sub: str, req: Request) -> Response:
         '''override'''
-        pass
+        return super().process_normal(sub, req)
 
-    def scheduler_function(self):
+    def scheduler_function(self) -> None:
         '''override'''
-        pass
+        super().scheduler_function()
 
     def db_delete(self, day: int | str) -> int:
         '''override'''
         return super().db_delete(day)
 
-    def plugin_load(self):
+    def plugin_load(self) -> None:
         '''override'''
-        pass
+        super().plugin_load()
 
-    def plugin_load_celery(self):
+    def plugin_load_celery(self) -> None:
         '''override'''
-        pass
+        super().plugin_load_celery()
 
-    def plugin_unload(self):
+    def plugin_unload(self) -> None:
         '''override'''
-        pass
+        super().plugin_unload()
 
     def setting_save_after(self, change_list: list) -> None:
         '''override'''
-        pass
+        super().setting_save_after(change_list)
 
-    def process_telegram_data(self, data, target=None):
+    def process_telegram_data(self, data: Any, target: str = None) -> None:
         '''override'''
-        pass
+        super().process_telegram_data(data, target=target)
 
-    def migration(self):
+    def migration(self) -> None:
         '''override'''
-        pass
+        super().migration()
 
     def get_scheduler_desc(self) -> str:
         '''override'''
@@ -312,25 +312,25 @@ class BaseModule(Base, PluginModuleBase):
         '''override'''
         return super().dump(data)
 
-    def socketio_connect(self):
+    def socketio_connect(self) -> None:
         '''override'''
-        pass
+        super().socketio_connect()
 
-    def socketio_disconnect(self):
+    def socketio_disconnect(self) -> None:
         '''override'''
-        pass
+        super().socketio_disconnect()
 
-    def arg_to_dict(self, arg):
+    def arg_to_dict(self, args: str) -> dict:
         '''override'''
-        return super().arg_to_dict(arg)
+        return super().arg_to_dict(args)
 
-    def get_scheduler_name(self):
+    def get_scheduler_name(self) -> str:
         '''override'''
         return super().get_scheduler_name()
 
-    def process_discord_data(self, data):
+    def process_discord_data(self, data: Any) -> None:
         '''override'''
-        pass
+        super().process_discord_data(data)
 
     def start_celery(self, func: callable, *args, on_message: callable = None, page: PluginPageBase = None) -> Any:
         '''override'''
@@ -370,37 +370,37 @@ class BasePage(Base, PluginPageBase):
             self.P.logger.error(traceback.format_exc())
             return render_template('sample.html', title=f"process_menu() - {PLUGIN.package_name}/{self.parent.name}/{self.name}")
 
-    def process_ajax(self, sub: str, req: Request):
+    def process_ajax(self, sub: str, req: Request) -> Response:
         '''override'''
-        pass
+        return super().process_ajax(sub, req)
 
-    def process_api(self, sub: str, req: Request):
+    def process_api(self, sub: str, req: Request) -> Response:
         '''override'''
-        pass
+        return super().process_api(sub, req)
 
-    def process_normal(self, sub: str, req: Request):
+    def process_normal(self, sub: str, req: Request) -> Response:
         '''override'''
-        pass
+        return super().process_normal(sub, req)
 
     def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: Request) -> Response:
         '''override'''
         return super().process_command(command, arg1, arg2, arg3, req)
 
-    def plugin_load(self):
+    def plugin_load(self) -> None:
         '''override'''
-        pass
+        super().plugin_load()
 
-    def plugin_load_celery(self):
+    def plugin_load_celery(self) -> None:
         '''override'''
-        pass
+        super().plugin_load_celery()
 
-    def plugin_unload(self):
+    def plugin_unload(self) -> None:
         '''override'''
-        pass
+        super().plugin_unload()
 
-    def scheduler_function(self):
+    def scheduler_function(self) -> None:
         '''override'''
-        pass
+        super().scheduler_function()
 
     def get_scheduler_desc(self) -> str:
         '''override'''
@@ -414,21 +414,21 @@ class BasePage(Base, PluginPageBase):
         '''override'''
         return super().get_scheduler_name()
 
-    def migration(self):
+    def migration(self) -> None:
         '''override'''
-        pass
+        super().migration()
 
     def setting_save_after(self, change_list: list) -> None:
         '''override'''
-        pass
+        super().setting_save_after(change_list)
 
-    def process_telegram_data(self, data, target=None):
+    def process_telegram_data(self, data: Any, target: str = None) -> None:
         '''override'''
-        pass
+        super().process_telegram_data(data, target=target)
 
-    def arg_to_dict(self, arg) -> dict:
+    def arg_to_dict(self, args: str) -> dict:
         '''override'''
-        return super().arg_to_dict(arg)
+        return super().arg_to_dict(args)
 
     def get_page(self, page_name) -> PluginPageBase:
         '''override'''
@@ -438,9 +438,9 @@ class BasePage(Base, PluginPageBase):
         '''override'''
         return super().get_module(module_name)
 
-    def process_discord_data(self, data):
+    def process_discord_data(self, data: Any) -> None:
         '''override'''
-        pass
+        super().process_discord_data(data)
 
     def db_delete(self, day: int | str) -> int:
         '''override'''
