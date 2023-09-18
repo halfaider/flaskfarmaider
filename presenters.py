@@ -21,7 +21,8 @@ from .constants import *
 
 class ThreadHasReturn(Thread):
 
-    def __init__(self, group=None, target: callable = None, name: str = None, args: tuple | list = (), kwargs: dict = {}, daemon: bool = None, callback: callable = None):
+    def __init__(self, group=None, target: callable = None, name: str = None, args: tuple | list = (),
+                 kwargs: dict = {}, daemon: bool = None, callback: callable = None) -> None:
         Thread.__init__(self, group, target, name, args, kwargs, daemon=daemon)
         self._return = None
         self.callback = callback
@@ -73,13 +74,11 @@ class Base():
             recursive = True if recursive.lower() == 'true' else False
         else:
             recursive = False
-
         if scan:
             scan_mode, periodic_id = scan.split('|')
         else:
             scan_mode = SCAN_MODE_KEYS[0]
             periodic_id = '-1'
-
         if target:
             job = {
                 'task': task,
@@ -542,7 +541,7 @@ class Schedule(BaseModule):
             }
         )
 
-    def migration(self):
+    def migration(self) -> None:
         '''override'''
         with FRAMEWORK.app.app_context():
             set_db_ver = CONFIG.get(SETTING_DB_VERSION)
@@ -550,6 +549,7 @@ class Schedule(BaseModule):
                 current_db_ver = CONFIG.get(SETTING_DB_VERSION)
             else:
                 current_db_ver = CONFIG.get(SCHEDULE_DB_VERSION)
+            # 'flaskfarmaider': 'sqlite:////data/db/flaskfarmaider.db?check_same_thread=False'
             db_file = FRAMEWORK.app.config['SQLALCHEMY_BINDS'][PLUGIN.package_name].replace('sqlite:///', '').split('?')[0]
             LOGGER.debug(f'DB 버전: {current_db_ver}')
             with sqlite3.connect(db_file) as conn:
@@ -684,7 +684,7 @@ class ToolTrash(BasePage):
             }
         )
 
-    def check_status(func: callable):
+    def check_status(func: callable) -> callable:
         @functools.wraps(func)
         def wrap(*args, **kwds) -> dict:
             status = CONFIG.get(TOOL_TRASH_TASK_STATUS)
@@ -793,7 +793,7 @@ class ToolEtcSetting(BasePage):
         GDSToolAider().delete(mod, span)
         return self.returns('success', 'DB 정리를 실행합니다.')
 
-    def plugin_load(self):
+    def plugin_load(self) -> None:
         '''override'''
         request_auto = True if CONFIG.get(TOOL_GDS_TOOL_REQUEST_AUTO).lower() == 'true' else False
         fp_auto = True if CONFIG.get(TOOL_GDS_TOOL_FP_AUTO).lower() == 'true' else False

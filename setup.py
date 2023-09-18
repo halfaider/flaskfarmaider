@@ -23,7 +23,7 @@ CELERY_INSPECT = FRAMEWORK.celery.control.inspect()
 CELERY_ACTIVE = False
 
 
-def check_celery():
+def check_celery() -> None:
     global CELERY_ACTIVE
     while True:
         CELERY_ACTIVE = True if CELERY_INSPECT.active() else False

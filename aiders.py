@@ -16,7 +16,6 @@ import locale
 
 import requests
 from requests import Response
-from plexapi.server import PlexServer
 
 from .setup import PluginModuleBase, ModelBase
 from .setup import FRAMEWORK, LOGGER,  DEPEND_USER_YAML, CONFIG
@@ -25,7 +24,7 @@ from .constants import *
 
 class Aider:
 
-    def __init__(self, name: str = None):
+    def __init__(self, name: str = None) -> None:
         self.name = name
 
     def get_readable_time(self, _time: float) -> str:
@@ -62,7 +61,7 @@ class Aider:
 
 class JobAider(Aider):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.starts = {
             TASK_KEYS[0]: self.start_refresh_scan,
@@ -72,48 +71,36 @@ class JobAider(Aider):
             TASK_KEYS[4]: self.start_clear,
             TASK_KEYS[5]: self.start_startup,
             TASK_KEYS[6]: self.start_forget,
-            TOOL_TRASH_KEYS[0]: self.start_trash_refresh,
-            TOOL_TRASH_KEYS[1]: self.start_trash_scan,
-            TOOL_TRASH_KEYS[2]: self.start_trash_empty,
-            TOOL_TRASH_KEYS[3]: self.start_trash_refresh_scan,
-            TOOL_TRASH_KEYS[4]: self.start_trash_refresh_scan_empty,
+            TOOL_TRASH_KEYS[0]: self.start_trash,
+            TOOL_TRASH_KEYS[1]: self.start_trash,
+            TOOL_TRASH_KEYS[2]: self.start_trash,
+            TOOL_TRASH_KEYS[3]: self.start_trash,
+            TOOL_TRASH_KEYS[4]: self.start_trash,
         }
 
-    def start_trash(self, job: ModelBase, refresh: bool = False, scan: bool = False, empty: bool = False) -> None:
+    def start_trash(self, job: ModelBase) -> None:
+        refresh = scan = empty = False
+        if job.task in [TOOL_TRASH_KEYS[0], TOOL_TRASH_KEYS[3], TOOL_TRASH_KEYS[4]]:
+            refresh = True
+        if job.task in [TOOL_TRASH_KEYS[1], TOOL_TRASH_KEYS[3], TOOL_TRASH_KEYS[4]]:
+            scan = True
+        if job.task in [TOOL_TRASH_KEYS[2], TOOL_TRASH_KEYS[4]]:
+            empty = True
         plex_aider = PlexmateAider()
-        rclone_aider = RcloneAider()
-        trashes: dict = plex_aider.get_trashes(job.section_id, 1, -1)
-        paths = {Path(row['file']).parent for row in trashes}
-        for path in paths:
-            if CONFIG.get(TOOL_TRASH_TASK_STATUS) != STATUS_KEYS[1]:
-                LOGGER.info(f'작업을 중지합니다.')
-                break
-            if refresh:
-                rclone_aider.vfs_refresh(path, job.recursive, job.vfs)
-            if scan:
-                plex_aider.scan(SCAN_MODE_KEYS[2], str(path), -1, job.section_id)
-        if empty:
+        if not job.task == TOOL_TRASH_KEYS[2]:
+            rclone_aider = RcloneAider()
+            trashes: dict = plex_aider.get_trashes(job.section_id, 1, -1)
+            paths = {Path(row['file']).parent for row in trashes}
+            for path in paths:
+                if CONFIG.get(TOOL_TRASH_TASK_STATUS) != STATUS_KEYS[1]:
+                    LOGGER.info(f'작업을 중지합니다.')
+                    break
+                if refresh:
+                    rclone_aider.vfs_refresh(path, job.recursive, job.vfs)
+                if scan:
+                    plex_aider.scan(SCAN_MODE_KEYS[2], str(path), -1, job.section_id)
+        if empty and CONFIG.get(TOOL_TRASH_TASK_STATUS) == STATUS_KEYS[1]:
             plex_aider.empty_trash(job.section_id)
-
-    def start_trash_refresh_scan_empty(self, job: ModelBase) -> None:
-        '''trash_refresh_scan_empty'''
-        self.start_trash(job, True, True, True)
-
-    def start_trash_refresh_scan(self, job: ModelBase) -> None:
-        '''trash_refresh_scan'''
-        self.start_trash(job, True, True, False)
-
-    def start_trash_empty(self, job: ModelBase) -> None:
-        '''trash_empty'''
-        PlexmateAider().empty_trash(job.section_id)
-
-    def start_trash_scan(self, job: ModelBase) -> None:
-        '''trash_scan'''
-        self.start_trash(job, False, True, False)
-
-    def start_trash_refresh(self, job: ModelBase) -> None:
-        '''trash_refresh'''
-        self.start_trash(job, True, False, False)
 
     def start_forget(self, job: ModelBase) -> None:
         '''forget'''
@@ -124,11 +111,9 @@ class JobAider(Aider):
         platform_name = platform.system().lower()
         LOGGER.debug(f'플랫폼: {platform_name}')
         if platform_name == 'windows':
-            winaider = WindowsAider()
-            winaider.startup()
+            WindowsAider().startup()
         elif platform_name == 'linux':
-            ubuntuaider = UbuntuAider()
-            ubuntuaider.startup()
+            UbuntuAider().startup()
         else:
             LOGGER.warning(f'실행할 수 없는 OS 환경입니다: {platform_name}')
 
@@ -185,14 +170,14 @@ class JobAider(Aider):
 
 class SettingAider(Aider):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     def remote_command(self, command: str, url: str, username: str, password: str) -> requests.Response:
         LOGGER.debug(url)
         return self.request('POST', f'{url}/{command}', auth=(username, password))
 
-    def depends(self, text: str = None):
+    def depends(self, text: str = None) -> str:
         try:
             if not DEPEND_USER_YAML.exists():
                 shutil.copyfile(DEPEND_SOURCE_YAML, DEPEND_USER_YAML)
@@ -214,7 +199,7 @@ class SettingAider(Aider):
 
 class BrowserAider(Aider):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     def get_dir(self, target_path: str) -> list[dict[str, str]]:
@@ -260,7 +245,7 @@ class BrowserAider(Aider):
 
 class PluginAider(Aider):
 
-    def __init__(self, name: str):
+    def __init__(self, name: str) -> None:
         super().__init__(name)
 
     @property
@@ -293,17 +278,9 @@ class PluginAider(Aider):
 
 class PlexmateAider(PluginAider):
 
-    _plex_server = None
-
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('plex_mate')
         self.db = self.plugin.PlexDBHandle
-
-    @property
-    def plex_server(self):
-        if not self._plex_server:
-            self._plex_server = PlexServer(self.plugin.ModelSetting.get('base_url'), self.plugin.ModelSetting.get('base_token'))
-        return self._plex_server
 
     def get_scan_model(self) -> ModelBase:
         return self.get_module('scan').web_list_model
@@ -312,12 +289,12 @@ class PlexmateAider(PluginAider):
         return self.get_scan_model().get_list_by_status(status)
 
     def get_sections(self) -> dict[str, Any]:
-        sections = {}
-        sections[SECTION_TYPE_KEYS[0]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=1)]
-        sections[SECTION_TYPE_KEYS[1]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=2)]
-        sections[SECTION_TYPE_KEYS[2]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=8)]
-        sections[SECTION_TYPE_KEYS[3]] = [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=13)]
-        return sections
+        return {
+            SECTION_TYPE_KEYS[0]: [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=1)],
+            SECTION_TYPE_KEYS[1]: [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=2)],
+            SECTION_TYPE_KEYS[2]: [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=8)],
+            SECTION_TYPE_KEYS[3]: [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=13)],
+        }
 
     def get_periodics(self) -> list[dict[str, Any]]:
         periodics = []
@@ -351,21 +328,6 @@ class PlexmateAider(PluginAider):
             return cs.execute(query.format(section_id=section_id, limit=limit, offset=offset)).fetchall()
 
     def get_trash_list(self, section_id: int, page_no: int = 1, limit: int = 10) -> dict[str, Any]:
-        '''
-        plex_server = PlexServer(self.plugin.ModelSetting.get('base_url'), self.plugin.ModelSetting.get('base_token'))
-        movie:
-            videos: plexapi.video.Movie = plex_server.library.sectionByID(section_id).search(filters={"trash": True})
-        episode:
-            libtype:
-                movie, show, season, episode, artist, album, track, photoalbum
-                Default is the main library type.
-            videos: plexapi.video.Episode = plex_server.library.sectionByID(section_id).search(libtype='episode', filters={"trash": True})
-        exists:
-            for v in videos:
-                v.reload() # It takes a long time.
-                v.media[0].parts[0].exists
-                v.media[0].parts[0].accessible
-        '''
         result = {'total': 0, 'limit': limit, 'page': page_no, 'section_id': section_id, 'total_paths': 0, 'data': None}
         total_rows = self.get_trashes(section_id, 1, -1)
         paths ={Path(row['file']).parent for row in total_rows}
@@ -457,9 +419,21 @@ class PlexmateAider(PluginAider):
         웹 스캔의 activity 추적은 정확하지 않아 명령만 전달하는 방식으로 실행
         정확한 추적은 바이너리 스캔의 activity 옵션으로 가능해 보임
         '''
-        section = self.plex_server.library.sectionByID(section_id)
-        section.update(path=location)
-        LOGGER.info(f'스캔 전송: {section.title}: {location}')
+        url = f'{self.plugin.ModelSetting.get("base_url")}/library/sections/{section_id}/refresh'
+        params = {
+            'X-Plex-Token': self.plugin.ModelSetting.get('base_token'),
+            'path': location,
+        }
+        section = self.get_section_by_id(section_id)
+        try:
+            response = self.request('GET', url, params=params)
+            if str(response.status_code)[0] == '2':
+                LOGGER.info(f'스캔 전송: {section.get("name")}: {location}')
+            else:
+                raise Exception(f'스캔 전송 실패: {response.text}')
+        except:
+            LOGGER.error(traceback.format_exc())
+
 
     def scan(self, scan_mode: str, target: str = None, periodic_id: int = -1, section_id: int = -1) -> None:
         if scan_mode == SCAN_MODE_KEYS[2]:
@@ -524,40 +498,39 @@ class PlexmateAider(PluginAider):
             LOGGER.warning(f'존재하지 않는 섹션입니다: {section_id}')
 
     def delete_media(self, meta_id: int, media_id: int) -> tuple[bool, str]:
-        """
-        #/library/metadata/508092/media/562600
-        plex_url = self.plugin.ModelSetting.get('base_url')
-        plex_token = self.plugin.ModelSetting.get('base_token')
-        url = f'{plex_url}/library/metadata/{meta_id}/media/{media_id}'
+        url = f'{self.plugin.ModelSetting.get("base_url")}/library/metadata/{meta_id}/media/{media_id}'
         params = {
-            'X-Plex-Token': plex_token
+            'X-Plex-Token': self.plugin.ModelSetting.get('base_token')
         }
-        response = self.request('DELETE', url, params=params)
-        """
         try:
-            video = self.plex_server.library.fetchItem(meta_id, Media__id=media_id).reload()
-            for media in video.media:
-                if media.id == media_id:
-                    non_exists = []
-                    for part in media.parts:
-                        if not part.exists:
-                            non_exists.append(part.file)
-                    if non_exists:
-                        LOGGER.debug(f'삭제: {non_exists}')
-                        media.delete()
-            return True, '삭제했습니다.'
-        except:
+            response = self.request('DELETE', url, params=params)
+            if str(response.status_code)[0] == '2':
+                return True, f'삭제했습니다: {media_id}'
+            else:
+                raise Exception(f'삭제할 수 없습니다: {response.text}')
+        except Exception as e:
             LOGGER.error(traceback.format_exc())
-            return False, '오류가 발생했습니다.'
+            return False, str(e)
 
     def empty_trash(self, section_id: int) -> None:
-        self.plex_server.library.sectionByID(section_id).emptyTrash()
-        LOGGER.debug(f'휴지통 비우기 명령을 전송했습니다: {section_id}')
+        url = f'{self.plugin.ModelSetting.get("base_url")}/library/sections/{section_id}/emptyTrash'
+        params = {
+            'X-Plex-Token': self.plugin.ModelSetting.get('base_token')
+        }
+        section = self.get_section_by_id(section_id)
+        try:
+            response = self.request('PUT', url, params=params)
+            if str(response.status_code)[0] == '2':
+                LOGGER.info(f'휴지통 비우기 명령을 전송했습니다: {section.get("name")}')
+            else:
+                raise Exception(f'휴지통 비우기 명령을 전달할 수 없습니다: {response.text}')
+        except Exception as e:
+            LOGGER.error(traceback.format_exc())
 
 
 class GDSToolAider(PluginAider):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('gds_tool')
 
     def get_model(self, name: str) -> ModelBase:
@@ -579,7 +552,7 @@ class GDSToolAider(PluginAider):
 
 class RcloneAider(Aider):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     def get_metadata_cache(self, fs: str) -> tuple[int, int]:
@@ -687,7 +660,7 @@ class RcloneAider(Aider):
 
 class StatupAider(Aider):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     def sub_run(self, *args: tuple[str],
@@ -781,7 +754,7 @@ class StatupAider(Aider):
 
 class UbuntuAider(StatupAider):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     def get_commands_from_packages(self, require_packages) -> list[str]:
@@ -790,7 +763,7 @@ class UbuntuAider(StatupAider):
 
 class WindowsAider(StatupAider):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     def get_commands_from_packages(self, require_packages) -> list[str]:

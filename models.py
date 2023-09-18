@@ -40,7 +40,7 @@ class Job(ModelBase):
     def __init__(self, task: str = '', schedule_mode: str = FF_SCHEDULE_KEYS[0], schedule_auto_start: bool = False,
                  desc: str = '', target: str = '', recursive: bool = False, section_id: int = -1,
                  vfs: str = '', scan_mode: str = SCAN_MODE_KEYS[0], periodic_id: int = -1,
-                 clear_type: str = '', clear_level: str = '', clear_section: int = -1):
+                 clear_type: str = '', clear_level: str = '', clear_section: int = -1) -> None:
         self.ctime = datetime.now()
         self.ftime = datetime(1970, 1, 1)
         self.task = task
@@ -152,7 +152,7 @@ class Job(ModelBase):
         return self
 
     @classmethod
-    def web_list(cls, request: Request) -> dict[str, Any] | None:
+    def web_list(cls, request: Request) -> dict[str, Any]:
         '''override'''
         returns = {}
         returns['list'] = []
