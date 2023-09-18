@@ -250,7 +250,7 @@ class BaseModule(Base, PluginModuleBase):
 
     def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: Request) -> Response:
         '''override'''
-        return Base.process_command(self, command, arg1, arg2, arg3, req)
+        return super().process_command(command, arg1, arg2, arg3, req)
 
     def process_api(self, sub: str, req: Request):
         '''override'''
@@ -384,7 +384,7 @@ class BasePage(Base, PluginPageBase):
 
     def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: Request) -> Response:
         '''override'''
-        return Base.process_command(self, command, arg1, arg2, arg3, req)
+        return super().process_command(command, arg1, arg2, arg3, req)
 
     def plugin_load(self):
         '''override'''
