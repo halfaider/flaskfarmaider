@@ -5,16 +5,18 @@ from .constants import TASK_KEYS, SCAN_MODE_KEYS
 
 
 def migrate(ver: str, table, cs: sqlite3.Cursor) -> None:
-    if ver == '1':
-        migrate_v2(cs, table)
-    elif ver == '2':
-        migrate_v3(cs, table)
-    elif ver == '3':
-        migrate_v4(cs, table)
-    elif ver == '4':
-        migrate_v5(cs, table)
-    elif ver == '5':
-        migrate_v6(cs, table)
+    migrations = {
+        '1': migrate_v2,
+        '2': migrate_v3,
+        '3': migrate_v4,
+        '4': migrate_v5,
+        '5': migrate_v6,
+    }
+    migrations.get(ver, migrate_v1)(cs, table)
+
+
+def migrate_v1(cs: sqlite3.Cursor, table: str) -> None:
+    LOGGER.warning(f'DB 버전 확인 필요')
 
 
 def migrate_v2(cs: sqlite3.Cursor, table: str) -> None:

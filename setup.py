@@ -22,6 +22,13 @@ DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/flaskfarmai
 CELERY_INSPECT = FRAMEWORK.celery.control.inspect()
 CELERY_ACTIVE = False
 
+from .presenters import Setting
+from .presenters import Schedule
+from .presenters import Manual
+from .presenters import Tool
+
+PLUGIN.set_module_list([Setting, Schedule, Manual, Tool])
+
 
 def check_celery() -> None:
     global CELERY_ACTIVE
@@ -31,10 +38,3 @@ def check_celery() -> None:
 
 
 threading.Thread(target=check_celery, daemon=True).start()
-
-from .presenters import Setting
-from .presenters import Schedule
-from .presenters import Manual
-from .presenters import Tool
-
-PLUGIN.set_module_list([Setting, Schedule, Manual, Tool])
