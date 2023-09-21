@@ -173,10 +173,6 @@ class SettingAider(Aider):
     def __init__(self) -> None:
         super().__init__()
 
-    def remote_command(self, command: str, url: str, username: str, password: str) -> requests.Response:
-        LOGGER.debug(url)
-        return self.request('POST', f'{url}/{command}', auth=(username, password))
-
     def depends(self, text: str = None) -> str:
         try:
             if not DEPEND_USER_YAML.exists():
@@ -570,6 +566,16 @@ class RcloneAider(Aider):
             data=data,
             auth=(CONFIG.get(SETTING_RCLONE_REMOTE_USER), CONFIG.get(SETTING_RCLONE_REMOTE_PASS))
         )
+
+    def _vfs_list(self) -> Response:
+        return self.command('vfs/list')
+
+    def vfs_list(self) -> list:
+        response = self._vfs_list()
+        vfses = [CONFIG.get(SETTING_RCLONE_REMOTE_VFS)]
+        if int(str(response.status_code)[0]) == 2:
+            vfses = response.json().get('vfses', vfses)
+        return sorted(vfses)
 
     def _vfs_refresh(self, remote_path: str, recursive: bool = False, fs: str = None, forget: bool = False) -> Response:
         data = {

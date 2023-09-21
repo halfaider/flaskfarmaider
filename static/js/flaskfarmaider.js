@@ -7,31 +7,29 @@ function init() {
 
 function init_setting() {
     init();
-    $("body").on('click', '#btn_test_connection_rclone', function (e) {
+    E_SETTING_TEST_CONN = $('#btn_test_connection_rclone');
+    E_SETTING_VFSES = $('#setting_rclone_remote_vfs');
+
+    E_SETTING_TEST_CONN.on('click', function (e) {
         e.preventDefault();
-        ret = globalSendCommand(
-            'command_test_connection',
-            $('#setting_rclone_remote_addr').prop('value').trim(),
-            $('#setting_rclone_remote_user').prop('value').trim(),
-            $('#setting_rclone_remote_pass').prop('value').trim(),
-            callback_test_connection
-        );
+        globalSettingSave();
+        globalSendCommand('command_test_connection', '', '', '', callback_test_connection);
     });
 
     function callback_test_connection(result) {
-        switch (result.ret) {
-            case 'success':
-                console.log('Connection success');
-                $('#btn_test_connection_rclone').text('접속 성공');
-                console.log(result.vfses[0]);
-                $('#setting_rclone_remote_vfs').prop('value', result.vfses[0]);
-                break;
-            case 'failed': arguments
-                console.log('Connection failed');
-                $('#btn_test_connection_rclone').text('접속 실패');
-                break;
-            default:
-                console.log('Connection returns : ${result.ret}');
+        if (result.ret == 'success') {
+            console.log('Connection success');
+            console.log(result.vfses);
+            E_SETTING_TEST_CONN.text('접속 성공');
+            E_SETTING_VFSES.empty();
+            result.vfses.forEach(function(vfs) {
+                E_SETTING_VFSES.append($('<option></option>').prop('value', vfs).append(vfs));
+            });
+            E_SETTING_VFSES.prop('value', (VFS) ? VFS : result.vfses[0]);
+        } else {
+            console.log('Connection failed');
+            console.log(result.ret);
+            E_SETTING_TEST_CONN.text('접속 실패');
         }
     }
 }
@@ -45,7 +43,7 @@ function init_schedule() {
     SCH_FORM_PATH = build_sch_form_text_btn('sch-target-path', '로컬 경로', '', 'sch-target-path-btn', '경로 탐색', 10, '새로고침/스캔 할 경로<br>Flaskfarm에서 접근 가능한 로컬 경로');
     SCH_FORM_SECTION = build_sch_form_select('sch-target-section', '라이브러리 섹션', [{value: -1, name: '선택 안 함'}], 5, '새로고침/스캔 할 라이브러리 섹션<br>로컬 경로와 비교하여 하위인 경로가 선택됩니다.')
     SCH_FORM_GROUP_PATH = build_sch_form_group('sch-form-group-path', [SCH_FORM_PATH, SCH_FORM_SECTION, SCH_FORM_LINE]);
-    SCH_FORM_VFS = build_sch_form_text('sch-vfs', 'VFS 리모트', '', 5, 'rclone rc로 접근 가능한 리모트 이름<br>ex. gds:');
+    SCH_FORM_VFS = build_sch_form_select('sch-vfs', 'VFS 리모트', VFSES, 5, 'rclone rc로 접근 가능한 리모트 이름<br>ex. gds:');
     SCH_FORM_RECURSIVE = build_sch_form_checkbox('sch-recursive', 'recursive', 'off', 9, 'rclone vfs/refresh의 --recursive 옵션 적용 여부<br>On: 지정된 경로의 모든 하위 경로도 vfs/refresh<br>Off: 지정된 경로만 vfs/refresh');
     SCH_FORM_GROUP_RCLONE = build_sch_form_group('sch-form-group-rclone', [SCH_FORM_VFS, SCH_FORM_RECURSIVE, SCH_FORM_LINE]);
     SCH_FORM_SCAN_TYPE = build_sch_form_radio('sch-scan-mode', '스캔 방식', SCAN_OPTS, 9, '');
@@ -164,7 +162,7 @@ function init_schedule() {
     // 브라우저 이동 버튼
     E_BROWSER_WD_SUBMIT.on('click', function(e) {
         dir = E_BROWSER_WD.prop('value');
-        browser_command({command: 'list', path: dir});
+        browser_command({command: 'list', path: dir, vfs: VFS, recursive: false, scan_mode: SCAN_MODE_KEYS[0]});
     });
     E_GLOBAL_SEARCH_BTN = $('#globalSearchSearchBtn');
     E_GLOBAL_SEARCH_KEYWORD = $('#keyword');
@@ -199,6 +197,7 @@ function init_schedule() {
         command: 'list',
         path: E_BROWSER_WD.prop('value'),
         recursive: false,
+        vfs: VFS,
         scan_mode: SCAN_MODE_KEYS[0],
     });
 
@@ -236,9 +235,10 @@ function init_trash() {
         globalSendCommandPage('stop', '', '', '', null);
     });
     E_TRASH_TASK = $('#trash-task');
+    E_TRASH_VFS = $('#trash-vfs');
     E_TRASH_BTN_EXCEUTE = $('#trash-btn-execute');
     E_TRASH_BTN_EXCEUTE.on('click', function(e) {
-        globalSendCommandPage(E_TRASH_TASK.prop('value'), E_TRASH_SECTIONS.prop('value'), '', '', null);
+        globalSendCommandPage(E_TRASH_TASK.prop('value'), E_TRASH_SECTIONS.prop('value'), E_TRASH_VFS.prop('value'), '', null);
     });
 }
 
@@ -424,7 +424,7 @@ function copy_to_clipboard(text) {
 }
 
 function browser_command(cmd) {
-    globalSendCommand(cmd.command, cmd.path, cmd.recursive, cmd.scan_mode + "|-1", function(result) {
+    globalSendCommand(cmd.command, cmd.path, cmd.vfs + '|' + cmd.recursive, cmd.scan_mode + "|-1", function(result) {
         if (result.ret == 'success' && cmd.command == 'list') {
             E_WORKING_DIR.prop('value', cmd.path);
             list_dir(JSON.parse(result.data));
@@ -468,6 +468,7 @@ function list_dir(result) {
                 command: 'list',
                 path: path,
                 recursive: false,
+                vfs: VFS,
                 scan_mode: SCAN_MODE_KEYS[0],
             }
             browser_command(cmd);
@@ -475,6 +476,10 @@ function list_dir(result) {
     });
 
     // attach context menu
+    vfs_options = {};
+    for (idx in _VFSES) {
+        vfs_options[_VFSES[idx]] = _VFSES[idx];
+    }
     $.contextMenu({
         selector: '.browser-context-menu',
         className: 'context-menu',
@@ -487,6 +492,7 @@ function list_dir(result) {
                     path: path,
                     recursive: opt.inputs['recursive'].$input.prop('checked'),
                     scan_mode: opt.inputs['scan_mode'].$input.prop('value'),
+                    vfs: opt.inputs['vfs'].$input.prop('value'),
                 }
                 browser_command(cmd);
             });
@@ -541,6 +547,13 @@ function list_dir(result) {
                 name: 'Recursive',
                 type: 'checkbox',
                 selected: false,
+                disabled: function(){return $(this).hasClass('restrict-context');},
+            },
+            vfs: {
+                name: 'vfs 리모트',
+                type: 'select',
+                options: vfs_options,
+                selected: VFS,
                 disabled: function(){return $(this).hasClass('restrict-context');},
             },
             scan_mode: {

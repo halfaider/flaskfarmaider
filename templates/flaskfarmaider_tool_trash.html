@@ -11,14 +11,23 @@
             <option>No sections</option>
         </select>
         <div class="input-group-append">
-            <button class="btn btn-primary px-5" type="button" id="trash-btn-list">조회</button>
+            <button class="btn btn-primary px-4" type="button" id="trash-btn-list">조회</button>
         </div>
-        <select class="custom-select col-3" id="trash-task">
+        <select class="custom-select col-2" id="trash-task">
             <option value="{{ args.tool_trash_keys.0 }}">{{ args.tool_trashes[args.tool_trash_keys.0].name }}</option>
             <option value="{{ args.tool_trash_keys.1 }}">{{ args.tool_trashes[args.tool_trash_keys.1].name }}</option>
             <option value="{{ args.tool_trash_keys.2 }}">{{ args.tool_trashes[args.tool_trash_keys.2].name }}</option>
             <option value="{{ args.tool_trash_keys.3 }}">{{ args.tool_trashes[args.tool_trash_keys.3].name }}</option>
             <option value="{{ args.tool_trash_keys.4 }}">{{ args.tool_trashes[args.tool_trash_keys.4].name }}</option>
+        </select>
+        <select class="custom-select col-1" id="trash-vfs">
+        {%- for vfs in args.setting_rclone_remote_vfses %}
+        {%- if vfs == args.setting_rclone_remote_vfs %}
+            <option value="{{ vfs }}" selected>{{ vfs }}</option>
+        {% else %}
+            <option value="{{ vfs }}">{{ vfs }}</option>
+        {% endif %}
+        {% endfor %}
         </select>
         <div class="input-group-append">
             <button class="btn btn-primary px-5" type="button" id="trash-btn-execute" data-tool_trash_task_status="{{ args.tool_trash_task_status }}">

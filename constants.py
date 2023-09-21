@@ -87,6 +87,7 @@ MEDIA_TYPE_VALUES = {
 SETTING_DB_VERSION = f'{SETTING}_db_version'
 SETTING_RCLONE_REMOTE_ADDR = f'{SETTING}_rclone_remote_addr'
 SETTING_RCLONE_REMOTE_VFS = f'{SETTING}_rclone_remote_vfs'
+SETTING_RCLONE_REMOTE_VFSES = f'{SETTING}_rclone_remote_vfses'
 SETTING_RCLONE_REMOTE_USER = f'{SETTING}_rclone_remote_user'
 SETTING_RCLONE_REMOTE_PASS = f'{SETTING}_rclone_remote_pass'
 SETTING_RCLONE_MAPPING = f'{SETTING}_rclone_remote_mapping'

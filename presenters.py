@@ -14,7 +14,7 @@ import flask_login
 from .setup import PluginBase, PluginModuleBase, PluginPageBase, system_plugin, default_route_socketio_module, ModelBase, FrameworkJob
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
 from .models import Job
-from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider
+from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider, RcloneAider
 from .migrations import migrate
 from .constants import *
 
@@ -70,7 +70,8 @@ class Base:
     def prerender(self, sub: str, req: Request) -> None:
         self.set_recent_menu(req)
 
-    def task_command(self, task: str, target: str, recursive: str, scan: str) -> tuple[bool, str]:
+    def task_command(self, task: str, target: str, vfs: str, scan: str) -> tuple[bool, str]:
+        vfs, recursive = vfs.split('|')
         if recursive:
             recursive = True if recursive.lower() == 'true' else False
         else:
@@ -87,6 +88,7 @@ class Base:
                 'recursive': recursive,
                 'scan_mode': scan_mode,
                 'periodic_id': int(periodic_id) if periodic_id else -1,
+                'vfs': vfs,
             }
             self.run_async(self.start_job, (Job.get_job(info=job),))
             result, msg = True, '작업을 실행했습니다.'
@@ -483,6 +485,7 @@ class Setting(BaseModule):
         args = super().get_template_args()
         args[SETTING_RCLONE_REMOTE_ADDR] = CONFIG.get(SETTING_RCLONE_REMOTE_ADDR)
         args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
+        args[SETTING_RCLONE_REMOTE_VFSES] = RcloneAider().vfs_list()
         args[SETTING_RCLONE_REMOTE_USER] = CONFIG.get(SETTING_RCLONE_REMOTE_USER)
         args[SETTING_RCLONE_REMOTE_PASS] = CONFIG.get(SETTING_RCLONE_REMOTE_PASS)
         args[SETTING_RCLONE_MAPPING] = CONFIG.get(SETTING_RCLONE_MAPPING)
@@ -496,12 +499,12 @@ class Setting(BaseModule):
         return args
 
     def command_test_conn(self, request: Request) -> dict:
-        response = SettingAider().remote_command('vfs/list', request.form.get('arg1'), request.form.get('arg2'), request.form.get('arg3'))
+        response = RcloneAider()._vfs_list()
         data = {'title': 'Rclone Remote', 'modal': response.text}
         if int(str(response.status_code)[0]) == 2:
             data['ret'] = 'success'
             data['msg'] = '접속에 성공했습니다.'
-            data['vfses'] = response.json()['vfses']
+            data['vfses'] = sorted(response.json()['vfses'])
         else:
             data['ret'] = 'warning'
             data['msg'] = '접속에 실패했습니다.'
@@ -569,7 +572,8 @@ class Schedule(BaseModule):
         args = super().get_template_args()
         args[f'{self.name}_working_directory'] = CONFIG.get(SCHEDULE_WORKING_DIRECTORY)
         args[f'{self.name}_last_list_option'] = CONFIG.get(SCHEDULE_LAST_LIST_OPTION)
-        args['rclone_remote_vfs'] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
+        args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
+        args[SETTING_RCLONE_REMOTE_VFSES] = RcloneAider().vfs_list()
         try:
             plexmateaider = PlexmateAider()
             args['periodics'] = plexmateaider.get_periodics()
@@ -615,6 +619,7 @@ class Schedule(BaseModule):
         if old_job.id > 0:
             th = ThreadHasReturn(target=self.schedule_reload, args=(job, old_job), daemon=True, callback=self.callback_sio)
             th.start()
+        if job.id > 0:
             return self.returns('success', '저장했습니다.')
         else:
             return self.returns('warning', '저장할 수 없습니다.')
@@ -723,6 +728,7 @@ class ToolTrash(BasePage):
             job = Job.get_job()
             job.task = command
             job.section_id = int(request.form.get('arg1'))
+            job.vfs = request.form.get('arg2')
             self.run_async(self.start_job, (job,))
             return self.returns('success', f'작업을 실행했습니다.')
         else:
@@ -747,6 +753,8 @@ class ToolTrash(BasePage):
         args['tool_trashes'] = TOOL_TRASHES
         args['status_keys'] = STATUS_KEYS
         args[TOOL_TRASH_TASK_STATUS.lower()] = CONFIG.get(TOOL_TRASH_TASK_STATUS)
+        args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
+        args[SETTING_RCLONE_REMOTE_VFSES] = RcloneAider().vfs_list()
         return args
 
 
