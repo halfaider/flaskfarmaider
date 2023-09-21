@@ -18,6 +18,19 @@ from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSTool
 from .migrations import migrate
 from .constants import *
 
+CELERY_INSPECT = FRAMEWORK.celery.control.inspect()
+CELERY_ACTIVE = False
+
+
+def check_celery() -> None:
+    global CELERY_ACTIVE
+    while True:
+        CELERY_ACTIVE = True if CELERY_INSPECT.active() else False
+        time.sleep(5)
+
+
+Thread(target=check_celery, daemon=True).start()
+
 
 class ThreadHasReturn(Thread):
 
@@ -97,9 +110,9 @@ class Base:
         return result, msg
 
     def run_async(self, func: callable, args: tuple = (), kwargs: dict = {}, **opts) -> None:
-        from .setup import CELERY_ACTIVE
         if CELERY_ACTIVE:
             result = func.apply_async(args=args, kwargs=kwargs, link=self.celery_link.s(), **opts)
+            # 결과는 serve 중인 메인 스레드에 출력해야 하므로
             Thread(target=result.get, kwargs={'on_message': self.callback_sio, 'propagate': False}, daemon=True).start()
         else:
             th = ThreadHasReturn(target=func, args=args, kwargs=kwargs, daemon=True, callback=self.callback_sio)
@@ -756,6 +769,16 @@ class ToolTrash(BasePage):
         args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
         args[SETTING_RCLONE_REMOTE_VFSES] = RcloneAider().vfs_list()
         return args
+
+    def plugin_load(self) -> None:
+        '''override'''
+        super().plugin_load()
+        CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[0])
+
+    def plugin_unload(self) -> None:
+        '''override'''
+        super().plugin_unload()
+        CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[0])
 
 
 class ToolEtcSetting(BasePage):

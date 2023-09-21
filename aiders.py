@@ -18,9 +18,10 @@ import requests
 from requests import Response
 
 from .setup import PluginModuleBase, ModelBase
-from .setup import FRAMEWORK, LOGGER,  DEPEND_USER_YAML, CONFIG
+from .setup import FRAMEWORK, LOGGER, CONFIG
 from .constants import *
 
+DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/flaskfarmaider.yaml')
 
 class Aider:
 
