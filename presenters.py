@@ -1,14 +1,12 @@
 import json
 import traceback
-from typing import Any
-from urllib.parse import parse_qs
+import urllib
 from threading import Thread
 import sqlite3
 import time
 import functools
 
-from flask import Response, render_template, jsonify
-from flask.wrappers import Request
+import flask
 import flask_login
 
 from .setup import PluginBase, PluginModuleBase, PluginPageBase, system_plugin, default_route_socketio_module, ModelBase, FrameworkJob
@@ -67,12 +65,12 @@ class Base:
             'default': self.command_default,
         }
 
-    def set_recent_menu(self, req: Request) -> None:
+    def set_recent_menu(self, req: flask.Request) -> None:
         current_menu = '|'.join(req.path[1:].split('/')[1:])
         if not current_menu == CONFIG.get('recent_menu_plugin'):
             CONFIG.set('recent_menu_plugin', current_menu)
 
-    def get_template_args(self) -> dict[str, Any]:
+    def get_template_args(self) -> dict:
         args = {
             'package_name': PLUGIN.package_name,
             'module_name': self.name if isinstance(self, BaseModule) else self.parent.name,
@@ -80,7 +78,7 @@ class Base:
         }
         return args
 
-    def prerender(self, sub: str, req: Request) -> None:
+    def prerender(self, sub: str, req: flask.Request) -> None:
         self.set_recent_menu(req)
 
     def task_command(self, task: str, target: str, vfs: str, scan: str) -> tuple[bool, str]:
@@ -147,16 +145,16 @@ class Base:
     def callback_sio(self, data: dict) -> None:
         self.socketio_callback('result', {'status': data.get('status'), 'data': data.get('result')})
 
-    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, request: Request) -> Response:
+    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, request: flask.Request) -> flask.Response:
         try:
             data = self.commands.get(command, self.commands.get('default'))(request)
         except Exception as e:
             LOGGER.error(traceback.format_exc())
             data = self.returns('warning', str(e))
         finally:
-            return jsonify(data)
+            return flask.jsonify(data)
 
-    def command_default(self, request: Request) -> dict:
+    def command_default(self, request: flask.Request) -> dict:
         command = request.form.get('command')
         if command in TASK_KEYS:
             result, msg = self.task_command(command, request.form.get('arg1'), request.form.get('arg2'), request.form.get('arg3'))
@@ -242,7 +240,7 @@ class BaseModule(Base, PluginModuleBase):
         '''override'''
         return super().get_page(page_name)
 
-    def process_menu(self, sub: str, req: Request) -> Response:
+    def process_menu(self, sub: str, req: flask.Request) -> flask.Response:
         '''override'''
         self.prerender(sub, req)
         try:
@@ -254,24 +252,24 @@ class BaseModule(Base, PluginModuleBase):
                 return page_ins.process_menu(req)
             else:
                 args = self.get_template_args()
-                return render_template(f'{PLUGIN.package_name}_{self.name}.html', args=args)
+                return flask.render_template(f'{PLUGIN.package_name}_{self.name}.html', args=args)
         except:
             LOGGER.error(traceback.format_exc())
-            return render_template('sample.html', title=f"process_menu() - {PLUGIN.package_name}/{self.name}/{sub}")
+            return flask.render_template('sample.html', title=f"process_menu() - {PLUGIN.package_name}/{self.name}/{sub}")
 
-    def process_ajax(self, sub: str, req: Request) -> Response:
+    def process_ajax(self, sub: str, req: flask.Request) -> flask.Response:
         '''override'''
         return super().process_ajax(sub, req)
 
-    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: Request) -> Response:
+    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: flask.Request) -> flask.Response:
         '''override'''
         return super().process_command(command, arg1, arg2, arg3, req)
 
-    def process_api(self, sub: str, req: Request) -> Response:
+    def process_api(self, sub: str, req: flask.Request) -> flask.Response:
         '''override'''
         return super().process_api(sub, req)
 
-    def process_normal(self, sub: str, req: Request) -> Response:
+    def process_normal(self, sub: str, req: flask.Request) -> flask.Response:
         '''override'''
         return super().process_normal(sub, req)
 
@@ -299,7 +297,7 @@ class BaseModule(Base, PluginModuleBase):
         '''override'''
         super().setting_save_after(change_list)
 
-    def process_telegram_data(self, data: Any, target: str = None) -> None:
+    def process_telegram_data(self, data: dict, target: str = None) -> None:
         '''override'''
         super().process_telegram_data(data, target=target)
 
@@ -343,11 +341,11 @@ class BaseModule(Base, PluginModuleBase):
         '''override'''
         return super().get_scheduler_name()
 
-    def process_discord_data(self, data: Any) -> None:
+    def process_discord_data(self, data: dict) -> None:
         '''override'''
         super().process_discord_data(data)
 
-    def start_celery(self, func: callable, *args, on_message: callable = None, page: PluginPageBase = None) -> Any:
+    def start_celery(self, func: callable, *args, on_message: callable = None, page: PluginPageBase = None) -> dict:
         '''override'''
         if FRAMEWORK.config['use_celery']:
             result = func.apply_async(args)
@@ -375,29 +373,29 @@ class BasePage(Base, PluginPageBase):
         super().__init__(plugin, parent, name, scheduler_desc)
         self.db_default = {}
 
-    def process_menu(self, req: Request) -> Response:
+    def process_menu(self, req: flask.Request) -> flask.Response:
         '''override'''
         self.prerender(self.name, req)
         try:
             args = self.get_template_args()
-            return render_template(f'{PLUGIN.package_name}_{self.parent.name}_{self.name}.html', args=args)
+            return flask.render_template(f'{PLUGIN.package_name}_{self.parent.name}_{self.name}.html', args=args)
         except:
             self.P.logger.error(traceback.format_exc())
-            return render_template('sample.html', title=f"process_menu() - {PLUGIN.package_name}/{self.parent.name}/{self.name}")
+            return flask.render_template('sample.html', title=f"process_menu() - {PLUGIN.package_name}/{self.parent.name}/{self.name}")
 
-    def process_ajax(self, sub: str, req: Request) -> Response:
+    def process_ajax(self, sub: str, req: flask.Request) -> flask.Response:
         '''override'''
         return super().process_ajax(sub, req)
 
-    def process_api(self, sub: str, req: Request) -> Response:
+    def process_api(self, sub: str, req: flask.Request) -> flask.Response:
         '''override'''
         return super().process_api(sub, req)
 
-    def process_normal(self, sub: str, req: Request) -> Response:
+    def process_normal(self, sub: str, req: flask.Request) -> flask.Response:
         '''override'''
         return super().process_normal(sub, req)
 
-    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: Request) -> Response:
+    def process_command(self, command: str, arg1: str, arg2: str, arg3: str, req: flask.Request) -> flask.Response:
         '''override'''
         return super().process_command(command, arg1, arg2, arg3, req)
 
@@ -437,7 +435,7 @@ class BasePage(Base, PluginPageBase):
         '''override'''
         super().setting_save_after(change_list)
 
-    def process_telegram_data(self, data: Any, target: str = None) -> None:
+    def process_telegram_data(self, data: dict, target: str = None) -> None:
         '''override'''
         super().process_telegram_data(data, target=target)
 
@@ -453,7 +451,7 @@ class BasePage(Base, PluginPageBase):
         '''override'''
         return super().get_module(module_name)
 
-    def process_discord_data(self, data: Any) -> None:
+    def process_discord_data(self, data: dict) -> None:
         '''override'''
         super().process_discord_data(data)
 
@@ -461,7 +459,7 @@ class BasePage(Base, PluginPageBase):
         '''override'''
         return super().db_delete(day)
 
-    def start_celery(self, func: callable, *args, on_message: callable = None) -> Any:
+    def start_celery(self, func: callable, *args, on_message: callable = None) -> dict:
         '''override'''
         return self.parent.start_celery(func, *args, on_message, page=self)
 
@@ -487,13 +485,13 @@ class Setting(BaseModule):
         }
         self.commands.update({'command_test_connection': self.command_test_conn})
 
-    def prerender(self, sub: str, req: Request) -> None:
+    def prerender(self, sub: str, req: flask.Request) -> None:
         '''override'''
         super().prerender(sub, req)
         # yaml 파일 우선
         CONFIG.set(SETTING_STARTUP_DEPENDENCIES, SettingAider().depends())
 
-    def get_template_args(self) -> dict[str, Any]:
+    def get_template_args(self) -> dict:
         '''override'''
         args = super().get_template_args()
         args[SETTING_RCLONE_REMOTE_ADDR] = CONFIG.get(SETTING_RCLONE_REMOTE_ADDR)
@@ -511,7 +509,7 @@ class Setting(BaseModule):
         args[SETTING_STARTUP_DEPENDENCIES] = CONFIG.get(SETTING_STARTUP_DEPENDENCIES)
         return args
 
-    def command_test_conn(self, request: Request) -> dict:
+    def command_test_conn(self, request: flask.Request) -> dict:
         response = RcloneAider()._vfs_list()
         data = {'title': 'Rclone Remote', 'modal': response.text}
         if int(str(response.status_code)[0]) == 2:
@@ -523,7 +521,7 @@ class Setting(BaseModule):
             data['msg'] = '접속에 실패했습니다.'
         return data
 
-    def command_default(self, request: Request) -> tuple[bool, str]:
+    def command_default(self, request: flask.Request) -> tuple[bool, str]:
         '''override'''
         return super().command_default(request)
 
@@ -582,7 +580,7 @@ class Schedule(BaseModule):
             CONFIG.set(SCHEDULE_DB_VERSION, current_db_ver)
             CONFIG.set(SETTING_DB_VERSION, '')
 
-    def get_template_args(self) -> dict[str, Any]:
+    def get_template_args(self) -> dict:
         '''override'''
         args = super().get_template_args()
         args[f'{self.name}_working_directory'] = CONFIG.get(SCHEDULE_WORKING_DIRECTORY)
@@ -630,7 +628,7 @@ class Schedule(BaseModule):
                 LOGGER.warning(f'강제로 종료되는 작업: {job.id} {job.desc}')
                 job.set_status(STATUS_KEYS[0])
 
-    def command_list(self, request: Request) -> dict:
+    def command_list(self, request: flask.Request) -> dict:
         path = request.form.get('arg1')
         dir_list = json.dumps(BrowserAider().get_dir(path))
         CONFIG.set(SCHEDULE_WORKING_DIRECTORY, path)
@@ -639,8 +637,8 @@ class Schedule(BaseModule):
         else:
             return self.returns('warning', '폴더 목록을 생성할 수 없습니다.')
 
-    def command_save(self, request: Request) -> dict:
-        query = parse_qs(request.form.get('arg1'))
+    def command_save(self, request: flask.Request) -> dict:
+        query = urllib.parse.parse_qs(request.form.get('arg1'))
         old_job = Job.get_job(int(query.get('id')[0]))
         job = Job.update_formdata(query)
         if old_job.id > 0:
@@ -651,7 +649,7 @@ class Schedule(BaseModule):
         else:
             return self.returns('warning', '저장할 수 없습니다.')
 
-    def command_delete(self, request: Request) -> dict:
+    def command_delete(self, request: flask.Request) -> dict:
         job_id = int(request.form.get('arg1'))
         if Job.delete_by_id(job_id):
             self.set_schedule(job_id, False)
@@ -659,12 +657,12 @@ class Schedule(BaseModule):
         else:
             return self.returns('warning',  f'삭제할 수 없습니다: ID {job_id}')
 
-    def command_execute(self, request: Request) -> dict:
+    def command_execute(self, request: flask.Request) -> dict:
         job_id = int(request.form.get('arg1'))
         self.run_async(self.start_job, (Job.get_job(job_id),))
         return self.returns('success', '일정을 실행했습니다.')
 
-    def command_schedule(self, request: Request) -> dict:
+    def command_schedule(self, request: flask.Request) -> dict:
         job_id = int(request.form.get('arg1'))
         active = True if request.form.get('arg2').lower() == 'true' else False
         result, msg = self.set_schedule(job_id, active)
@@ -676,7 +674,7 @@ class Manual(BaseModule):
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name=MANUAL)
 
-    def get_template_args(self) -> dict[str, Any]:
+    def get_template_args(self) -> dict:
         '''override'''
         args = super().get_template_args()
         with README.open(encoding='utf-8', newline='\n') as file:
@@ -724,16 +722,16 @@ class ToolTrash(BasePage):
                 return {'ret': 'warning', 'msg': '작업이 실행중입니다.'}
         return wrap
 
-    def command_status(self, request: Request) -> dict:
+    def command_status(self, request: flask.Request) -> dict:
         return self.returns('success', data={'status': CONFIG.get(TOOL_TRASH_TASK_STATUS)})
 
-    def command_list(self, request: Request) -> dict:
+    def command_list(self, request: flask.Request) -> dict:
         section_id = int(request.form.get('arg1'))
         page_no = int(request.form.get('arg2'))
         limit = int(request.form.get('arg3'))
         return self.returns('success', data=PlexmateAider().get_trash_list(section_id, page_no, limit))
 
-    def command_stop(self, request: Request) -> dict:
+    def command_stop(self, request: flask.Request) -> dict:
         status = CONFIG.get(TOOL_TRASH_TASK_STATUS)
         if status == STATUS_KEYS[1] or status == STATUS_KEYS[3]:
             CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[3])
@@ -742,14 +740,14 @@ class ToolTrash(BasePage):
             return self.returns('warning', '실행중이 아닙니다.')
 
     @check_status
-    def command_delete(self, request: Request) -> dict:
+    def command_delete(self, request: flask.Request) -> dict:
         metadata_id = int(request.form.get('arg1'))
         mediaitem_id = int(request.form.get('arg2'))
         result, msg = PlexmateAider().delete_media(metadata_id, mediaitem_id)
         return self.returns('success' if result else 'warning', msg)
 
     @check_status
-    def command_default(self, request: Request) -> dict:
+    def command_default(self, request: flask.Request) -> dict:
         '''override'''
         command = request.form.get('command')
         if command in TOOL_TRASH_KEYS:
@@ -762,7 +760,7 @@ class ToolTrash(BasePage):
         else:
             return super().command_default(request)
 
-    def get_template_args(self) -> dict[str, Any]:
+    def get_template_args(self) -> dict:
         '''override'''
         args = super().get_template_args()
         args['section_type_keys'] = SECTION_TYPE_KEYS
@@ -811,7 +809,7 @@ class ToolEtcSetting(BasePage):
         self.system_route_process_command = self.system_route.process_command
         self.commands['delete'] = self.command_delete
 
-    def get_template_args(self) -> dict[str, Any]:
+    def get_template_args(self) -> dict:
         '''override'''
         args = super().get_template_args()
         args[TOOL_GDS_TOOL_REQUEST_SPAN] = CONFIG.get(TOOL_GDS_TOOL_REQUEST_SPAN)
@@ -830,7 +828,7 @@ class ToolEtcSetting(BasePage):
             args[TOOL_GDS_TOOL_FP_TOTAL] = -1
         return args
 
-    def command_delete(self, request: Request) -> dict:
+    def command_delete(self, request: flask.Request) -> dict:
         mod = request.form.get('arg1')
         span = int(request.form.get('arg2'))
         GDSToolAider().delete(mod, span)
@@ -860,7 +858,7 @@ class ToolEtcSetting(BasePage):
                 else:
                     self.system_route.process_command = self.system_route_process_command
 
-    def process_command_route_system(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: Request) -> Response:
+    def process_command_route_system(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: flask.Request) -> flask.Response:
         '''alternative of system.route.process_command()'''
         if command == 'login':
             username = arg1
@@ -870,12 +868,12 @@ class ToolEtcSetting(BasePage):
             failed_msg = f'로그인 실패: {client_info}'
             if username not in FRAMEWORK.users:
                 system_plugin.logger.warning(failed_msg)
-                return jsonify('no_id')
+                return flask.jsonify('no_id')
             elif not FRAMEWORK.users[username].can_login(password):
                 system_plugin.logger.warning(failed_msg)
-                return jsonify('wrong_password')
+                return flask.jsonify('wrong_password')
             else:
                 system_plugin.logger.info(f'로그인 성공: {client_info}')
                 FRAMEWORK.users[username].authenticated = True
                 flask_login.login_user(FRAMEWORK.users[username], remember=remember)
-                return jsonify('redirect')
+                return flask.jsonify('redirect')

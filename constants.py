@@ -11,7 +11,7 @@ MANUAL = 'manual'
 LOG = 'log'
 PKG_PATH = pathlib.Path(__file__).parent
 README = PKG_PATH / 'README.md'
-DEPEND_SOURCE_YAML = PKG_PATH / 'files' / 'flaskfarmaider.yaml'
+DEPEND_SOURCE_YAML = PKG_PATH / 'files' / f'{__package__}.yaml'
 
 TASK_KEYS = ('refresh_scan', 'refresh', 'scan', 'pm_ready_refresh', 'clear', 'startup', 'forget')
 TASKS = {
@@ -121,7 +121,7 @@ OPTS = {
     'home_module': SCHEDULE,
     'menu': {
         'uri': __package__,
-        'name': 'FLASKFARMAIDER',
+        'name': __package__.upper(),
         'list': [
             {
                 'uri': SETTING,

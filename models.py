@@ -1,6 +1,5 @@
-from datetime import datetime
+import datetime
 import traceback
-from typing import Any
 
 from flask.wrappers import Request
 from flask_sqlalchemy.query import Query
@@ -41,8 +40,8 @@ class Job(ModelBase):
                  desc: str = '', target: str = '', recursive: bool = False, section_id: int = -1,
                  vfs: str = '', scan_mode: str = SCAN_MODE_KEYS[0], periodic_id: int = -1,
                  clear_type: str = '', clear_level: str = '', clear_section: int = -1) -> None:
-        self.ctime = datetime.now()
-        self.ftime = datetime(1970, 1, 1)
+        self.ctime = datetime.datetime.now()
+        self.ftime = datetime.datetime(1970, 1, 1)
         self.task = task
         self.schedule_mode = schedule_mode
         self.schedule_auto_start = schedule_auto_start
@@ -181,7 +180,7 @@ class Job(ModelBase):
         if status in STATUS_KEYS:
             self.status = status
             if status == STATUS_KEYS[2]:
-                self.ftime = datetime.now()
+                self.ftime = datetime.datetime.now()
                 self.status = STATUS_KEYS[0]
             if save:
                 self.save()
@@ -190,7 +189,7 @@ class Job(ModelBase):
         return self
 
     @classmethod
-    def web_list(cls, request: Request) -> dict[str, Any]:
+    def web_list(cls, request: Request) -> dict:
         '''override'''
         returns = {}
         returns['list'] = []

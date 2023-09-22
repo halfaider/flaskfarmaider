@@ -3,8 +3,6 @@ __pycache__/
 *.py[co]
 *$py.class
 
-
-
 # Distribution / packaging
 .Python
 build/
@@ -13,7 +11,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-#lib/
+lib/
 lib64/
 parts/
 sdist/
@@ -101,8 +99,8 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-#.env
-#.venv
+.env
+.venv
 env/
 venv/
 ENV/
@@ -126,25 +124,3 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-
-
-# FlaksFarm
-config.yaml
-lib2/
-.vscode/
-memo.txt
-*.zip
-flaskfarm.sh
-export.sh
-run.sh
-pre_start.sh
-*.code-workspace
-false
-*copy.py
-*.sh
-data/
-tmp/
-*.bat
-output/
-*.mkv
-

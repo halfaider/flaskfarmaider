@@ -1,27 +1,24 @@
 import os
-from pathlib import Path
-from datetime import datetime
-from typing import Any
+import pathlib
+import datetime
 import traceback
 import shutil
 import yaml
 import sqlite3
 import functools
 import subprocess
-from subprocess import CompletedProcess
 import shlex
 import platform
 import time
 import locale
 
 import requests
-from requests import Response
 
 from .setup import PluginModuleBase, ModelBase
 from .setup import FRAMEWORK, LOGGER, CONFIG
 from .constants import *
 
-DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/flaskfarmaider.yaml')
+DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml')
 
 class Aider:
 
@@ -29,7 +26,7 @@ class Aider:
         self.name = name
 
     def get_readable_time(self, _time: float) -> str:
-        return datetime.utcfromtimestamp(_time).strftime('%b %d %H:%M')
+        return datetime.datetime.utcfromtimestamp(_time).strftime('%b %d %H:%M')
 
     def parse_mappings(self, text: str) -> dict[str, str]:
         mappings = {}
@@ -45,7 +42,7 @@ class Aider:
             target = target.replace(k, v)
         return target
 
-    def request(self, method: str = 'POST', url: str = None, data: dict = None, **kwds: Any) -> Response:
+    def request(self, method: str = 'POST', url: str = None, data: dict = None, **kwds: dict) -> requests.Response:
         try:
             if method.upper() == 'JSON':
                 return requests.request('POST', url, json=data or {}, **kwds)
@@ -91,7 +88,7 @@ class JobAider(Aider):
         if not job.task == TOOL_TRASH_KEYS[2]:
             rclone_aider = RcloneAider()
             trashes: dict = plex_aider.get_trashes(job.section_id, 1, -1)
-            paths = {Path(row['file']).parent for row in trashes}
+            paths = {pathlib.Path(row['file']).parent for row in trashes}
             for path in paths:
                 if CONFIG.get(TOOL_TRASH_TASK_STATUS) != STATUS_KEYS[1]:
                     LOGGER.info(f'작업을 중지합니다.')
@@ -200,7 +197,7 @@ class BrowserAider(Aider):
         super().__init__()
 
     def get_dir(self, target_path: str) -> list[dict[str, str]]:
-        target_path = Path(target_path)
+        target_path = pathlib.Path(target_path)
         with os.scandir(target_path) as scandirs:
             target_list = []
             for entry in scandirs:
@@ -215,7 +212,7 @@ class BrowserAider(Aider):
             target_list.insert(0, parent_pack)
             return target_list
 
-    def pack_dir(self, entry: os.DirEntry | Path) -> dict[str, Any]:
+    def pack_dir(self, entry: os.DirEntry | pathlib.Path) -> dict:
         stats: os.stat_result = entry.stat(follow_symlinks=True)
         return {
             'name': entry.name,
@@ -285,7 +282,7 @@ class PlexmateAider(PluginAider):
     def get_scan_items(self, status: str) -> list[ModelBase]:
         return self.get_scan_model().get_list_by_status(status)
 
-    def get_sections(self) -> dict[str, Any]:
+    def get_sections(self) -> dict:
         return {
             SECTION_TYPE_KEYS[0]: [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=1)],
             SECTION_TYPE_KEYS[1]: [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=2)],
@@ -293,7 +290,7 @@ class PlexmateAider(PluginAider):
             SECTION_TYPE_KEYS[3]: [{'id': item['id'], 'name': item['name']} for item in self.db.library_sections(section_type=13)],
         }
 
-    def get_periodics(self) -> list[dict[str, Any]]:
+    def get_periodics(self) -> list[dict]:
         periodics = []
         jobs = self.get_module('periodic').get_jobs()
         for job in jobs:
@@ -308,7 +305,7 @@ class PlexmateAider(PluginAider):
             periodics.append({'idx': idx, 'name': name, 'desc': job.get('설명', '')})
         return periodics
 
-    def get_trashes(self, section_id: int, page_no: int = 1, limit: int = 10) -> dict[str, Any]:
+    def get_trashes(self, section_id: int, page_no: int = 1, limit: int = 10) -> dict:
         query = '''
         SELECT media_items.id, media_items.metadata_item_id, media_items.deleted_at, media_parts.file
         FROM media_parts, media_items
@@ -324,10 +321,10 @@ class PlexmateAider(PluginAider):
             cs = con.cursor()
             return cs.execute(query.format(section_id=section_id, limit=limit, offset=offset)).fetchall()
 
-    def get_trash_list(self, section_id: int, page_no: int = 1, limit: int = 10) -> dict[str, Any]:
+    def get_trash_list(self, section_id: int, page_no: int = 1, limit: int = 10) -> dict:
         result = {'total': 0, 'limit': limit, 'page': page_no, 'section_id': section_id, 'total_paths': 0, 'data': None}
         total_rows = self.get_trashes(section_id, 1, -1)
-        paths ={Path(row['file']).parent for row in total_rows}
+        paths ={pathlib.Path(row['file']).parent for row in total_rows}
         result['total'] = len(total_rows)
         result['total_paths'] = len(paths)
         rows = self.get_trashes(section_id, page_no, limit)
@@ -366,7 +363,7 @@ class PlexmateAider(PluginAider):
         if scans:
             model = self.get_scan_model()
             for scan in scans:
-                if int((datetime.now() - scan.process_start_time).total_seconds() / 60) >= max_scan_time:
+                if int((datetime.datetime.now() - scan.process_start_time).total_seconds() / 60) >= max_scan_time:
                     LOGGER.warning(f'스캔 시간 {max_scan_time}분 초과: {scan.target}')
                     LOGGER.warning(f'스캔 QUEUE에서 제외: {scan.target}')
                     # 대안 1
@@ -396,7 +393,7 @@ class PlexmateAider(PluginAider):
 
     def get_targets(self, target: str, section_id: int = -1) -> dict[str, int]:
         mappings = self.parse_mappings(CONFIG.get(SETTING_PLEXMATE_PLEX_MAPPING))
-        target = Path(self.update_path(target, mappings))
+        target = pathlib.Path(self.update_path(target, mappings))
         # section_id DB 패치가 안 됐을 경우 대비
         if section_id and int(section_id) > 0:
             locations = self.db.select(f'SELECT library_section_id, root_path FROM section_locations WHERE library_section_id = {section_id}')
@@ -404,7 +401,7 @@ class PlexmateAider(PluginAider):
             locations = self.db.select('SELECT library_section_id, root_path FROM section_locations')
         targets = {}
         for location in locations:
-            root = Path(f'{location["root_path"]}')
+            root = pathlib.Path(f'{location["root_path"]}')
             if target.is_relative_to(root):
                 targets[str(target)] = int(location['library_section_id'])
             elif root.is_relative_to(target):
@@ -455,7 +452,7 @@ class PlexmateAider(PluginAider):
     def get_locations_by_id(self, section_id: int) -> list[str]:
         return [location.get('root_path') for location in self.db.section_location(library_id=section_id)]
 
-    def get_section_by_id(self, section_id: int) -> dict[str, Any]:
+    def get_section_by_id(self, section_id: int) -> dict:
         return self.db.library_section(section_id)
 
     def get_periodic_locations(self, periodic_id: int) -> list[str]:
@@ -556,10 +553,10 @@ class RcloneAider(Aider):
         result = self.vfs_stats(fs).json().get("metadataCache")
         return result.get('dirs', 0), result.get('files', 0)
 
-    def vfs_stats(self, fs: str) -> Response:
+    def vfs_stats(self, fs: str) -> requests.Response:
         return self.command("vfs/stats", data={"fs": fs})
 
-    def command(self, command: str, data: dict = None) -> Response:
+    def command(self, command: str, data: dict = None) -> requests.Response:
         LOGGER.debug(f'{command}: {data}')
         return self.request(
             "JSON",
@@ -568,7 +565,7 @@ class RcloneAider(Aider):
             auth=(CONFIG.get(SETTING_RCLONE_REMOTE_USER), CONFIG.get(SETTING_RCLONE_REMOTE_PASS))
         )
 
-    def _vfs_list(self) -> Response:
+    def _vfs_list(self) -> requests.Response:
         return self.command('vfs/list')
 
     def vfs_list(self) -> list:
@@ -578,7 +575,7 @@ class RcloneAider(Aider):
             vfses = response.json().get('vfses', vfses)
         return sorted(vfses)
 
-    def _vfs_refresh(self, remote_path: str, recursive: bool = False, fs: str = None, forget: bool = False) -> Response:
+    def _vfs_refresh(self, remote_path: str, recursive: bool = False, fs: str = None, forget: bool = False) -> requests.Response:
         data = {
             'fs': fs or CONFIG.get(SETTING_RCLONE_REMOTE_VFS),
             'dir': remote_path
@@ -599,9 +596,9 @@ class RcloneAider(Aider):
         LOGGER.info(f'{title}: dirs={dirs - start_dirs} files={files - start_files} elapsed={(time.time() - start):.1f}s content={content}')
         return response
 
-    def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> Response:
+    def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> requests.Response:
         # 이미 존재하는 파일이면 패스, 존재하지 않은 파일/폴더, 존재하는 폴더이면 진행
-        local_path = Path(local_path)
+        local_path = pathlib.Path(local_path)
         if local_path.is_file():
             response = requests.Response()
             response.status_code = 0
@@ -636,7 +633,7 @@ class RcloneAider(Aider):
                 test_dirs.pop()
         return response
 
-    def vfs_forget(self, local_path: str, fs: str = None) -> Response:
+    def vfs_forget(self, local_path: str, fs: str = None) -> requests.Response:
         mappings = self.parse_mappings(CONFIG.get(SETTING_RCLONE_MAPPING))
         response = self._vfs_refresh(self.update_path(local_path, mappings), fs=fs, forget=True)
         result, reason = self.is_successful(response)
@@ -644,7 +641,7 @@ class RcloneAider(Aider):
             LOGGER.error(f'캐시삭제 실패: {reason}: {local_path}')
         return response
 
-    def is_successful(self, response: Response) -> tuple[bool, str]:
+    def is_successful(self, response: requests.Response) -> tuple[bool, str]:
         if not str(response.status_code).startswith('2'):
             return False, f'status code: {response.status_code}, content: {response.text}'
         try:
@@ -673,7 +670,7 @@ class StatupAider(Aider):
     def sub_run(self, *args: tuple[str],
                 stdout: int = subprocess.PIPE, stderr: int = subprocess.STDOUT,
                 encoding: str = locale.getpreferredencoding(),
-                **kwds: dict[str, Any]) -> CompletedProcess:
+                **kwds: dict) -> subprocess.CompletedProcess:
         startup_executable = CONFIG.get(SETTING_STARTUP_EXECUTABLE)
         startup_executable = True if startup_executable.lower() == 'true' else False
         if not startup_executable:
@@ -712,13 +709,13 @@ class StatupAider(Aider):
 
         self.execute(executable_commands, require_plugins, depends)
 
-    def execute(self, commands: list[str], require_plugins: set[str] = {}, depends: dict[str, Any] = {}) -> None:
+    def execute(self, commands: list[str], require_plugins: set[str] = {}, depends: dict = {}) -> None:
         startup_executable = CONFIG.get(SETTING_STARTUP_EXECUTABLE)
         startup_executable = True if startup_executable.lower() == 'true' else False
         if startup_executable:
             for command in commands:
                 command = shlex.split(command)
-                result: CompletedProcess = self.sub_run(*command, timeout=CONFIG.get_int(SETTING_STARTUP_TIMEOUT))
+                result: subprocess.CompletedProcess = self.sub_run(*command, timeout=CONFIG.get_int(SETTING_STARTUP_TIMEOUT))
                 if result.returncode == 0:
                     msg = '성공'
                 else:
