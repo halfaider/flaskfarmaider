@@ -529,6 +529,7 @@ class Setting(BaseModule):
 
     def setting_save_after(self, changes: list) -> None:
         '''override'''
+        super().setting_save_after(changes)
         for change in changes:
             if change == f'{self.name}_startup_dependencies':
                 SettingAider().depends(CONFIG.get(SETTING_STARTUP_DEPENDENCIES))
@@ -556,6 +557,7 @@ class Schedule(BaseModule):
 
     def migration(self) -> None:
         '''override'''
+        super().migration()
         with FRAMEWORK.app.app_context():
             set_db_ver = CONFIG.get(SETTING_DB_VERSION)
             if set_db_ver:
@@ -609,12 +611,24 @@ class Schedule(BaseModule):
 
     def plugin_load(self) -> None:
         '''override'''
-        jobs = Job.get_list()
-        for job in jobs:
+        super().plugin_load()
+        for job in Job.get_list():
             if job.schedule_mode == FF_SCHEDULE_KEYS[1]:
                 self.run_async(self.start_job, (job,))
             elif job.schedule_mode == FF_SCHEDULE_KEYS[2] and job.schedule_auto_start:
                 self.add_schedule(job.id)
+            if not job.status == STATUS_KEYS[0] and not job.schedule_mode == FF_SCHEDULE_KEYS[1]:
+                LOGGER.warning(f'정상적으로 종료되지 않은 작업: {job.id} {job.desc}')
+                job.set_status(STATUS_KEYS[0])
+            LOGGER.warning(type(job.id))
+
+    def plugin_unload(self) -> None:
+        '''override'''
+        super().plugin_unload()
+        for job in Job.get_list():
+            if not job.status == STATUS_KEYS[0]:
+                LOGGER.warning(f'강제로 종료되는 작업: {job.id} {job.desc}')
+                job.set_status(STATUS_KEYS[0])
 
     def command_list(self, request: Request) -> dict:
         path = request.form.get('arg1')
@@ -679,6 +693,7 @@ class Tool(BaseModule):
 
     def setting_save_after(self, changes: list) -> None:
         '''override'''
+        super().setting_save_after(changes)
         for page in self.page_list:
             page.setting_save_after(changes)
 
@@ -823,6 +838,7 @@ class ToolEtcSetting(BasePage):
 
     def plugin_load(self) -> None:
         '''override'''
+        super().plugin_load()
         request_auto = True if CONFIG.get(TOOL_GDS_TOOL_REQUEST_AUTO).lower() == 'true' else False
         fp_auto = True if CONFIG.get(TOOL_GDS_TOOL_FP_AUTO).lower() == 'true' else False
         gdsaider = GDSToolAider()
@@ -835,6 +851,7 @@ class ToolEtcSetting(BasePage):
 
     def setting_save_after(self, changes: list) -> None:
         '''override'''
+        super().setting_save_after(changes)
         for change in changes:
             if change == TOOL_LOGIN_LOG_ENABLE:
                 enable = CONFIG.get(TOOL_LOGIN_LOG_ENABLE)

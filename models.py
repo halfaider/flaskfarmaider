@@ -5,6 +5,7 @@ from typing import Any
 from flask.wrappers import Request
 from flask_sqlalchemy.query import Query
 from sqlalchemy import desc
+from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from .setup import ModelBase
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
@@ -15,7 +16,6 @@ class Job(ModelBase):
 
     P = PLUGIN
     __tablename__ = f'{PLUGIN.package_name}_jobs'
-    __table_args__ = {'mysql_collate': 'utf8_general_ci'}
     __bind_key__ = PLUGIN.package_name
 
     id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer, primary_key=True)
@@ -57,6 +57,44 @@ class Job(ModelBase):
         self.clear_level = clear_level
         self.clear_section = clear_section
         self.section_id = section_id
+
+    def as_dict(self) -> dict:
+        '''override'''
+        return super().as_dict()
+
+    def save(self) -> None:
+        '''override'''
+        super().save()
+
+    @classmethod
+    def get_paging_info(cls, count: int, current_page: int, page_size: int) -> dict | None:
+        '''override'''
+        return super().get_paging_info(count, current_page, page_size)
+
+    @classmethod
+    def get_by_id(cls, id) -> 'Job':
+        '''override'''
+        return super().get_by_id(id)
+
+    @classmethod
+    def get_list(cls, by_dict: bool = False) -> list | None:
+        '''override'''
+        return super().get_list(by_dict)
+
+    @classmethod
+    def delete_by_id(cls, id: int) -> bool:
+        '''override'''
+        return super().delete_by_id(id)
+
+    @classmethod
+    def delete_all(cls, day: int | str | None = None) -> int:
+        '''override'''
+        return super().delete_all(day)
+
+    @classmethod
+    def make_query_search(cls, query: Query, search: str, field: InstrumentedAttribute) -> Query:
+        '''override'''
+        return super().make_query_search(query, search, field)
 
     def update(self, info: dict) -> 'Job':
         self.task = info.get('task', self.task)
