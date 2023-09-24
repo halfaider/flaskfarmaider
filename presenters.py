@@ -618,7 +618,6 @@ class Schedule(BaseModule):
             if not job.status == STATUS_KEYS[0] and not job.schedule_mode == FF_SCHEDULE_KEYS[1]:
                 LOGGER.warning(f'정상적으로 종료되지 않은 작업: {job.id} {job.desc}')
                 job.set_status(STATUS_KEYS[0])
-            LOGGER.warning(type(job.id))
 
     def plugin_unload(self) -> None:
         '''override'''
