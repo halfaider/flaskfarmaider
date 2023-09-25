@@ -87,6 +87,8 @@ dependencies:
       - 'pip install xmltodict'
   vnStat:
     repo: 'https://github.com/by275/vnStat'
+    packages:
+      - vnstat
   torrent_info:
     repo: 'https://github.com/by275/torrent_info'
     commands:
