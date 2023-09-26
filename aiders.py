@@ -389,6 +389,8 @@ class PlexmateAider(PluginAider):
             for over in overs:
                 if over.id in range(start_id, end_id + 1):
                     LOGGER.warning(f'READY 로 상태 변경: {over.id} {over.target}')
+                    over.filecheck_count = 0
+                    over.created_time = datetime.datetime.now()
                     over.set_status('READY', save=True)
 
     def get_targets(self, target: str, section_id: int = -1) -> dict[str, int]:
