@@ -558,13 +558,14 @@ class RcloneAider(Aider):
     def vfs_stats(self, fs: str) -> requests.Response:
         return self.command("vfs/stats", data={"fs": fs})
 
-    def command(self, command: str, data: dict = None) -> requests.Response:
+    def command(self, command: str, data: dict = None, timeout: tuple = (3, 60)) -> requests.Response:
         LOGGER.debug(f'{command}: {data}')
         return self.request(
             "JSON",
             f'{CONFIG.get(SETTING_RCLONE_REMOTE_ADDR)}/{command}',
             data=data,
-            auth=(CONFIG.get(SETTING_RCLONE_REMOTE_USER), CONFIG.get(SETTING_RCLONE_REMOTE_PASS))
+            auth=(CONFIG.get(SETTING_RCLONE_REMOTE_USER), CONFIG.get(SETTING_RCLONE_REMOTE_PASS)),
+            timeout=timeout
         )
 
     def _vfs_list(self) -> requests.Response:
