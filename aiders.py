@@ -558,7 +558,7 @@ class RcloneAider(Aider):
     def vfs_stats(self, fs: str) -> requests.Response:
         return self.command("vfs/stats", data={"fs": fs})
 
-    def command(self, command: str, data: dict = None, timeout: tuple = (3, 60)) -> requests.Response:
+    def command(self, command: str, data: dict = None, timeout: tuple = (10, 3600)) -> requests.Response:
         LOGGER.debug(f'{command}: {data}')
         return self.request(
             "JSON",
