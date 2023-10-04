@@ -21,7 +21,7 @@
             <option value="{{ args.tool_trash_keys.4 }}">{{ args.tool_trashes[args.tool_trash_keys.4].name }}</option>
         </select>
         <select class="custom-select col-1" id="trash-vfs">
-        {%- for vfs in args.setting_rclone_remote_vfses %}
+        {%- for vfs in args.setting_rclone_remote_vfses.split('|') %}
         {%- if vfs == args.setting_rclone_remote_vfs %}
             <option value="{{ vfs }}" selected>{{ vfs }}</option>
         {% else %}

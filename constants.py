@@ -85,6 +85,7 @@ MEDIA_TYPE_VALUES = {
 }
 
 SETTING_DB_VERSION = f'{SETTING}_db_version'
+SETTING_DB_VERSIONS = ['1']
 SETTING_RCLONE_REMOTE_ADDR = f'{SETTING}_rclone_remote_addr'
 SETTING_RCLONE_REMOTE_VFS = f'{SETTING}_rclone_remote_vfs'
 SETTING_RCLONE_REMOTE_VFSES = f'{SETTING}_rclone_remote_vfses'
@@ -102,7 +103,7 @@ SETTING_STARTUP_DEPENDENCIES = f'{SETTING}_startup_dependencies'
 SCHEDULE_WORKING_DIRECTORY = f'{SCHEDULE}_working_directory'
 SCHEDULE_LAST_LIST_OPTION = f'{SCHEDULE}_last_list_option'
 SCHEDULE_DB_VERSION = f'{SCHEDULE}_db_version'
-SCHEDULE_DB_VERSIONS = ['1', '2', '3', '4', '5']
+SCHEDULE_DB_VERSIONS = ['1', '2', '3', '4', '5', '6']
 
 TOOL_TRASH_TASK_STATUS = f'{TOOL}_{TOOL_TRASH}_task_status'
 TOOL_GDS_TOOL_REQUEST_SPAN = f'{TOOL}_{TOOL_GDS_TOOL}_request_span'

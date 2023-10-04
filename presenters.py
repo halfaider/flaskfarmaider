@@ -469,9 +469,10 @@ class Setting(BaseModule):
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name=SETTING)
         self.db_default = {
-            SETTING_DB_VERSION: '',
+            SETTING_DB_VERSION: SETTING_DB_VERSIONS[-1],
             SETTING_RCLONE_REMOTE_ADDR: 'http://172.17.0.1:5572',
             SETTING_RCLONE_REMOTE_VFS: '',
+            SETTING_RCLONE_REMOTE_VFSES: '',
             SETTING_RCLONE_REMOTE_USER: '',
             SETTING_RCLONE_REMOTE_PASS: '',
             SETTING_RCLONE_MAPPING: '/mnt/gds:\n/home/cloud/sjva/VOD:/VOD',
@@ -496,7 +497,7 @@ class Setting(BaseModule):
         args = super().get_template_args()
         args[SETTING_RCLONE_REMOTE_ADDR] = CONFIG.get(SETTING_RCLONE_REMOTE_ADDR)
         args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
-        args[SETTING_RCLONE_REMOTE_VFSES] = RcloneAider().vfs_list()
+        args[SETTING_RCLONE_REMOTE_VFSES] = CONFIG.get(SETTING_RCLONE_REMOTE_VFSES)
         args[SETTING_RCLONE_REMOTE_USER] = CONFIG.get(SETTING_RCLONE_REMOTE_USER)
         args[SETTING_RCLONE_REMOTE_PASS] = CONFIG.get(SETTING_RCLONE_REMOTE_PASS)
         args[SETTING_RCLONE_MAPPING] = CONFIG.get(SETTING_RCLONE_MAPPING)
@@ -515,7 +516,9 @@ class Setting(BaseModule):
         if int(str(response.status_code)[0]) == 2:
             data['ret'] = 'success'
             data['msg'] = '접속에 성공했습니다.'
-            data['vfses'] = sorted(response.json()['vfses'])
+            vfses = sorted(response.json()['vfses'])
+            CONFIG.set(SETTING_RCLONE_REMOTE_VFSES, '|'.join(vfses))
+            data['vfses'] = vfses
         else:
             data['ret'] = 'warning'
             data['msg'] = '접속에 실패했습니다.'
@@ -531,6 +534,13 @@ class Setting(BaseModule):
         for change in changes:
             if change == f'{self.name}_startup_dependencies':
                 SettingAider().depends(CONFIG.get(SETTING_STARTUP_DEPENDENCIES))
+
+    def plugin_load(self) -> None:
+        '''override'''
+        super().plugin_load()
+        if not CONFIG.get(SETTING_RCLONE_REMOTE_VFSES) and CONFIG.get(SETTING_RCLONE_REMOTE_VFS):
+            vfses = RcloneAider().vfs_list()
+            CONFIG.set(SETTING_RCLONE_REMOTE_VFSES, '|'.join(vfses))
 
 
 class Schedule(BaseModule):
@@ -586,7 +596,7 @@ class Schedule(BaseModule):
         args[f'{self.name}_working_directory'] = CONFIG.get(SCHEDULE_WORKING_DIRECTORY)
         args[f'{self.name}_last_list_option'] = CONFIG.get(SCHEDULE_LAST_LIST_OPTION)
         args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
-        args[SETTING_RCLONE_REMOTE_VFSES] = RcloneAider().vfs_list()
+        args[SETTING_RCLONE_REMOTE_VFSES] = CONFIG.get(SETTING_RCLONE_REMOTE_VFSES)
         try:
             plexmateaider = PlexmateAider()
             args['periodics'] = plexmateaider.get_periodics()
@@ -779,7 +789,7 @@ class ToolTrash(BasePage):
         args['status_keys'] = STATUS_KEYS
         args[TOOL_TRASH_TASK_STATUS.lower()] = CONFIG.get(TOOL_TRASH_TASK_STATUS)
         args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
-        args[SETTING_RCLONE_REMOTE_VFSES] = RcloneAider().vfs_list()
+        args[SETTING_RCLONE_REMOTE_VFSES] = CONFIG.get(SETTING_RCLONE_REMOTE_VFSES)
         return args
 
     def plugin_load(self) -> None:

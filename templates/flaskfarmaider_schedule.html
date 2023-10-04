@@ -121,7 +121,7 @@
         { value: FF_SCHEDULE_KEYS[2], name: FF_SCHEDULES[FF_SCHEDULE_KEYS[2]]['name'] },
     ];
     var VFSES = [];
-    var _VFSES = JSON.parse('{{ args.setting_rclone_remote_vfses|tojson }}');
+    var _VFSES = JSON.parse('{{ args.setting_rclone_remote_vfses.split('|')|tojson }}');
     for (idx in _VFSES) {
         VFSES.push({value: _VFSES[idx], name: _VFSES[idx]});
     }

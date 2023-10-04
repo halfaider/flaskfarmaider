@@ -2,7 +2,7 @@
 {% block content %}
 
 {% set vfses = [] %}
-{% for vfs in args[module_name + '_rclone_remote_vfses'] %}
+{% for vfs in args[module_name + '_rclone_remote_vfses'].split('|') %}
     {{ vfses.append([vfs, vfs]) or '' }}
 {% endfor %}
 

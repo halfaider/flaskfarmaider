@@ -11,6 +11,7 @@ def migrate(ver: str, table, cs: sqlite3.Cursor) -> None:
         '3': migrate_v4,
         '4': migrate_v5,
         '5': migrate_v6,
+        '6': migrate_v7,
     }
     migrations.get(ver, migrate_v1)(cs, table)
 
@@ -136,3 +137,6 @@ def migrate_v6(cs: sqlite3.Cursor, table: str) -> None:
                 cs.execute(f'UPDATE {table} SET section_id = -1 WHERE id = {row["id"]}').fetchall()
     except Exception as e:
         LOGGER.error(e)
+
+def migrate_v7(cs: sqlite3.Cursor, table: str) -> None:
+    pass
