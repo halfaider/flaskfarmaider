@@ -63,6 +63,15 @@ SECTION_TYPES = {
     SECTION_TYPE_KEYS[3]: {'key': SECTION_TYPE_KEYS[3], 'name': '사진', 'desc': None},
 }
 
+SEARCH_KEYS= ('task', 'desc', 'target', 'status', 'schedule_interval')
+SEARCHES = {
+    SEARCH_KEYS[0]: {'key': SEARCH_KEYS[0], 'name': '작업', 'desc': None},
+    SEARCH_KEYS[1]: {'key': SEARCH_KEYS[1], 'name': '설명', 'desc': None},
+    SEARCH_KEYS[2]: {'key': SEARCH_KEYS[2], 'name': '로컬 경로', 'desc': None},
+    SEARCH_KEYS[3]: {'key': SEARCH_KEYS[3], 'name': '상태', 'desc': None},
+    SEARCH_KEYS[4]: {'key': SEARCH_KEYS[4], 'name': '시간 간격', 'desc': None},
+}
+
 MEDIA_TYPE_VALUES = {
     1: 'movie',
     2: 'show',
