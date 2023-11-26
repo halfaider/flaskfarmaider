@@ -162,18 +162,13 @@ class Job(ModelBase):
         return job
 
     @classmethod
-    def make_query(cls, request: Request, order: str ='desc', search: str = '', option1: str = 'all', option2: str = 'all') -> Query:
+    def make_query(cls, request: Request, order: str ='desc', keyword: str = '', option1: str = SEARCH_KEYS[0], option2: str = 'all') -> Query:
         '''override'''
         with FRAMEWORK.app.app_context():
-            query = cls.make_query_search(FRAMEWORK.db.session.query(cls), search, cls.target)
-            if option1 != 'all':
-                query = query.filter(cls.task == option1)
+            query = cls.make_query_search(FRAMEWORK.db.session.query(cls), keyword, getattr(cls, option1))
             if option2 != 'all':
-                query = query.filter(cls.status == option2)
-            if order == 'desc':
-                query = query.order_by(desc(cls.id))
-            else:
-                query = query.order_by(cls.id)
+                query = query.filter(getattr(cls, option1) == option2)
+            query = query.order_by(desc(cls.id) if order == 'desc' else cls.id)
             return query
 
     def set_status(self, status: str, save: bool = True) -> 'Job':
@@ -191,32 +186,28 @@ class Job(ModelBase):
     @classmethod
     def web_list(cls, request: Request) -> dict:
         '''override'''
-        returns = {}
-        returns['list'] = []
+        page_size = 30
+        data = {}
+        data['list'] = []
+        opt_page = int(request.form.get('page')) or 1
+        opt_order = request.form.get('order', 'desc')
+        opt_option1 = request.form.get('option1', SEARCH_KEYS[0])
+        opt_option2 = request.form.get('option2', 'all')
+        opt_keyword = request.form.get('keyword')
         try:
-            page = 1
-            page_size = 30
-            search = ''
-            if 'page' in request.form:
-                page = int(request.form['page'])
-            if 'keyword' in request.form:
-                search = request.form['keyword'].strip()
-            option1 = request.form.get('option1', 'all')
-            option2 = request.form.get('option2', 'all')
-            order = request.form.get('order') or 'desc'
-            query = cls.make_query(request, order, search, option1, option2)
-            query = query.limit(page_size).offset((page - 1) * page_size)
-            lists = query.all()
             sch_mod = PLUGIN.logic.get_module(SCHEDULE)
-            for item in lists:
-                item = item.as_dict()
+            query = cls.make_query(request, opt_order, opt_keyword, opt_option1, opt_option2)
+            total = query.count()
+            query = query.limit(page_size).offset((opt_page - 1) * page_size)
+            for row in query.all():
+                item = row.as_dict()
                 sch_id = sch_mod.create_schedule_id(item['id'])
                 item['is_include'] = True if FRAMEWORK.scheduler.is_include(sch_id) else False
                 item['is_running'] = True if FRAMEWORK.scheduler.is_running(sch_id) else False
-                returns['list'].append(item)
-            returns['paging'] = cls.get_paging_info(query.count(), page, page_size)
-            CONFIG.set(f'{SCHEDULE}_last_list_option', f'{order}|{page}|{search}|{option1}|{option2}')
+                data['list'].append(item)
+            data['paging'] = cls.get_paging_info(total, opt_page, page_size)
+            CONFIG.set(f'{SCHEDULE}_last_list_option', f'{opt_order}|{opt_page}|{opt_keyword or ""}|{opt_option1 or ""}|{opt_option2 or ""}')
         except:
             LOGGER.error(traceback.format_exc())
         finally:
-            return returns
+            return data

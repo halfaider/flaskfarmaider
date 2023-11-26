@@ -164,7 +164,15 @@ function init_schedule() {
         dir = E_BROWSER_WD.prop('value');
         browser_command({command: 'list', path: dir, vfs: VFS, recursive: false, scan_mode: SCAN_MODE_KEYS[0]});
     });
+
+    PERIODICS.forEach(function(item, index) {
+        E_SCAN_PERIODIC_ID.append(
+            $('<option></option>').prop('value', item.idx).html(item.idx + '. ' + item.name + ' : ' + item.desc)
+        );
+    });
+
     E_GLOBAL_SEARCH_BTN = $('#globalSearchSearchBtn');
+    E_SEARCH_RESET_BTN = $('#SearchResetBtn');
     E_GLOBAL_SEARCH_KEYWORD = $('#keyword');
     // 검색 inputs
     E_GLOBAL_SEARCH_KEYWORD.keypress(function(e) {
@@ -176,10 +184,8 @@ function init_schedule() {
     E_GLOBAL_SEARCH_ORDER = $('#order');
     E_GLOBAL_SEARCH_OPTION1 = $('#option1');
     E_GLOBAL_SEARCH_OPTION2 = $('#option2');
-    PERIODICS.forEach(function(item, index) {
-        E_SCAN_PERIODIC_ID.append(
-            $('<option></option>').prop('value', item.idx).html(item.idx + '. ' + item.name + ' : ' + item.desc)
-        );
+    E_GLOBAL_SEARCH_OPTION1.change(function(){
+        set_search_option2_by_option1($(this).prop('value'));
     });
     // 초기 일정 불러오기
     // f'{order}|{page}|{search}|{option1}|{option2}'
@@ -187,11 +193,21 @@ function init_schedule() {
         E_GLOBAL_SEARCH_ORDER.prop('value', LAST_LIST_OPTIONS[0]);
         E_GLOBAL_SEARCH_KEYWORD.prop('value', LAST_LIST_OPTIONS[2]);
         E_GLOBAL_SEARCH_OPTION1.prop('value', LAST_LIST_OPTIONS[3]);
+        set_search_option2_by_option1(E_GLOBAL_SEARCH_OPTION1.prop('value'));
         E_GLOBAL_SEARCH_OPTION2.prop('value', LAST_LIST_OPTIONS[4]);
         globalRequestSearch(LAST_LIST_OPTIONS[1]);
     } else {
         globalRequestSearch('1');
     }
+    // search reset button
+    E_SEARCH_RESET_BTN.on('click', function(e) {
+        E_GLOBAL_SEARCH_ORDER.prop('value', 'desc');
+        E_GLOBAL_SEARCH_OPTION1.prop('value', SEARCH_KEYS[0]);
+        set_search_option2_by_option1(E_GLOBAL_SEARCH_OPTION1.prop('value'));
+        E_GLOBAL_SEARCH_OPTION2.prop('value', 'all');
+        E_GLOBAL_SEARCH_KEYWORD.prop('value', '');
+        globalRequestSearch(1, false);
+    });
     // 초기 디렉토리 불러오기
     browser_command({
         command: 'list',
@@ -938,6 +954,32 @@ function set_form_by_task(task) {
             disabled_by_schedule_mode(FF_SCHEDULE_KEYS[1]);
             E_SCH_RADIO_0.prop('disabled', true);
             E_SCH_RADIO_2.prop('disabled', true);
+            break;
+    }
+}
+
+function set_search_option2_by_option1(opt) {
+    E_GLOBAL_SEARCH_OPTION2.empty();
+    E_GLOBAL_SEARCH_OPTION2.append(
+        $('<option></option>').prop('value', 'all').html('전체')
+    );
+    E_GLOBAL_SEARCH_KEYWORD.prop('disabled', false);
+    switch(opt){
+        case SEARCH_KEYS[0]:
+            for (idx in TASK_OPTS) {
+                E_GLOBAL_SEARCH_OPTION2.append(
+                    $('<option></option>').prop('value', TASK_OPTS[idx].value).html(TASK_OPTS[idx].name)
+                );
+            }
+            E_GLOBAL_SEARCH_KEYWORD.prop('disabled', true);
+            break;
+        case SEARCH_KEYS[3]:
+            for (key in STATUSES){
+                E_GLOBAL_SEARCH_OPTION2.append(
+                    $('<option></option>').prop('value', key).html(STATUSES[key].name)
+                );
+            }
+            E_GLOBAL_SEARCH_KEYWORD.prop('disabled', true);
             break;
     }
 }

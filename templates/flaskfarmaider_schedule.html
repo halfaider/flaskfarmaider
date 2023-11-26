@@ -15,17 +15,20 @@
                 <option value="asc">오래된순</option>
             </select>
             <select id="option1" name="option1" class="form-control">
-                <option value="all">전체</option>
-                {% for task in TASK_KEYS %}
-                <option value="{{ task }}">{{ TASKS[task]['name'] }}</option>
+                {% for key, value in args.searches.items() %}
+                <option value="{{ key }}">{{ value.name }}</option>
                 {% endfor %}
             </select>
+            <select id="option2" name="option2" class="form-control">
+                <option value="all">전체</option>
+            </select>
+
         </div>
         <input id="keyword" name="keyword" class="form-control" type="text" placeholder="검색..." aria-label="Search">
         <div class="input-group-append">
             <div class="btn-group" role="group">
                 <button type="button" id="globalSearchSearchBtn" class="btn btn-outline-primary">검색</button>
-                <button type="button" id="globalSearchResetBtn" class="btn btn-outline-primary">리셋</button>
+                <button type="button" id="SearchResetBtn" class="btn btn-outline-primary">리셋</button>
             </div>
         </div>
     </div>
@@ -39,11 +42,11 @@
     <thead>
         <tr class="text-primary">
             <th scope="col" class="w-auto text-center">ID</th>
-            <th scope="col" class="w-auto text-center">작업</th>
-            <th scope="col" class="w-auto">내용</th>
+            <th scope="col" class="w-auto text-center">{{ args.searches[args.search_keys[0]].name }}</th>
+            <th scope="col" class="w-auto">{{ args.searches[args.search_keys[1]].name }}</th>
             <th scope="col" class="w-auto text-center">활성화</th>
-            <th scope="col" class="w-auto text-center">상태</th>
-            <th scope="col" class="w-auto text-center">주기</th>
+            <th scope="col" class="w-auto text-center">{{ args.searches[args.search_keys[3]].name }}</th>
+            <th scope="col" class="w-auto text-center">{{ args.searches[args.search_keys[4]].name }}</th>
             <th scope="col" class="w-auto text-center">최근 완료</th>
             <th scope="col" class="w-auto text-center">메뉴</th>
         </tr>
@@ -97,6 +100,8 @@
     var SECTIONS = JSON.parse('{{ args.sections|tojson }}');
     var SECTION_TYPES = JSON.parse('{{ args.section_types|tojson }}');
     var SECTION_TYPE_KEYS = JSON.parse('{{ args.section_type_keys|tojson }}');
+    var SEARCH_KEYS = JSON.parse('{{ args.search_keys|tojson }}');
+    var SEARCHES = JSON.parse('{{ args.searches|tojson }}');
     var TASK_OPTS = [
         { value: TASK_KEYS[0], name: TASKS[TASK_KEYS[0]]['name'] },
         { value: TASK_KEYS[1], name: TASKS[TASK_KEYS[1]]['name'] },
@@ -120,6 +125,13 @@
         { value: FF_SCHEDULE_KEYS[1], name: FF_SCHEDULES[FF_SCHEDULE_KEYS[1]]['name'] },
         { value: FF_SCHEDULE_KEYS[2], name: FF_SCHEDULES[FF_SCHEDULE_KEYS[2]]['name'] },
     ];
+    var SEARCH_OPTS = [
+        { value: SEARCH_KEYS[0], name: SEARCHES[SEARCH_KEYS[0]]['name'] },
+        { value: SEARCH_KEYS[1], name: SEARCHES[SEARCH_KEYS[1]]['name'] },
+        { value: SEARCH_KEYS[2], name: SEARCHES[SEARCH_KEYS[2]]['name'] },
+        { value: SEARCH_KEYS[3], name: SEARCHES[SEARCH_KEYS[3]]['name'] },
+        { value: SEARCH_KEYS[4], name: SEARCHES[SEARCH_KEYS[4]]['name'] },
+    ]
     var VFSES = [];
     var _VFSES = JSON.parse('{{ args.setting_rclone_remote_vfses.split('|')|tojson }}');
     for (idx in _VFSES) {

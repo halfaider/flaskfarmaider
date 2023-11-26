@@ -615,6 +615,8 @@ class Schedule(BaseModule):
         args['scan_modes'] = SCAN_MODES
         args['section_type_keys'] = SECTION_TYPE_KEYS
         args['section_types'] = SECTION_TYPES
+        args['search_keys'] = SEARCH_KEYS
+        args['searches'] = SEARCHES
         return args
 
     def plugin_load(self) -> None:
