@@ -3,7 +3,6 @@ import pathlib
 import datetime
 import traceback
 import shutil
-import yaml
 import sqlite3
 import functools
 import subprocess
@@ -12,6 +11,7 @@ import platform
 import time
 import locale
 
+import yaml
 import requests
 
 from .setup import PluginModuleBase, ModelBase
@@ -19,6 +19,7 @@ from .setup import FRAMEWORK, LOGGER, CONFIG
 from .constants import *
 
 DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml')
+
 
 class Aider:
 
@@ -705,7 +706,7 @@ class RcloneAider(Aider):
             return False, response.text
 
 
-class StatupAider(Aider):
+class StartupAider(Aider):
 
     def __init__(self) -> None:
         super().__init__()
@@ -799,7 +800,7 @@ class StatupAider(Aider):
         pass
 
 
-class UbuntuAider(StatupAider):
+class UbuntuAider(StartupAider):
 
     def __init__(self) -> None:
         super().__init__()
@@ -808,7 +809,7 @@ class UbuntuAider(StatupAider):
         return [f'apt-get install -y {req}' for req in require_packages]
 
 
-class WindowsAider(StatupAider):
+class WindowsAider(StartupAider):
 
     def __init__(self) -> None:
         super().__init__()
