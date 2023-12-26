@@ -11,8 +11,9 @@
     <div class="input-group">
         <div class="input-group-prepend w-25">
             <select id="order" name="order" class="form-control">
-                <option value="desc">최근순</option>
-                <option value="asc">오래된순</option>
+                <option value="desc">최근 순</option>
+                <option value="asc">오래된 순</option>
+                <option value="ftime">최근 완료 순</option>
             </select>
             <select id="option1" name="option1" class="form-control">
                 {% for key, value in args.searches.items() %}
