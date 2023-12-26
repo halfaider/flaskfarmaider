@@ -162,13 +162,16 @@ class Job(ModelBase):
         return job
 
     @classmethod
-    def make_query(cls, request: Request, order: str ='desc', keyword: str = '', option1: str = SEARCH_KEYS[0], option2: str = 'all') -> Query:
+    def make_query(cls, request: Request, order: str = 'desc', keyword: str = '', option1: str = SEARCH_KEYS[0], option2: str = 'all') -> Query:
         '''override'''
         with FRAMEWORK.app.app_context():
             query = cls.make_query_search(FRAMEWORK.db.session.query(cls), keyword, getattr(cls, option1))
             if option2 != 'all':
                 query = query.filter(getattr(cls, option1) == option2)
-            query = query.order_by(desc(cls.id) if order == 'desc' else cls.id)
+            if order in ['desc', 'asc']:
+                query = query.order_by(desc(cls.id) if order == 'desc' else cls.id)
+            else:
+                query = query.order_by(desc(getattr(cls, order)))
             return query
 
     def set_status(self, status: str, save: bool = True) -> 'Job':
