@@ -3,6 +3,40 @@ function init() {
     E_CONFIRM_BODY = $('#confirm_body');
     E_CONFIRM_BTN = $('#confirm_button');
     E_CONFIRM_MODAL = $("#confirm_modal");
+
+    E_SELECT_ALL = $('#select-all');
+    E_SELECT_ALL.on('click', function(e) {
+        if (this.checked) {
+            $('input[class="selectable"]').each(function() {
+                this.checked = true;
+            });
+        } else {
+            $('input[class="selectable"]').each(function() {
+                this.checked = false;
+            });
+        }
+    });
+
+    E_SELECT_ALL_DEL = $('#select-del');
+    E_SELECT_ALL_DEL.on('click', function(e) {
+        selected = $('input[class="selectable"]:checked').map((i, el) => el.value).get();
+        if (selected.length > 0) {
+            confirm_modal(
+                '선택한 항목을 삭제할까요?',
+                selected.length + ' 개의 항목이 모두 삭제됩니다.',
+                function() {
+                    globalSendCommand('delete', 'selected', selected.join('|'), null, function(result) {
+                        if (result.ret == 'success') {
+                            globalRequestSearch('1');
+                        }
+                        E_SELECT_ALL.prop('checked', false);
+                    });
+                }
+            );
+        } else {
+            notify('선택된 항목이 없습니다.', 'warning');
+        }
+    });
 }
 
 function init_setting() {
@@ -245,7 +279,6 @@ function init_trash() {
     E_TRASH_BTN_LIST.on('click', function(e) {
         trash_get_list(1);
     });
-    console.log(TOOL_TRASH_TASK_STATUS);
     E_TRASH_BTN_STOP = $('#trash-btn-stop');
     E_TRASH_BTN_STOP.on('click', function(e) {
         globalSendCommandPage('stop', '', '', '', null);
@@ -591,6 +624,7 @@ function list_dir(result) {
 function make_list(data) {
     $('#sch-list-table tbody').empty();
     for (model of data){
+        col_checkbox = '<td class="text-center"><input type="checkbox" class="selectable" value="' + model.id + '"></td>';
         col_id = '<td class="text-center">' + model.id + '</td>';
         col_task = '<td class="text-center">' + TASKS[model.task].name + '</td>';
         col_interval = '<td class="text-center">' + model.schedule_interval + '</td>';
@@ -633,7 +667,7 @@ function make_list(data) {
         row_sub += '</div></div></td></tr>';
         row_group = '<tr id="list-' + model.id + '" class="" data-toggle="collapse" data-target="#collapse-' + model.id;
         row_group += '" aria-expanded="true" aria-controls="collapse-' + model.id + '">';
-        row_group += col_id + col_task + col_title + col_switch + col_status + col_interval + col_ftime + col_menu +'</tr>' + row_sub;
+        row_group += col_checkbox + col_id + col_task + col_title + col_switch + col_status + col_interval + col_ftime + col_menu +'</tr>' + row_sub;
         $('#sch-list-table tbody').append(row_group);
     }
 

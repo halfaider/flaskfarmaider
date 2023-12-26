@@ -8,7 +8,7 @@
   ]
 ) }}
 <form id="form_search">
-    <div class="input-group mb-3">
+    <div class="input-group">
         <div class="input-group-prepend w-25">
             <select id="order" name="order" class="form-control">
                 <option value="desc">최근순</option>
@@ -27,20 +27,21 @@
         <input id="keyword" name="keyword" class="form-control" type="text" placeholder="검색..." aria-label="Search">
         <div class="input-group-append">
             <div class="btn-group" role="group">
-                <button type="button" id="globalSearchSearchBtn" class="btn btn-outline-primary">검색</button>
-                <button type="button" id="SearchResetBtn" class="btn btn-outline-primary">리셋</button>
+                <button type="button" id="globalSearchSearchBtn" class="btn btn-primary px-4">검색</button>
+                <button type="button" id="SearchResetBtn" class="btn btn-outline-primary">검색 리셋</button>
+                <button type="button" id="sch-add-btn" class="btn btn-primary">일정 추가</button>
+                <button type="button" id="select-del" class="btn btn-outline-warning">선택 삭제</button>
             </div>
         </div>
     </div>
 </form>
-<div class="text-right" role="group">
-    <button type="button" id="sch-add-btn" class="btn btn-lg btn-block btn-primary">일정 추가</button>
-</div>
+
 <hr class="border border-secondary">
 
 <table id="sch-list-table" class="table table-hover table-sm table-striped align-bottom table-responsive-sm">
     <thead>
         <tr class="text-primary">
+            <th scope="col" class="w-auto text-center"><input type="checkbox" class="" id="select-all"  aria-label="..."></th>
             <th scope="col" class="w-auto text-center">ID</th>
             <th scope="col" class="w-auto text-center">{{ args.searches[args.search_keys[0]].name }}</th>
             <th scope="col" class="w-auto">{{ args.searches[args.search_keys[1]].name }}</th>
