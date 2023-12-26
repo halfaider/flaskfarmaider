@@ -661,12 +661,28 @@ class Schedule(BaseModule):
             return self.returns('warning', '저장할 수 없습니다.')
 
     def command_delete(self, request: flask.Request) -> dict:
-        job_id = int(request.form.get('arg1'))
-        if Job.delete_by_id(job_id):
-            self.set_schedule(job_id, False)
-            return self.returns('success', f'삭제 했습니다: ID {job_id}')
+        arg1 = request.form.get('arg1')
+        if arg1 == 'selected':
+            selected = [ int(_id) for _id in request.form.get('arg2').split('|') ]
+            not_deleted = []
+            LOGGER.info(f'selected for deletion: {selected}')
+            for _id in selected:
+                if Job.delete_by_id(_id):
+                    self.set_schedule(_id, False)
+                else:
+                    not_deleted.append(_id)
+            if len(not_deleted) > 0:
+                LOGGER.warning(f'could not delete: {not_deleted}')
+                return self.returns('warning', f'일부는 삭제할 수 없었습니다.')
+            else:
+                return self.returns('success', f'모두 삭제 했습니다.')
         else:
-            return self.returns('warning',  f'삭제할 수 없습니다: ID {job_id}')
+            job_id = int(arg1)
+            if Job.delete_by_id(job_id):
+                self.set_schedule(job_id, False)
+                return self.returns('success', f'삭제 했습니다: ID {job_id}')
+            else:
+                return self.returns('warning',  f'삭제할 수 없습니다: ID {job_id}')
 
     def command_execute(self, request: flask.Request) -> dict:
         job_id = int(request.form.get('arg1'))
