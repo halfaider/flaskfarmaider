@@ -45,8 +45,8 @@ function init_setting() {
     E_SETTING_VFSES = $('#setting_rclone_remote_vfs');
 
     E_SETTING_TEST_CONN.on('click', function (e) {
-        e.preventDefault();
         globalSettingSave();
+        e.preventDefault();
         globalSendCommand('command_test_connection', '', '', '', callback_test_connection);
     });
 
