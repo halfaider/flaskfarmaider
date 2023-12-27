@@ -73,7 +73,43 @@
     var TOOL_GDS_TOOL_FP_TOTAL = JSON.parse('{{ args.tool_gds_tool_fp_total|int }}');
     var TOOL_LOGIN_LOG_ENABLE = JSON.parse('{{ args.tool_login_log_enable|lower }}');
     $(function() {
-        init_etc_setting();
+        init();
+        E_GDS_TOOL_REQUEST_SPAN = $('#tool_gds_tool_request_span');
+        E_GDS_TOOL_REQUEST_AUTO = $('#tool_gds_tool_request_auto');
+        E_GDS_TOOL_REQUEST_TOTAL = $('#tool_gds_tool_request_total');
+        E_GDS_TOOL_REQUEST_DEL = $('#tool_gds_tool_request_del');
+        E_GDS_TOOL_FP_SPAN = $('#tool_gds_tool_fp_span');
+        E_GDS_TOOL_FP_AUTO = $('#tool_gds_tool_fp_auto');
+        E_GDS_TOOL_FP_TOTAL = $('#tool_gds_tool_fp_total');
+        E_GDS_TOOL_FP_DEL = $('#tool_gds_tool_fp_del');
+
+        E_GDS_TOOL_REQUEST_SPAN.prop('value', TOOL_GDS_TOOL_REQUEST_SPAN);
+        E_GDS_TOOL_REQUEST_AUTO.bootstrapToggle(TOOL_GDS_TOOL_REQUEST_AUTO ? 'on' : 'off');
+        E_GDS_TOOL_REQUEST_TOTAL.text(TOOL_GDS_TOOL_REQUEST_TOTAL);
+        E_GDS_TOOL_FP_SPAN.prop('value', TOOL_GDS_TOOL_FP_SPAN);
+        E_GDS_TOOL_FP_AUTO.bootstrapToggle(TOOL_GDS_TOOL_FP_AUTO ? 'on' : 'off');
+        E_GDS_TOOL_FP_TOTAL.text(TOOL_GDS_TOOL_FP_TOTAL);
+
+        E_GDS_TOOL_REQUEST_DEL.on('click', function(e) {
+            span = E_GDS_TOOL_REQUEST_SPAN.prop('value');
+            confirm_modal('복사 요청 목록을 삭제할까요?',
+                '잔여 기간: ' + span,
+                function() {
+                    globalSendCommandPage('delete', 'request', span, '', null);
+            });
+        });
+
+        E_GDS_TOOL_FP_DEL.on('click', function(e) {
+            span = E_GDS_TOOL_FP_SPAN.prop('value');
+            confirm_modal('변경사항 목록을 삭제할까요?',
+                '잔여 기간: ' + span,
+                function() {
+                    globalSendCommandPage('delete', 'fp', span, '', null);
+            });
+        });
+
+        E_TOOL_LOGIN_LOG_ENABLE = $('#tool_login_log_enable');
+        E_TOOL_LOGIN_LOG_ENABLE.bootstrapToggle(TOOL_LOGIN_LOG_ENABLE ? 'on' : 'off');
     });
 </script>
 {% endblock %}
