@@ -148,6 +148,7 @@ function list_dir(result) {
 // 일정 리스트
 // globalRequestSearch@ff_global1.js 에서 make_list() 호출하기 때문에 구현
 function make_list(data) {
+    E_SELECT_ALL.prop('checked', false);
     $('#sch-list-table tbody').empty();
     for (model of data){
         col_checkbox = '<td class="text-center"><input type="checkbox" class="selectable" value="' + model.id + '"></td>';

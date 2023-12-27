@@ -6,6 +6,18 @@ function init() {
 
     E_SELECT_ALL = $('#select-all');
     E_SELECT_ALL.on('click', function(e) {
+        /*
+        console.log($(this).hasClass('active'));
+        if ($(this).hasClass('active')) {
+            $('input[class="selectable"]').each(function() {
+                this.checked = false;
+            });
+        } else {
+            $('input[class="selectable"]').each(function() {
+                this.checked = true;
+            });
+        }
+        */
         if (this.checked) {
             $('input[class="selectable"]').each(function() {
                 this.checked = true;
