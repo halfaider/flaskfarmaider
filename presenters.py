@@ -560,6 +560,7 @@ class Schedule(BaseModule):
                 'delete': self.command_delete,
                 'execute': self.command_execute,
                 'schedule': self.command_schedule,
+                'get_job': self.command_get_job,
             }
         )
 
@@ -694,6 +695,16 @@ class Schedule(BaseModule):
         active = True if request.form.get('arg2').lower() == 'true' else False
         result, msg = self.set_schedule(job_id, active)
         return self.returns('success' if result else 'warning', msg)
+
+    def command_get_job(self, request: flask.Request) -> dict:
+        job_id = int(request.form.get('arg1'))
+        job = Job.get_by_id(job_id)
+        if job:
+            return self.returns('success', data=job.as_dict())
+        else:
+            return self.returns('warning', f'일정을 찾을 수 없습니다: ID {job_id}')
+
+
 
 
 class Manual(BaseModule):

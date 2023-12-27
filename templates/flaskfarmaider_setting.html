@@ -65,7 +65,32 @@
 <script type="text/javascript">
     var VFS = "{{ args.setting_rclone_remote_vfs }}";
     $(function() {
-        init_setting();
+        init();
+        E_SETTING_TEST_CONN = $('#btn_test_connection_rclone');
+        E_SETTING_VFSES = $('#setting_rclone_remote_vfs');
+
+        E_SETTING_TEST_CONN.on('click', function (e) {
+            globalSettingSave();
+            e.preventDefault();
+            globalSendCommand('command_test_connection', '', '', '', callback_test_connection);
+        });
+
+        function callback_test_connection(result) {
+            if (result.ret == 'success') {
+                console.log('Connection success');
+                console.log(result.vfses);
+                E_SETTING_TEST_CONN.text('접속 성공');
+                E_SETTING_VFSES.empty();
+                result.vfses.forEach(function(vfs) {
+                    E_SETTING_VFSES.append($('<option></option>').prop('value', vfs).append(vfs));
+                });
+                E_SETTING_VFSES.prop('value', (VFS) ? VFS : result.vfses[0]);
+            } else {
+                console.log('Connection failed');
+                console.log(result.ret);
+                E_SETTING_TEST_CONN.text('접속 실패');
+            }
+        }
     });
 </script>
 

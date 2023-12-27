@@ -82,8 +82,12 @@
     var TOOL_TRASHES = JSON.parse('{{ args.tool_trashes|tojson }}');
     var STATUS_KEYS = JSON.parse('{{ args.status_keys|tojson }}');
     var TOOL_TRASH_TASK_STATUS = '{{ args.tool_trash_task_status }}';
+
     $(function() {
-        init_trash();
+        init();
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_tool_trash.js') }}")
     });
+
+
 </script>
 {% endblock %}

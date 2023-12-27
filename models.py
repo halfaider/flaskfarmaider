@@ -189,10 +189,10 @@ class Job(ModelBase):
     @classmethod
     def web_list(cls, request: Request) -> dict:
         '''override'''
-        page_size = 30
         data = {}
         data['list'] = []
-        opt_page = int(request.form.get('page')) or 1
+        opt_page = int(request.form.get('page') or 1 )
+        page_size = int(request.form.get('length') or 30)
         opt_order = request.form.get('order', 'desc')
         opt_option1 = request.form.get('option1', SEARCH_KEYS[0])
         opt_option2 = request.form.get('option2', 'all')
@@ -209,7 +209,7 @@ class Job(ModelBase):
                 item['is_running'] = True if FRAMEWORK.scheduler.is_running(sch_id) else False
                 data['list'].append(item)
             data['paging'] = cls.get_paging_info(total, opt_page, page_size)
-            CONFIG.set(f'{SCHEDULE}_last_list_option', f'{opt_order}|{opt_page}|{opt_keyword or ""}|{opt_option1 or ""}|{opt_option2 or ""}')
+            CONFIG.set(f'{SCHEDULE}_last_list_option', f'{opt_order}|{opt_page}|{page_size}|{opt_keyword or ""}|{opt_option1 or ""}|{opt_option2 or ""}')
         except:
             LOGGER.error(traceback.format_exc())
         finally:

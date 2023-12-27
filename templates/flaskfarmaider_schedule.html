@@ -9,7 +9,14 @@
 ) }}
 <form id="form_search">
     <div class="input-group">
-        <div class="input-group-prepend w-25">
+        <div class="input-group-prepend">
+            <select id="length" name="length" class="form-control w-50">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        <div class="input-group-prepend"></div>
             <select id="order" name="order" class="form-control">
                 <option value="desc">최근 순</option>
                 <option value="asc">오래된 순</option>
@@ -23,21 +30,26 @@
             <select id="option2" name="option2" class="form-control">
                 <option value="all">전체</option>
             </select>
-
         </div>
         <input id="keyword" name="keyword" class="form-control" type="text" placeholder="검색..." aria-label="Search">
         <div class="input-group-append">
             <div class="btn-group" role="group">
                 <button type="button" id="globalSearchSearchBtn" class="btn btn-primary px-4">검색</button>
-                <button type="button" id="SearchResetBtn" class="btn btn-outline-primary">검색 리셋</button>
-                <button type="button" id="sch-add-btn" class="btn btn-primary">일정 추가</button>
-                <button type="button" id="select-del" class="btn btn-outline-warning">선택 삭제</button>
+                <button type="button" id="SearchResetBtn" class="btn btn-outline-primary">리셋</button>
             </div>
         </div>
     </div>
 </form>
 
 <hr class="border border-secondary">
+
+<div class="input-group-append">
+    <button type="button" id="sch-add-btn" class="btn btn-block btn-primary mr-2">일정 추가</button>
+    <button type="button" id="select-del" class="btn btn-outline-warning">선택 삭제</button>
+</div>
+
+
+<br />
 
 <table id="sch-list-table" class="table table-hover table-sm table-striped align-bottom table-responsive-sm">
     <thead>
@@ -46,11 +58,12 @@
             <th scope="col" class="w-auto text-center">ID</th>
             <th scope="col" class="w-auto text-center">{{ args.searches[args.search_keys[0]].name }}</th>
             <th scope="col" class="w-auto">{{ args.searches[args.search_keys[1]].name }}</th>
-            <th scope="col" class="w-auto text-center">활성화</th>
             <th scope="col" class="w-auto text-center">{{ args.searches[args.search_keys[3]].name }}</th>
             <th scope="col" class="w-auto text-center">{{ args.searches[args.search_keys[4]].name }}</th>
             <th scope="col" class="w-auto text-center">최근 완료</th>
-            <th scope="col" class="w-auto text-center">메뉴</th>
+            <th scope="col" class="w-auto text-center">일정 방식</th>
+            <th scope="col" class="w-auto text-center">활성화</th>
+            <th scope="col" class="w-auto text-center">관리</th>
         </tr>
     </thead>
     <tbody class="table-group-divider align-middle accordion" id="sch-accordion">
@@ -86,6 +99,7 @@
 </table>
 <br />
 <br />
+
 <script type="text/javascript">
     // assign variables
     var TASKS = JSON.parse('{{ args.tasks|tojson }}');
@@ -104,44 +118,14 @@
     var SECTION_TYPE_KEYS = JSON.parse('{{ args.section_type_keys|tojson }}');
     var SEARCH_KEYS = JSON.parse('{{ args.search_keys|tojson }}');
     var SEARCHES = JSON.parse('{{ args.searches|tojson }}');
-    var TASK_OPTS = [
-        { value: TASK_KEYS[0], name: TASKS[TASK_KEYS[0]]['name'] },
-        { value: TASK_KEYS[1], name: TASKS[TASK_KEYS[1]]['name'] },
-        { value: TASK_KEYS[2], name: TASKS[TASK_KEYS[2]]['name'] },
-        { value: TASK_KEYS[3], name: TASKS[TASK_KEYS[3]]['name'] },
-        { value: TASK_KEYS[4], name: TASKS[TASK_KEYS[4]]['name'] },
-        { value: TASK_KEYS[5], name: TASKS[TASK_KEYS[5]]['name'] },
-    ];
-    var SCAN_OPTS = [
-        { value: SCAN_MODE_KEYS[0], name: SCAN_MODES[SCAN_MODE_KEYS[0]]['name'] },
-        { value: SCAN_MODE_KEYS[1], name: SCAN_MODES[SCAN_MODE_KEYS[1]]['name'] },
-        { value: SCAN_MODE_KEYS[2], name: SCAN_MODES[SCAN_MODE_KEYS[2]]['name'] },
-    ];
-    var CLEAR_OPTS = [
-        { value: SECTION_TYPE_KEYS[0], name: SECTION_TYPES[SECTION_TYPE_KEYS[0]]['name'] },
-        { value: SECTION_TYPE_KEYS[1], name: SECTION_TYPES[SECTION_TYPE_KEYS[1]]['name'] },
-        { value: SECTION_TYPE_KEYS[2], name: SECTION_TYPES[SECTION_TYPE_KEYS[2]]['name'] },
-    ];
-    var SCHEDULE_OPTS = [
-        { value: FF_SCHEDULE_KEYS[0], name: FF_SCHEDULES[FF_SCHEDULE_KEYS[0]]['name'] },
-        { value: FF_SCHEDULE_KEYS[1], name: FF_SCHEDULES[FF_SCHEDULE_KEYS[1]]['name'] },
-        { value: FF_SCHEDULE_KEYS[2], name: FF_SCHEDULES[FF_SCHEDULE_KEYS[2]]['name'] },
-    ];
-    var SEARCH_OPTS = [
-        { value: SEARCH_KEYS[0], name: SEARCHES[SEARCH_KEYS[0]]['name'] },
-        { value: SEARCH_KEYS[1], name: SEARCHES[SEARCH_KEYS[1]]['name'] },
-        { value: SEARCH_KEYS[2], name: SEARCHES[SEARCH_KEYS[2]]['name'] },
-        { value: SEARCH_KEYS[3], name: SEARCHES[SEARCH_KEYS[3]]['name'] },
-        { value: SEARCH_KEYS[4], name: SEARCHES[SEARCH_KEYS[4]]['name'] },
-    ]
     var VFSES = [];
     var _VFSES = JSON.parse('{{ args.setting_rclone_remote_vfses.split('|')|tojson }}');
     for (idx in _VFSES) {
         VFSES.push({value: _VFSES[idx], name: _VFSES[idx]});
     }
-
     $(function() {
-        init_schedule();
+        init();
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_schedule.js') }}")
     });
 </script>
 {% endblock %}
