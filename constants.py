@@ -4,9 +4,6 @@ SETTING = 'setting'
 SCHEDULE = 'schedule'
 TOOL = 'tool'
 TOOL_TRASH = 'trash'
-TOOL_ETC_SETTING = 'etc_setting'
-TOOL_GDS_TOOL = 'gds_tool'
-TOOL_LOGIN_LOG = 'login_log'
 MANUAL = 'manual'
 LOG = 'log'
 PKG_PATH = pathlib.Path(__file__).parent
@@ -72,7 +69,7 @@ SEARCHES = {
     SEARCH_KEYS[4]: {'key': SEARCH_KEYS[4], 'name': '시간 간격', 'desc': None},
 }
 
-MEDIA_TYPE_VALUES = {
+PLEX_MEDIA_TYPE_VALUES = {
     1: 'movie',
     2: 'show',
     3: 'season',
@@ -94,7 +91,7 @@ MEDIA_TYPE_VALUES = {
 }
 
 SETTING_DB_VERSION = f'{SETTING}_db_version'
-SETTING_DB_VERSIONS = ['1']
+SETTING_DB_VERSIONS = ['1', '2']
 SETTING_RCLONE_REMOTE_ADDR = f'{SETTING}_rclone_remote_addr'
 SETTING_RCLONE_REMOTE_VFS = f'{SETTING}_rclone_remote_vfs'
 SETTING_RCLONE_REMOTE_VFSES = f'{SETTING}_rclone_remote_vfses'
@@ -109,20 +106,24 @@ SETTING_STARTUP_COMMANDS = f'{SETTING}_startup_commands'
 SETTING_STARTUP_TIMEOUT = f'{SETTING}_startup_timeout'
 SETTING_STARTUP_DEPENDENCIES = f'{SETTING}_startup_dependencies'
 
+SETTING_GDS_TOOL_REQUEST_SPAN = f'{SETTING}_gds_tool_request_span'
+SETTING_GDS_TOOL_REQUEST_AUTO = f'{SETTING}_gds_tool_request_auto'
+SETTING_GDS_TOOL_REQUEST_TOTAL = f'{SETTING}_gds_tool_request_total'
+SETTING_GDS_TOOL_FP_SPAN = f'{SETTING}_gds_tool_fp_span'
+SETTING_GDS_TOOL_FP_AUTO = f'{SETTING}_gds_tool_fp_auto'
+SETTING_GDS_TOOL_FP_TOTAL = f'{SETTING}_gds_tool_fp_total'
+SETTING_LOGGING_LOGIN = f'{SETTING}_logging_login'
+SETTING_LOGGING_LOGIN_FILE = f'{SETTING}_logging_login_file'
+SETTING_LOGGING_ACCESS = f'{SETTING}_logging_access'
+SETTING_LOGGING_ACCESS_FILE = f'{SETTING}_logging_access_file'
+SETTING_LOGGING_ACCESS_FORMAT = f'{SETTING}_logging_access_format'
+
 SCHEDULE_WORKING_DIRECTORY = f'{SCHEDULE}_working_directory'
 SCHEDULE_LAST_LIST_OPTION = f'{SCHEDULE}_last_list_option'
 SCHEDULE_DB_VERSION = f'{SCHEDULE}_db_version'
 SCHEDULE_DB_VERSIONS = ['1', '2', '3', '4', '5', '6']
 
 TOOL_TRASH_TASK_STATUS = f'{TOOL}_{TOOL_TRASH}_task_status'
-TOOL_GDS_TOOL_REQUEST_SPAN = f'{TOOL}_{TOOL_GDS_TOOL}_request_span'
-TOOL_GDS_TOOL_REQUEST_AUTO = f'{TOOL}_{TOOL_GDS_TOOL}_request_auto'
-TOOL_GDS_TOOL_REQUEST_TOTAL = f'{TOOL}_{TOOL_GDS_TOOL}_request_total'
-TOOL_GDS_TOOL_FP_SPAN = f'{TOOL}_{TOOL_GDS_TOOL}_fp_span'
-TOOL_GDS_TOOL_FP_AUTO = f'{TOOL}_{TOOL_GDS_TOOL}_fp_auto'
-TOOL_GDS_TOOL_FP_TOTAL = f'{TOOL}_{TOOL_GDS_TOOL}_fp_total'
-TOOL_LOGIN_LOG_ENABLE = f'{TOOL}_{TOOL_LOGIN_LOG}_enable'
-TOOL_LOGIN_LOG_FILE = f'{TOOL}_{TOOL_LOGIN_LOG}_file'
 
 OPTS = {
     'filepath' : __file__,
@@ -146,7 +147,6 @@ OPTS = {
                 'name': '도구',
                 'list': [
                     {'uri': TOOL_TRASH, 'name': 'Plex 휴지통 스캔'},
-                    {'uri': TOOL_ETC_SETTING, 'name': '기타 설정'},
                 ]
             },
             {
