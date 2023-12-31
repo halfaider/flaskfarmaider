@@ -5,6 +5,7 @@ from threading import Thread
 import sqlite3
 import time
 import functools
+import logging
 
 import flask
 import flask_login
@@ -13,7 +14,7 @@ from .setup import PluginBase, PluginModuleBase, PluginPageBase, system_plugin, 
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
 from .models import Job
 from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider, RcloneAider
-from .migrations import migrate
+from .migrations import migrate_schedule, migrate_setting
 from .constants import *
 
 CELERY_INSPECT = FRAMEWORK.celery.control.inspect()
@@ -220,6 +221,42 @@ class Base:
         job['is_include'] = FRAMEWORK.scheduler.is_include(schedule_id)
         job['msg'] = msg
         return job
+
+    def get_client_ip(self, request: flask.Request) -> str:
+        try:
+            if 'X-Real-Ip' in request.headers:
+                remote_addr = request.headers.getlist("X-Real-IP")[0].rpartition(' ')[-1]
+            if 'X-Forwarded-For' in request.headers:
+                remote_addr = request.headers.getlist("X-Forwarded-For")[0].rpartition(' ')[-1]
+            else:
+                remote_addr = request.remote_addr or 'unknown'
+        except:
+            LOGGER.error(traceback.format_exc())
+            remote_addr = 'unknown'
+        return remote_addr
+
+    def _migration(self, version: str, versions: list, table: str, migrate_func: callable) -> str:
+        LOGGER.debug(f'{table} 현재 DB 버전: {version}')
+        with FRAMEWORK.app.app_context():
+            db_file = FRAMEWORK.app.config['SQLALCHEMY_BINDS'][PLUGIN.package_name].replace('sqlite:///', '').split('?')[0]
+            conn = sqlite3.connect(db_file)
+            try:
+
+                with conn:
+                    conn.row_factory = sqlite3.Row
+                    cs = conn.cursor()
+                    # DB 볼륨 정리
+                    cs.execute(f'VACUUM;')
+                    for ver in versions[(versions.index(version)):]:
+                        migrate_func(ver, table, cs)
+                        version = ver
+                    FRAMEWORK.db.session.flush()
+            except:
+                LOGGER.exception('마이그레이션 실패')
+            conn.close()
+        LOGGER.debug(f'{table} 최종 DB 버전: {version}')
+        return version
+
 
 
 class BaseModule(Base, PluginModuleBase):
@@ -483,8 +520,19 @@ class Setting(BaseModule):
             SETTING_STARTUP_COMMANDS: 'apt-get update',
             SETTING_STARTUP_TIMEOUT: '300',
             SETTING_STARTUP_DEPENDENCIES: SettingAider().depends(),
+            SETTING_GDS_TOOL_REQUEST_SPAN: '30',
+            SETTING_GDS_TOOL_REQUEST_AUTO: 'false',
+            SETTING_GDS_TOOL_FP_SPAN: '30',
+            SETTING_GDS_TOOL_FP_AUTO: 'false',
+            SETTING_LOGGING_LOGIN: 'false',
+            SETTING_LOGGING_ACCESS: 'false',
+            SETTING_LOGGING_ACCESS_FILE: '/data/log/access.log',
+            SETTING_LOGGING_ACCESS_FORMAT: '{remote} {method} "{path}" {status}'
         }
         self.commands.update({'command_test_connection': self.command_test_conn})
+        self.system_route = system_plugin.logic.get_module('route')
+        self.system_route_process_command = self.system_route.process_command
+        self.commands['clear_db'] = self.command_clear_db
 
     def prerender(self, sub: str, req: flask.Request) -> None:
         '''override'''
@@ -508,7 +556,32 @@ class Setting(BaseModule):
         args[SETTING_STARTUP_COMMANDS] = CONFIG.get(SETTING_STARTUP_COMMANDS)
         args[SETTING_STARTUP_TIMEOUT] = CONFIG.get(SETTING_STARTUP_TIMEOUT)
         args[SETTING_STARTUP_DEPENDENCIES] = CONFIG.get(SETTING_STARTUP_DEPENDENCIES)
+
+        args[SETTING_GDS_TOOL_REQUEST_SPAN] = CONFIG.get(SETTING_GDS_TOOL_REQUEST_SPAN)
+        args[SETTING_GDS_TOOL_REQUEST_AUTO] = CONFIG.get(SETTING_GDS_TOOL_REQUEST_AUTO)
+        args[SETTING_GDS_TOOL_FP_SPAN] = CONFIG.get(SETTING_GDS_TOOL_FP_SPAN)
+        args[SETTING_GDS_TOOL_FP_AUTO] = CONFIG.get(SETTING_GDS_TOOL_FP_AUTO)
+        args[SETTING_LOGGING_LOGIN] = CONFIG.get(SETTING_LOGGING_LOGIN)
+        args[SETTING_LOGGING_LOGIN_FILE] = f"{FRAMEWORK.config['path_data']}/log/{system_plugin.package_name}.log"
+        args[SETTING_LOGGING_ACCESS] = CONFIG.get(SETTING_LOGGING_ACCESS)
+        args[SETTING_LOGGING_ACCESS_FILE] = CONFIG.get(SETTING_LOGGING_ACCESS_FILE)
+        args[SETTING_LOGGING_ACCESS_FORMAT] = CONFIG.get(SETTING_LOGGING_ACCESS_FORMAT)
+        try:
+            gdsaider = GDSToolAider()
+            args[SETTING_GDS_TOOL_REQUEST_TOTAL] = gdsaider.get_total_records('request')
+            args[SETTING_GDS_TOOL_FP_TOTAL] = gdsaider.get_total_records('fp')
+        except:
+            LOGGER.error(traceback.format_exc())
+            args[SETTING_GDS_TOOL_REQUEST_TOTAL] = -1
+            args[SETTING_GDS_TOOL_FP_TOTAL] = -1
         return args
+
+    def migration(self) -> None:
+        '''override'''
+        super().migration()
+        version = CONFIG.get(SETTING_DB_VERSION) or SETTING_DB_VERSIONS[0]
+        version = self._migration(version, SETTING_DB_VERSIONS, f'{PLUGIN.package_name}_setting', migrate_setting)
+        CONFIG.set(SETTING_DB_VERSION, version)
 
     def command_test_conn(self, request: flask.Request) -> dict:
         response = RcloneAider()._vfs_list()
@@ -524,6 +597,12 @@ class Setting(BaseModule):
             data['msg'] = '접속에 실패했습니다.'
         return data
 
+    def command_clear_db(self, request: flask.Request) -> dict:
+        mod = request.form.get('arg1')
+        span = int(request.form.get('arg2'))
+        GDSToolAider().delete(mod, span)
+        return self.returns('success', 'DB 정리를 실행합니다.')
+
     def command_default(self, request: flask.Request) -> tuple[bool, str]:
         '''override'''
         return super().command_default(request)
@@ -534,6 +613,32 @@ class Setting(BaseModule):
         for change in changes:
             if change == f'{self.name}_startup_dependencies':
                 SettingAider().depends(CONFIG.get(SETTING_STARTUP_DEPENDENCIES))
+            if change == SETTING_LOGGING_LOGIN:
+                enable = CONFIG.get(SETTING_LOGGING_LOGIN)
+                if enable.lower() == 'true':
+                    self.system_route.process_command = self.process_command_route_system
+                else:
+                    self.system_route.process_command = self.system_route_process_command
+
+    def process_command_route_system(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: flask.Request) -> flask.Response:
+        '''alternative of system.route.process_command()'''
+        if command == 'login':
+            username = arg1
+            password = arg2
+            remember = (arg3 == 'true')
+            client_info = f"user={username} ip={self.get_client_ip(request)}"
+            failed_msg = f'로그인 실패: {client_info}'
+            if username not in FRAMEWORK.users:
+                system_plugin.logger.warning(failed_msg)
+                return flask.jsonify('no_id')
+            elif not FRAMEWORK.users[username].can_login(password):
+                system_plugin.logger.warning(failed_msg)
+                return flask.jsonify('wrong_password')
+            else:
+                system_plugin.logger.info(f'로그인 성공: {client_info}')
+                FRAMEWORK.users[username].authenticated = True
+                flask_login.login_user(FRAMEWORK.users[username], remember=remember)
+                return flask.jsonify('redirect')
 
     def plugin_load(self) -> None:
         '''override'''
@@ -541,6 +646,57 @@ class Setting(BaseModule):
         if not CONFIG.get(SETTING_RCLONE_REMOTE_VFSES) and CONFIG.get(SETTING_RCLONE_REMOTE_VFS):
             vfses = RcloneAider().vfs_list()
             CONFIG.set(SETTING_RCLONE_REMOTE_VFSES, '|'.join(vfses))
+        if (True if CONFIG.get(SETTING_GDS_TOOL_REQUEST_AUTO).lower() == 'true' else False):
+            GDSToolAider().delete('request', CONFIG.get_int(SETTING_GDS_TOOL_REQUEST_SPAN))
+        if (True if CONFIG.get(SETTING_GDS_TOOL_FP_AUTO).lower() == 'true' else False):
+            GDSToolAider().delete('fp', CONFIG.get_int(SETTING_GDS_TOOL_FP_SPAN))
+        if CONFIG.get(SETTING_LOGGING_LOGIN).lower() == 'true':
+            self.system_route.process_command = self.process_command_route_system
+        if CONFIG.get(SETTING_LOGGING_ACCESS).lower() == 'true':
+            self.set_access_log()
+
+    def set_access_log(self) -> None:
+        log_file = CONFIG.get(SETTING_LOGGING_ACCESS_FILE) or f"{FRAMEWORK.config.get('path_data', '/data')}/log/access.log"
+        level = FRAMEWORK.SystemModelSetting.get_int('log_level') or logging.DEBUG
+        logger = self.get_rotating_file_logger(log_file, level=level)
+
+        @FRAMEWORK.app.after_request
+        def after_request(response: flask.Response) -> flask.Response:
+            request = flask.request
+            namespace = {
+                'remote': self.get_client_ip(request),
+                'method': request.method,
+                'scheme': request.scheme,
+                'path': request.full_path,
+                'status': response.status_code,
+                'agent': request.user_agent,
+                'length': response.content_length,
+            }
+            log_format = CONFIG.get(SETTING_LOGGING_ACCESS_FORMAT)
+            if not log_format:
+                log_format = '{remote} {method} "{path}" {status}'
+                CONFIG.set(SETTING_LOGGING_ACCESS_FORMAT, log_format)
+            try:
+                logger.log(level, log_format.format(**namespace))
+            except:
+                LOGGER.exception(f'엑세스 로그 형식: {log_format}')
+            return response
+
+    def get_rotating_file_logger(self,
+                                 path: str,
+                                 name: str = None,
+                                 fmt: logging.Formatter = logging.Formatter(u'[%(asctime)s] %(message)s'),
+                                 max_bytes: int = 5 * 1024 * 1024,
+                                 level: int = logging.DEBUG) -> logging.Logger:
+        log_file = pathlib.Path(path)
+        if not name:
+            name = log_file.name
+        logger = logging.getLogger(name)
+        handler = logging.handlers.RotatingFileHandler(filename=log_file, maxBytes=max_bytes, backupCount=5, encoding='utf8', delay=True)
+        handler.setFormatter(fmt)
+        logger.setLevel(level)
+        logger.addHandler(handler)
+        return logger
 
 
 class Schedule(BaseModule):
@@ -567,29 +723,9 @@ class Schedule(BaseModule):
     def migration(self) -> None:
         '''override'''
         super().migration()
-        with FRAMEWORK.app.app_context():
-            set_db_ver = CONFIG.get(SETTING_DB_VERSION)
-            if set_db_ver:
-                current_db_ver = CONFIG.get(SETTING_DB_VERSION)
-            else:
-                current_db_ver = CONFIG.get(SCHEDULE_DB_VERSION)
-            # 'flaskfarmaider': 'sqlite:////data/db/flaskfarmaider.db?check_same_thread=False'
-            db_file = FRAMEWORK.app.config['SQLALCHEMY_BINDS'][PLUGIN.package_name].replace('sqlite:///', '').split('?')[0]
-            LOGGER.debug(f'DB 버전: {current_db_ver}')
-            with sqlite3.connect(db_file) as conn:
-                conn.row_factory = sqlite3.Row
-                cs = conn.cursor()
-                table_jobs = f'{PLUGIN.package_name}_jobs'
-                # DB 볼륨 정리
-                cs.execute(f'VACUUM;').fetchall()
-                for ver in SCHEDULE_DB_VERSIONS[(SCHEDULE_DB_VERSIONS.index(current_db_ver)):]:
-                    migrate(ver, table_jobs, cs)
-                    current_db_ver = ver
-                conn.commit()
-                FRAMEWORK.db.session.flush()
-            LOGGER.debug(f'최종 DB 버전: {current_db_ver}')
-            CONFIG.set(SCHEDULE_DB_VERSION, current_db_ver)
-            CONFIG.set(SETTING_DB_VERSION, '')
+        version = CONFIG.get(SCHEDULE_DB_VERSION)
+        version = self._migration(version, SCHEDULE_DB_VERSIONS, f'{PLUGIN.package_name}_jobs', migrate_schedule)
+        CONFIG.set(SCHEDULE_DB_VERSION, version)
 
     def get_template_args(self) -> dict:
         '''override'''
@@ -725,7 +861,7 @@ class Tool(BaseModule):
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name=TOOL, first_menu=TOOL_TRASH)
-        self.set_page_list([ToolTrash, ToolEtcSetting])
+        self.set_page_list([ToolTrash])
 
     def setting_save_after(self, changes: list) -> None:
         '''override'''
@@ -830,88 +966,3 @@ class ToolTrash(BasePage):
         '''override'''
         super().plugin_unload()
         CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[0])
-
-
-class ToolEtcSetting(BasePage):
-
-    def __init__(self, plugin: PluginBase, parent: PluginModuleBase) -> None:
-        super().__init__(plugin, parent, name=TOOL_ETC_SETTING)
-        self.db_default = {
-            TOOL_GDS_TOOL_REQUEST_SPAN: '30',
-            TOOL_GDS_TOOL_REQUEST_AUTO: 'false',
-            TOOL_GDS_TOOL_FP_SPAN: '30',
-            TOOL_GDS_TOOL_FP_AUTO: 'false',
-            TOOL_LOGIN_LOG_ENABLE: 'false',
-        }
-        self.system_route = system_plugin.logic.get_module('route')
-        self.system_route_process_command = self.system_route.process_command
-        self.commands['delete'] = self.command_delete
-
-    def get_template_args(self) -> dict:
-        '''override'''
-        args = super().get_template_args()
-        args[TOOL_GDS_TOOL_REQUEST_SPAN] = CONFIG.get(TOOL_GDS_TOOL_REQUEST_SPAN)
-        args[TOOL_GDS_TOOL_REQUEST_AUTO] = CONFIG.get(TOOL_GDS_TOOL_REQUEST_AUTO)
-        args[TOOL_GDS_TOOL_FP_SPAN] = CONFIG.get(TOOL_GDS_TOOL_FP_SPAN)
-        args[TOOL_GDS_TOOL_FP_AUTO] = CONFIG.get(TOOL_GDS_TOOL_FP_AUTO)
-        args[TOOL_LOGIN_LOG_ENABLE] = CONFIG.get(TOOL_LOGIN_LOG_ENABLE).lower()
-        args[TOOL_LOGIN_LOG_FILE] = f"{FRAMEWORK.config['path_data']}/log/{system_plugin.package_name}.log"
-        try:
-            gdsaider = GDSToolAider()
-            args[TOOL_GDS_TOOL_REQUEST_TOTAL] = gdsaider.get_total_records('request')
-            args[TOOL_GDS_TOOL_FP_TOTAL] = gdsaider.get_total_records('fp')
-        except:
-            LOGGER.error(traceback.format_exc())
-            args[TOOL_GDS_TOOL_REQUEST_TOTAL] = -1
-            args[TOOL_GDS_TOOL_FP_TOTAL] = -1
-        return args
-
-    def command_delete(self, request: flask.Request) -> dict:
-        mod = request.form.get('arg1')
-        span = int(request.form.get('arg2'))
-        GDSToolAider().delete(mod, span)
-        return self.returns('success', 'DB 정리를 실행합니다.')
-
-    def plugin_load(self) -> None:
-        '''override'''
-        super().plugin_load()
-        request_auto = True if CONFIG.get(TOOL_GDS_TOOL_REQUEST_AUTO).lower() == 'true' else False
-        fp_auto = True if CONFIG.get(TOOL_GDS_TOOL_FP_AUTO).lower() == 'true' else False
-        gdsaider = GDSToolAider()
-        if request_auto:
-            gdsaider.delete('request', CONFIG.get_int(TOOL_GDS_TOOL_REQUEST_SPAN))
-        if fp_auto:
-            gdsaider.delete('fp', CONFIG.get_int(TOOL_GDS_TOOL_FP_SPAN))
-        if CONFIG.get(TOOL_LOGIN_LOG_ENABLE).lower() == 'true':
-            self.system_route.process_command = self.process_command_route_system
-
-    def setting_save_after(self, changes: list) -> None:
-        '''override'''
-        super().setting_save_after(changes)
-        for change in changes:
-            if change == TOOL_LOGIN_LOG_ENABLE:
-                enable = CONFIG.get(TOOL_LOGIN_LOG_ENABLE)
-                if enable.lower() == 'true':
-                    self.system_route.process_command = self.process_command_route_system
-                else:
-                    self.system_route.process_command = self.system_route_process_command
-
-    def process_command_route_system(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: flask.Request) -> flask.Response:
-        '''alternative of system.route.process_command()'''
-        if command == 'login':
-            username = arg1
-            password = arg2
-            remember = (arg3 == 'true')
-            client_info = f"user={username} ip={request.environ.get('HTTP_X_REAL_IP') or request.environ.get('HTTP_X_FORWARDED_FOR') or request.remote_addr}"
-            failed_msg = f'로그인 실패: {client_info}'
-            if username not in FRAMEWORK.users:
-                system_plugin.logger.warning(failed_msg)
-                return flask.jsonify('no_id')
-            elif not FRAMEWORK.users[username].can_login(password):
-                system_plugin.logger.warning(failed_msg)
-                return flask.jsonify('wrong_password')
-            else:
-                system_plugin.logger.info(f'로그인 성공: {client_info}')
-                FRAMEWORK.users[username].authenticated = True
-                flask_login.login_user(FRAMEWORK.users[username], remember=remember)
-                return flask.jsonify('redirect')

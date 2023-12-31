@@ -14,7 +14,9 @@
 {{ macros.m_tab_head_start() }}
 {{ macros.m_tab_head('rcloneremote', 'Rclone Remote', true) }}
 {{ macros.m_tab_head('plexmate', 'Plexmate', false) }}
+{{ macros.m_tab_head('gds_tool', '구드공 툴', false) }}
 {{ macros.m_tab_head('startup', '시작 스크립트', false) }}
+{{ macros.m_tab_head('logging', '기타 로그', false) }}
 {{ macros.m_tab_head_end() }}
 </nav>
 <form id="setting">
@@ -58,12 +60,73 @@
         row='20'
     ) }}
 {{ macros.m_tab_content_end() }}
-
+{{ macros.m_tab_content_start('gds_tool', false) }}
+    {% set sources = ({'request': {'title': '복사 요청 목록'}, 'fp': {'title': 'GDS 변경사항 목록'}}) %}
+    {{ macros.m_row_start('5') }}
+    {{ macros.m_row_end() }}
+        <div class="row">
+        {% for k, v in sources.items() %}
+            <div class="col">
+                <h3>{{ v.title }}</h3>
+                <h4>총 레코드: <span class="badge badge-info" id="setting_gds_tool_{{ k }}_total">0</span></h4>
+                <br />
+                <br />
+                <div class="form-row">
+                    <label for="setting_gds_tool_{{ k }}_span" class="col-sm-4 col-form-label text-right font-weight-bold">잔여 기간</label>
+                    <input type="text" class="col-sm-4 form-control col" id="setting_gds_tool_{{ k }}_span" name="setting_gds_tool_{{ k }}_span" placeholder="days" />
+                    <div class="">
+                        <button class="btn btn-warning" type="button" id="setting_gds_tool_{{ k }}_del">삭제</button>
+                    </div>
+                </div>
+                <div class="form-row mb-3">
+                    <div class="col-sm-4"></div><div class=""><em>오늘부터 잔여 기간(일) 까지만 남기고 삭제<br />전체 삭제는 0 입력</em></div>
+                </div>
+                <div class="form-row">
+                    <label for="setting_gds_tool_{{ k }}_auto" class="col-sm-4 col-form-label text-right font-weight-bold">자동 삭제</label>
+                    <input id="setting_gds_tool_{{ k }}_auto" name="setting_gds_tool_{{ k }}_auto" type="checkbox" class="form-control" data-toggle="toggle" />
+                </div>
+                <div class="form-row">
+                    <div class="col-sm-4"></div><div class=""><em>자동으로 기간 적용 삭제</em></div>
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+{{ macros.m_tab_content_end() }}
+{{ macros.m_tab_content_start('logging', false) }}
+    {{ macros.setting_checkbox(module_name + '_logging_login', '로그인 로그', args[module_name + '_logging_login'], desc=[args[module_name + '_logging_login_file']]) }}
+    {{ macros.m_hr() }}
+    {{ macros.setting_checkbox(module_name + '_logging_access', '접속 로그', args[module_name + '_logging_access'], desc=['변경 사항은 재시작시 적용']) }}
+    {{ macros.setting_input_text(module_name + '_logging_access_file', '접속 로그 경로', value=args[module_name + '_logging_access_file'], col='8', desc=['접속 로그 파일의 경로']) }}
+    {{ macros.setting_input_text(
+            module_name + '_logging_access_format',
+            '접속 로그 형식',
+            value=args[module_name + '_logging_access_format'],
+            col='8',
+            desc=[
+                '{remote}: 클라이언트 IP',
+                '{method}: HTTP 메소드 (GET, POST, ...)',
+                '{path}: 요청 경로',
+                '{status}: HTTP 상태 코드(200, 404, ...)',
+                '{length}: 응답 크기',
+                '{agent}: User-Agent',
+            ]
+        )
+    }}
+{{ macros.m_tab_content_end() }}
 </div>
 </form>
 
 <script type="text/javascript">
     var VFS = "{{ args.setting_rclone_remote_vfs }}";
+    var SETTING_GDS_TOOL_REQUEST_SPAN = JSON.parse('{{ args.setting_gds_tool_request_span|int }}');
+    var SETTING_GDS_TOOL_REQUEST_AUTO = JSON.parse('{{ args.setting_gds_tool_request_auto|lower }}');
+    var SETTING_GDS_TOOL_REQUEST_TOTAL = JSON.parse('{{ args.setting_gds_tool_request_total|int }}');
+    var SETTING_GDS_TOOL_FP_SPAN = JSON.parse('{{ args.setting_gds_tool_fp_span|int }}');
+    var SETTING_GDS_TOOL_FP_AUTO = JSON.parse('{{ args.setting_gds_tool_fp_auto|lower }}');
+    var SETTING_GDS_TOOL_FP_TOTAL = JSON.parse('{{ args.setting_gds_tool_fp_total|int }}');
+    var SETTING_LOGGING_LOGIN = JSON.parse('{{ args.setting_logging_login|lower }}');
+    var SETTING_LOGGING_ACCESS = JSON.parse('{{ args.setting_logging_access|lower }}');
+
     $(function() {
         init();
         E_SETTING_TEST_CONN = $('#btn_test_connection_rclone');
@@ -91,6 +154,40 @@
                 E_SETTING_TEST_CONN.text('접속 실패');
             }
         }
+
+        E_GDS_TOOL_REQUEST_SPAN = $('#setting_gds_tool_request_span');
+        E_GDS_TOOL_REQUEST_AUTO = $('#setting_gds_tool_request_auto');
+        E_GDS_TOOL_REQUEST_TOTAL = $('#setting_gds_tool_request_total');
+        E_GDS_TOOL_REQUEST_DEL = $('#setting_gds_tool_request_del');
+        E_GDS_TOOL_FP_SPAN = $('#setting_gds_tool_fp_span');
+        E_GDS_TOOL_FP_AUTO = $('#setting_gds_tool_fp_auto');
+        E_GDS_TOOL_FP_TOTAL = $('#setting_gds_tool_fp_total');
+        E_GDS_TOOL_FP_DEL = $('#setting_gds_tool_fp_del');
+
+        E_GDS_TOOL_REQUEST_SPAN.prop('value', SETTING_GDS_TOOL_REQUEST_SPAN);
+        E_GDS_TOOL_REQUEST_AUTO.bootstrapToggle(SETTING_GDS_TOOL_REQUEST_AUTO ? 'on' : 'off');
+        E_GDS_TOOL_REQUEST_TOTAL.text(SETTING_GDS_TOOL_REQUEST_TOTAL);
+        E_GDS_TOOL_FP_SPAN.prop('value', SETTING_GDS_TOOL_FP_SPAN);
+        E_GDS_TOOL_FP_AUTO.bootstrapToggle(SETTING_GDS_TOOL_FP_AUTO ? 'on' : 'off');
+        E_GDS_TOOL_FP_TOTAL.text(SETTING_GDS_TOOL_FP_TOTAL);
+
+        E_GDS_TOOL_REQUEST_DEL.on('click', function(e) {
+            span = E_GDS_TOOL_REQUEST_SPAN.prop('value');
+            confirm_modal('복사 요청 목록을 삭제할까요?',
+                '잔여 기간: ' + span,
+                function() {
+                    globalSendCommandPage('delete', 'request', span, '', null);
+            });
+        });
+
+        E_GDS_TOOL_FP_DEL.on('click', function(e) {
+            span = E_GDS_TOOL_FP_SPAN.prop('value');
+            confirm_modal('변경사항 목록을 삭제할까요?',
+                '잔여 기간: ' + span,
+                function() {
+                    globalSendCommandPage('delete', 'fp', span, '', null);
+            });
+        });
     });
 </script>
 
