@@ -8,9 +8,8 @@ import functools
 import logging
 
 import flask
-import flask_login
 
-from .setup import PluginBase, PluginModuleBase, PluginPageBase, system_plugin, default_route_socketio_module, ModelBase, FrameworkJob
+from .setup import PluginBase, PluginModuleBase, PluginPageBase, default_route_socketio_module, ModelBase, FrameworkJob
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
 from .models import Job
 from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider, RcloneAider
@@ -85,7 +84,7 @@ class Base:
     def task_command(self, task: str, target: str, vfs: str, scan: str) -> tuple[bool, str]:
         vfs, recursive = vfs.split('|')
         if recursive:
-            recursive = True if recursive.lower() == 'true' else False
+            recursive = recursive.lower() == 'true'
         else:
             recursive = False
         if scan:
@@ -221,19 +220,6 @@ class Base:
         job['is_include'] = FRAMEWORK.scheduler.is_include(schedule_id)
         job['msg'] = msg
         return job
-
-    def get_client_ip(self, request: flask.Request) -> str:
-        try:
-            if 'X-Real-Ip' in request.headers:
-                remote_addr = request.headers.getlist("X-Real-IP")[0].rpartition(' ')[-1]
-            if 'X-Forwarded-For' in request.headers:
-                remote_addr = request.headers.getlist("X-Forwarded-For")[0].rpartition(' ')[-1]
-            else:
-                remote_addr = request.remote_addr or 'unknown'
-        except:
-            LOGGER.error(traceback.format_exc())
-            remote_addr = 'unknown'
-        return remote_addr
 
     def _migration(self, version: str, versions: list, table: str, migrate_func: callable) -> str:
         LOGGER.debug(f'{table} 현재 DB 버전: {version}')
@@ -519,7 +505,7 @@ class Setting(BaseModule):
             SETTING_STARTUP_EXECUTABLE: 'false',
             SETTING_STARTUP_COMMANDS: 'apt-get update',
             SETTING_STARTUP_TIMEOUT: '300',
-            SETTING_STARTUP_DEPENDENCIES: SettingAider().depends(),
+            SETTING_STARTUP_DEPENDENCIES: SettingAider.depends(),
             SETTING_GDS_TOOL_REQUEST_SPAN: '30',
             SETTING_GDS_TOOL_REQUEST_AUTO: 'false',
             SETTING_GDS_TOOL_FP_SPAN: '30',
@@ -530,42 +516,43 @@ class Setting(BaseModule):
             SETTING_LOGGING_ACCESS_FORMAT: '{remote} {method} "{path}" {status}'
         }
         self.commands.update({'command_test_connection': self.command_test_conn})
-        self.system_route = system_plugin.logic.get_module('route')
-        self.system_route_process_command = self.system_route.process_command
         self.commands['clear_db'] = self.command_clear_db
 
     def prerender(self, sub: str, req: flask.Request) -> None:
         '''override'''
         super().prerender(sub, req)
         # yaml 파일 우선
-        CONFIG.set(SETTING_STARTUP_DEPENDENCIES, SettingAider().depends())
+        CONFIG.set(SETTING_STARTUP_DEPENDENCIES, SettingAider.depends())
 
     def get_template_args(self) -> dict:
         '''override'''
         args = super().get_template_args()
-        args[SETTING_RCLONE_REMOTE_ADDR] = CONFIG.get(SETTING_RCLONE_REMOTE_ADDR)
-        args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
-        args[SETTING_RCLONE_REMOTE_VFSES] = CONFIG.get(SETTING_RCLONE_REMOTE_VFSES)
-        args[SETTING_RCLONE_REMOTE_USER] = CONFIG.get(SETTING_RCLONE_REMOTE_USER)
-        args[SETTING_RCLONE_REMOTE_PASS] = CONFIG.get(SETTING_RCLONE_REMOTE_PASS)
-        args[SETTING_RCLONE_MAPPING] = CONFIG.get(SETTING_RCLONE_MAPPING)
-        args[SETTING_PLEXMATE_MAX_SCAN_TIME] = CONFIG.get(SETTING_PLEXMATE_MAX_SCAN_TIME)
-        args[SETTING_PLEXMATE_TIMEOVER_RANGE] = CONFIG.get(SETTING_PLEXMATE_TIMEOVER_RANGE)
-        args[SETTING_PLEXMATE_PLEX_MAPPING] = CONFIG.get(SETTING_PLEXMATE_PLEX_MAPPING)
-        args[SETTING_STARTUP_EXECUTABLE] = CONFIG.get(SETTING_STARTUP_EXECUTABLE)
-        args[SETTING_STARTUP_COMMANDS] = CONFIG.get(SETTING_STARTUP_COMMANDS)
-        args[SETTING_STARTUP_TIMEOUT] = CONFIG.get(SETTING_STARTUP_TIMEOUT)
-        args[SETTING_STARTUP_DEPENDENCIES] = CONFIG.get(SETTING_STARTUP_DEPENDENCIES)
-
-        args[SETTING_GDS_TOOL_REQUEST_SPAN] = CONFIG.get(SETTING_GDS_TOOL_REQUEST_SPAN)
-        args[SETTING_GDS_TOOL_REQUEST_AUTO] = CONFIG.get(SETTING_GDS_TOOL_REQUEST_AUTO)
-        args[SETTING_GDS_TOOL_FP_SPAN] = CONFIG.get(SETTING_GDS_TOOL_FP_SPAN)
-        args[SETTING_GDS_TOOL_FP_AUTO] = CONFIG.get(SETTING_GDS_TOOL_FP_AUTO)
-        args[SETTING_LOGGING_LOGIN] = CONFIG.get(SETTING_LOGGING_LOGIN)
-        args[SETTING_LOGGING_LOGIN_FILE] = f"{FRAMEWORK.config['path_data']}/log/{system_plugin.package_name}.log"
-        args[SETTING_LOGGING_ACCESS] = CONFIG.get(SETTING_LOGGING_ACCESS)
-        args[SETTING_LOGGING_ACCESS_FILE] = CONFIG.get(SETTING_LOGGING_ACCESS_FILE)
-        args[SETTING_LOGGING_ACCESS_FORMAT] = CONFIG.get(SETTING_LOGGING_ACCESS_FORMAT)
+        confs = [
+            SETTING_RCLONE_REMOTE_ADDR,
+            SETTING_RCLONE_REMOTE_VFS,
+            SETTING_RCLONE_REMOTE_VFSES,
+            SETTING_RCLONE_REMOTE_USER,
+            SETTING_RCLONE_REMOTE_PASS,
+            SETTING_RCLONE_MAPPING,
+            SETTING_PLEXMATE_MAX_SCAN_TIME,
+            SETTING_PLEXMATE_TIMEOVER_RANGE,
+            SETTING_PLEXMATE_PLEX_MAPPING,
+            SETTING_STARTUP_EXECUTABLE,
+            SETTING_STARTUP_COMMANDS,
+            SETTING_STARTUP_TIMEOUT,
+            SETTING_STARTUP_DEPENDENCIES,
+            SETTING_GDS_TOOL_REQUEST_SPAN,
+            SETTING_GDS_TOOL_REQUEST_AUTO,
+            SETTING_GDS_TOOL_FP_SPAN,
+            SETTING_GDS_TOOL_FP_AUTO,
+            SETTING_LOGGING_LOGIN,
+            SETTING_LOGGING_ACCESS,
+            SETTING_LOGGING_ACCESS_FILE,
+            SETTING_LOGGING_ACCESS_FORMAT,
+        ]
+        for conf in confs:
+            args[conf] = CONFIG.get(conf)
+        args[SETTING_LOGGING_LOGIN_FILE] = f"{FRAMEWORK.config['path_data']}/log/system.log"
         try:
             gdsaider = GDSToolAider()
             args[SETTING_GDS_TOOL_REQUEST_TOTAL] = gdsaider.get_total_records('request')
@@ -612,33 +599,10 @@ class Setting(BaseModule):
         super().setting_save_after(changes)
         for change in changes:
             if change == f'{self.name}_startup_dependencies':
-                SettingAider().depends(CONFIG.get(SETTING_STARTUP_DEPENDENCIES))
+                SettingAider.depends(CONFIG.get(SETTING_STARTUP_DEPENDENCIES))
             if change == SETTING_LOGGING_LOGIN:
                 enable = CONFIG.get(SETTING_LOGGING_LOGIN)
-                if enable.lower() == 'true':
-                    self.system_route.process_command = self.process_command_route_system
-                else:
-                    self.system_route.process_command = self.system_route_process_command
-
-    def process_command_route_system(self, command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: flask.Request) -> flask.Response:
-        '''alternative of system.route.process_command()'''
-        if command == 'login':
-            username = arg1
-            password = arg2
-            remember = (arg3 == 'true')
-            client_info = f"user={username} ip={self.get_client_ip(request)}"
-            failed_msg = f'로그인 실패: {client_info}'
-            if username not in FRAMEWORK.users:
-                system_plugin.logger.warning(failed_msg)
-                return flask.jsonify('no_id')
-            elif not FRAMEWORK.users[username].can_login(password):
-                system_plugin.logger.warning(failed_msg)
-                return flask.jsonify('wrong_password')
-            else:
-                system_plugin.logger.info(f'로그인 성공: {client_info}')
-                FRAMEWORK.users[username].authenticated = True
-                flask_login.login_user(FRAMEWORK.users[username], remember=remember)
-                return flask.jsonify('redirect')
+                SettingAider.set_login_log(enable.lower() == 'true')
 
     def plugin_load(self) -> None:
         '''override'''
@@ -646,25 +610,20 @@ class Setting(BaseModule):
         if not CONFIG.get(SETTING_RCLONE_REMOTE_VFSES) and CONFIG.get(SETTING_RCLONE_REMOTE_VFS):
             vfses = RcloneAider().vfs_list()
             CONFIG.set(SETTING_RCLONE_REMOTE_VFSES, '|'.join(vfses))
-        if (True if CONFIG.get(SETTING_GDS_TOOL_REQUEST_AUTO).lower() == 'true' else False):
+        if CONFIG.get(SETTING_GDS_TOOL_REQUEST_AUTO).lower() == 'true':
             GDSToolAider().delete('request', CONFIG.get_int(SETTING_GDS_TOOL_REQUEST_SPAN))
-        if (True if CONFIG.get(SETTING_GDS_TOOL_FP_AUTO).lower() == 'true' else False):
+        if CONFIG.get(SETTING_GDS_TOOL_FP_AUTO).lower() == 'true':
             GDSToolAider().delete('fp', CONFIG.get_int(SETTING_GDS_TOOL_FP_SPAN))
         if CONFIG.get(SETTING_LOGGING_LOGIN).lower() == 'true':
-            self.system_route.process_command = self.process_command_route_system
-        if CONFIG.get(SETTING_LOGGING_ACCESS).lower() == 'true':
-            self.set_access_log()
+            SettingAider.set_login_log()
 
-    def set_access_log(self) -> None:
-        log_file = CONFIG.get(SETTING_LOGGING_ACCESS_FILE) or f"{FRAMEWORK.config.get('path_data', '/data')}/log/access.log"
-        level = FRAMEWORK.SystemModelSetting.get_int('log_level') or logging.DEBUG
-        logger = self.get_rotating_file_logger(log_file, level=level)
-
-        @FRAMEWORK.app.after_request
-        def after_request(response: flask.Response) -> flask.Response:
+    @FRAMEWORK.app.after_request
+    def after_request(response: flask.Response) -> flask.Response:
+        enable = CONFIG.get(SETTING_LOGGING_ACCESS).lower() == 'true'
+        if enable:
             request = flask.request
             namespace = {
-                'remote': self.get_client_ip(request),
+                'remote': SettingAider.get_client_ip(request),
                 'method': request.method,
                 'scheme': request.scheme,
                 'path': request.full_path,
@@ -672,6 +631,9 @@ class Setting(BaseModule):
                 'agent': request.user_agent,
                 'length': response.content_length,
             }
+            file = CONFIG.get(SETTING_LOGGING_ACCESS_FILE) or f"{FRAMEWORK.config.get('path_data', '/data')}/log/access.log"
+            level = FRAMEWORK.SystemModelSetting.get_int('log_level') or logging.DEBUG
+            logger = SettingAider.get_rotating_file_logger(file, level=level)
             log_format = CONFIG.get(SETTING_LOGGING_ACCESS_FORMAT)
             if not log_format:
                 log_format = '{remote} {method} "{path}" {status}'
@@ -679,24 +641,8 @@ class Setting(BaseModule):
             try:
                 logger.log(level, log_format.format(**namespace))
             except:
-                LOGGER.exception(f'엑세스 로그 형식: {log_format}')
-            return response
-
-    def get_rotating_file_logger(self,
-                                 path: str,
-                                 name: str = None,
-                                 fmt: logging.Formatter = logging.Formatter(u'[%(asctime)s] %(message)s'),
-                                 max_bytes: int = 5 * 1024 * 1024,
-                                 level: int = logging.DEBUG) -> logging.Logger:
-        log_file = pathlib.Path(path)
-        if not name:
-            name = log_file.name
-        logger = logging.getLogger(name)
-        handler = logging.handlers.RotatingFileHandler(filename=log_file, maxBytes=max_bytes, backupCount=5, encoding='utf8', delay=True)
-        handler.setFormatter(fmt)
-        logger.setLevel(level)
-        logger.addHandler(handler)
-        return logger
+                LOGGER.exception(f'엑세스 로그 형식 확인: {log_format}')
+        return response
 
 
 class Schedule(BaseModule):
@@ -730,10 +676,14 @@ class Schedule(BaseModule):
     def get_template_args(self) -> dict:
         '''override'''
         args = super().get_template_args()
-        args[f'{self.name}_working_directory'] = CONFIG.get(SCHEDULE_WORKING_DIRECTORY)
-        args[f'{self.name}_last_list_option'] = CONFIG.get(SCHEDULE_LAST_LIST_OPTION)
-        args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
-        args[SETTING_RCLONE_REMOTE_VFSES] = CONFIG.get(SETTING_RCLONE_REMOTE_VFSES)
+        confs = [
+            SCHEDULE_WORKING_DIRECTORY,
+            SCHEDULE_LAST_LIST_OPTION,
+            SETTING_RCLONE_REMOTE_VFS,
+            SETTING_RCLONE_REMOTE_VFSES,
+        ]
+        for conf in confs:
+            args[conf] = CONFIG.get(conf)
         try:
             plexmateaider = PlexmateAider()
             args['periodics'] = plexmateaider.get_periodics()
@@ -778,7 +728,7 @@ class Schedule(BaseModule):
 
     def command_list(self, request: flask.Request) -> dict:
         path = request.form.get('arg1')
-        dir_list = json.dumps(BrowserAider().get_dir(path))
+        dir_list = json.dumps(BrowserAider.get_dir(path))
         CONFIG.set(SCHEDULE_WORKING_DIRECTORY, path)
         if dir_list:
             return self.returns('success', data=dir_list)
@@ -828,7 +778,7 @@ class Schedule(BaseModule):
 
     def command_schedule(self, request: flask.Request) -> dict:
         job_id = int(request.form.get('arg1'))
-        active = True if request.form.get('arg2').lower() == 'true' else False
+        active = request.form.get('arg2').lower() == 'true'
         result, msg = self.set_schedule(job_id, active)
         return self.returns('success' if result else 'warning', msg)
 
