@@ -10,11 +10,14 @@ import shlex
 import platform
 import time
 import locale
+import logging
 
 import yaml
 import requests
+import flask
+import flask_login
 
-from .setup import PluginModuleBase, ModelBase
+from .setup import PluginModuleBase, ModelBase, system_plugin
 from .setup import FRAMEWORK, LOGGER, CONFIG
 from .constants import *
 
@@ -26,10 +29,12 @@ class Aider:
     def __init__(self, name: str = None) -> None:
         self.name = name
 
-    def get_readable_time(self, _time: float) -> str:
+    @staticmethod
+    def get_readable_time(_time: float) -> str:
         return datetime.datetime.utcfromtimestamp(_time).strftime('%b %d %H:%M')
 
-    def parse_mappings(self, text: str) -> dict[str, str]:
+    @staticmethod
+    def parse_mappings(text: str) -> dict[str, str]:
         mappings = {}
         if text:
             settings = text.splitlines()
@@ -38,12 +43,14 @@ class Aider:
                 mappings[source.strip()] = target.strip()
         return mappings
 
-    def update_path(self, target: str, mappings: dict) -> str:
+    @staticmethod
+    def update_path(target: str, mappings: dict) -> str:
         for k, v in mappings.items():
             target = target.replace(k, v)
         return target
 
-    def request(self, method: str = 'POST', url: str = None, data: dict = None, **kwds: dict) -> requests.Response:
+    @staticmethod
+    def request(method: str = 'POST', url: str = None, data: dict = None, **kwds: dict) -> requests.Response:
         try:
             if method.upper() == 'JSON':
                 return requests.request('POST', url, json=data or {}, **kwds)
@@ -169,10 +176,15 @@ class JobAider(Aider):
 
 class SettingAider(Aider):
 
+    # system 플러그인은 플러그인 매니저에 등록되지 않으므로 직접 임포트
+    system_route = system_plugin.logic.get_module('route')
+    system_route_process_command = system_route.process_command
+
     def __init__(self) -> None:
         super().__init__()
 
-    def depends(self, text: str = None) -> str:
+    @staticmethod
+    def depends(text: str = None) -> str:
         try:
             if not DEPEND_USER_YAML.exists():
                 shutil.copyfile(DEPEND_SOURCE_YAML, DEPEND_USER_YAML)
@@ -191,40 +203,103 @@ class SettingAider(Aider):
                 with DEPEND_SOURCE_YAML.open(encoding='utf-8', newline='\n') as file:
                     return file.read()
 
+    @staticmethod
+    def get_client_ip(request: flask.Request) -> str:
+        try:
+            if 'X-Real-Ip' in request.headers:
+                remote_addr = request.headers.getlist("X-Real-IP")[0].rpartition(' ')[-1]
+            if 'X-Forwarded-For' in request.headers:
+                remote_addr = request.headers.getlist("X-Forwarded-For")[0].rpartition(' ')[-1]
+            else:
+                remote_addr = request.remote_addr or 'unknown'
+        except:
+            LOGGER.error(traceback.format_exc())
+            remote_addr = 'unknown'
+        return remote_addr
+
+    @classmethod
+    def set_login_log(cls, enable: bool = True) -> None:
+        if enable:
+            cls.system_route.process_command = cls.process_command_route_system
+        else:
+            cls.system_route.process_command = cls.system_route_process_command
+
+    @staticmethod
+    def process_command_route_system(command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: flask.Request) -> flask.Response:
+        '''alternative of system.route.process_command()'''
+        if command == 'login':
+            username = arg1
+            password = arg2
+            remember = (arg3 == 'true')
+            client_info = f"user={username} ip={SettingAider.get_client_ip(request)}"
+            failed_msg = f'로그인 실패: {client_info}'
+            if username not in FRAMEWORK.users:
+                system_plugin.logger.warning(failed_msg)
+                return flask.jsonify('no_id')
+            elif not FRAMEWORK.users[username].can_login(password):
+                system_plugin.logger.warning(failed_msg)
+                return flask.jsonify('wrong_password')
+            else:
+                system_plugin.logger.info(f'로그인 성공: {client_info}')
+                FRAMEWORK.users[username].authenticated = True
+                flask_login.login_user(FRAMEWORK.users[username], remember=remember)
+                return flask.jsonify('redirect')
+
+    @staticmethod
+    def get_rotating_file_logger(path: str,
+                                 name: str = None,
+                                 fmt: logging.Formatter = logging.Formatter(u'[%(asctime)s] %(message)s'),
+                                 max_bytes: int = 5 * 1024 * 1024,
+                                 level: int = logging.DEBUG) -> logging.Logger:
+        log_file = pathlib.Path(path)
+        if not name:
+            name = log_file.name
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
+        if not logger.handlers:
+            handler = logging.handlers.RotatingFileHandler(filename=log_file, maxBytes=max_bytes, backupCount=5, encoding='utf8', delay=True)
+            handler.setFormatter(fmt)
+            handler.setLevel(level)
+            logger.addHandler(handler)
+        return logger
+
 
 class BrowserAider(Aider):
 
     def __init__(self) -> None:
         super().__init__()
 
-    def get_dir(self, target_path: str) -> list[dict[str, str]]:
+    @staticmethod
+    def get_dir(target_path: str) -> list[dict[str, str]]:
         target_path = pathlib.Path(target_path)
         with os.scandir(target_path) as scandirs:
             target_list = []
             for entry in scandirs:
                 try:
-                    target_list.append(self.pack_dir(entry))
+                    target_list.append(BrowserAider.pack_dir(entry))
                 except Exception as e:
                     LOGGER.warning(e)
                     continue
             target_list = sorted(target_list, key=lambda entry: (entry.get('is_file'), entry.get('name')))
-            parent_pack = self.pack_dir(target_path.parent)
+            parent_pack = BrowserAider.pack_dir(target_path.parent)
             parent_pack['name'] = '..'
             target_list.insert(0, parent_pack)
             return target_list
 
-    def pack_dir(self, entry: os.DirEntry | pathlib.Path) -> dict:
+    @staticmethod
+    def pack_dir(entry: os.DirEntry | pathlib.Path) -> dict:
         stats: os.stat_result = entry.stat(follow_symlinks=True)
         return {
             'name': entry.name,
             'path': entry.path if isinstance(entry, os.DirEntry) else str(entry),
             'is_file': entry.is_file(),
-            'size': self.format_file_size(stats.st_size),
-            'ctime': self.get_readable_time(stats.st_ctime),
-            'mtime': self.get_readable_time(stats.st_mtime),
+            'size': BrowserAider.format_file_size(stats.st_size),
+            'ctime': BrowserAider.get_readable_time(stats.st_ctime),
+            'mtime': BrowserAider.get_readable_time(stats.st_mtime),
         }
 
-    def format_file_size(self, size: int, decimals: int = 1, binary_system: bool = True) -> str:
+    @staticmethod
+    def format_file_size(size: int, decimals: int = 1, binary_system: bool = True) -> str:
         units = ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']
         largest_unit = 'Y'
         if binary_system:
@@ -716,7 +791,7 @@ class StartupAider(Aider):
                 encoding: str = locale.getpreferredencoding(),
                 **kwds: dict) -> subprocess.CompletedProcess:
         startup_executable = CONFIG.get(SETTING_STARTUP_EXECUTABLE)
-        startup_executable = True if startup_executable.lower() == 'true' else False
+        startup_executable = startup_executable.lower() == 'true'
         if not startup_executable:
             msg = f'실행이 허용되지 않았어요.'
             LOGGER.error(msg)
@@ -755,11 +830,11 @@ class StartupAider(Aider):
 
     def execute(self, commands: list[str], require_plugins: set[str] = {}, depends: dict = {}) -> None:
         startup_executable = CONFIG.get(SETTING_STARTUP_EXECUTABLE)
-        startup_executable = True if startup_executable.lower() == 'true' else False
+        startup_executable = startup_executable.lower() == 'true'
         if startup_executable:
             for command in commands:
                 command = shlex.split(command)
-                result: subprocess.CompletedProcess = self.sub_run(*command, timeout=CONFIG.get_int(SETTING_STARTUP_TIMEOUT))
+                result: subprocess.CompletedProcess = self.sub_run(*command, timeout=CONFIG.get_int(SETTING_STARTUP_TIMEOUT) or 60)
                 if result.returncode == 0:
                     msg = '성공'
                 else:

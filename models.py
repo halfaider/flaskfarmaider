@@ -133,9 +133,9 @@ class Job(ModelBase):
                 model.target = formdata.get('sch-target-path')[0] if formdata.get('sch-target-path') else '/'
             model.vfs = formdata.get('sch-vfs')[0] if formdata.get('sch-vfs') else 'remote:'
             recursive = formdata.get('sch-recursive')[0] if formdata.get('sch-recursive') else 'false'
-            model.recursive = True if recursive.lower() == 'true' else False
+            model.recursive = recursive.lower() == 'true'
             schedule_auto_start = formdata.get('sch-schedule-auto-start')[0] if formdata.get('sch-schedule-auto-start') else 'false'
-            model.schedule_auto_start = True if schedule_auto_start.lower() == 'true' else False
+            model.schedule_auto_start = schedule_auto_start.lower() == 'true'
             model.scan_mode = formdata.get('sch-scan-mode')[0] if formdata.get('sch-scan-mode') else SCAN_MODE_KEYS[0]
             model.periodic_id = int(formdata.get('sch-scan-mode-periodic-id')[0]) if formdata.get('sch-scan-mode-periodic-id') else -1
             model.clear_type = formdata.get('sch-clear-type')[0] if formdata.get('sch-clear-type') else ''
@@ -205,8 +205,8 @@ class Job(ModelBase):
             for row in query.all():
                 item = row.as_dict()
                 sch_id = sch_mod.create_schedule_id(item['id'])
-                item['is_include'] = True if FRAMEWORK.scheduler.is_include(sch_id) else False
-                item['is_running'] = True if FRAMEWORK.scheduler.is_running(sch_id) else False
+                item['is_include'] = FRAMEWORK.scheduler.is_include(sch_id)
+                item['is_running'] = FRAMEWORK.scheduler.is_running(sch_id)
                 data['list'].append(item)
             data['paging'] = cls.get_paging_info(total, opt_page, page_size)
             CONFIG.set(f'{SCHEDULE}_last_list_option', f'{opt_order}|{opt_page}|{page_size}|{opt_keyword or ""}|{opt_option1 or ""}|{opt_option2 or ""}')
