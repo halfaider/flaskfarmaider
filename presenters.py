@@ -592,7 +592,7 @@ class Setting(BaseModule):
         return self.returns('success', 'DB 정리를 실행합니다.')
 
     def command_check_timeover(self, request: flask.Request) -> dict:
-        num_range = request.form.get('arg1').split('~')
+        num_range = request.form.get('arg1')
         plexmate = PlexmateAider()
         plexmate.check_timeover(num_range)
         return self.returns('success', 'TIMEOUT 항목을 READY로 변경합니다.')
