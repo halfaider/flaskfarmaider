@@ -517,6 +517,7 @@ class Setting(BaseModule):
         }
         self.commands.update({'command_test_connection': self.command_test_conn})
         self.commands['clear_db'] = self.command_clear_db
+        self.commands['check_timeover'] = self.command_check_timeover
 
     def prerender(self, sub: str, req: flask.Request) -> None:
         '''override'''
@@ -589,6 +590,12 @@ class Setting(BaseModule):
         span = int(request.form.get('arg2'))
         GDSToolAider().delete(mod, span)
         return self.returns('success', 'DB 정리를 실행합니다.')
+
+    def command_check_timeover(self, request: flask.Request) -> dict:
+        num_range = request.form.get('arg1').split('~')
+        plexmate = PlexmateAider()
+        plexmate.check_timeover(num_range)
+        return self.returns('success', 'TIMEOUT 항목을 READY로 변경합니다.')
 
     def command_default(self, request: flask.Request) -> tuple[bool, str]:
         '''override'''
