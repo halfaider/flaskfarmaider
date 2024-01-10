@@ -85,8 +85,4 @@ E_TRASH_BTN_EXCEUTE.on('click', function(e) {
 E_TRASH_SECTION_TYPE.prop('value', LAST_LIST_OPTIONS[0]);
 set_plex_sections(LAST_LIST_OPTIONS[0], E_TRASH_SECTIONS);
 E_TRASH_SECTIONS.prop('value', LAST_LIST_OPTIONS[1]);
-if (LAST_LIST_OPTIONS[2] > 0) {
-    get_list(LAST_LIST_OPTIONS[2]);
-} else {
-    get_list(1);
-}
+get_list(1);
