@@ -124,6 +124,7 @@ SCHEDULE_DB_VERSION = f'{SCHEDULE}_db_version'
 SCHEDULE_DB_VERSIONS = ['1', '2', '3', '4', '5', '6']
 
 TOOL_TRASH_TASK_STATUS = f'{TOOL}_{TOOL_TRASH}_task_status'
+TOOL_TRASH_LAST_LIST_OPTION = f'{TOOL}_{TOOL_TRASH}_last_list_option'
 
 OPTS = {
     'filepath' : __file__,

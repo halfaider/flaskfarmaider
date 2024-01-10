@@ -209,8 +209,6 @@ function make_list(data) {
     $('.sch-switch ~ div.toggle-group').on('click', function(e) {
         // collapse까지 bubble up 되는 것 방지
         e.stopPropagation();
-        //e.preventDefault();
-        //e.stopImmediatePropagation()
         $(this).prev().bootstrapToggle('toggle');
     })
 
@@ -224,56 +222,6 @@ function make_list(data) {
     $('.sch-list-execute').on('click', function(e) {
         execute_job($(this).data('id'));
     });
-
-    /*
-    // 컨텍스트 메뉴
-    $.contextMenu({
-        selector: '.sch-context-menu',
-        trigger: 'left',
-        items: {
-            edit: {
-                name: '편집',
-                icon: 'fa-pencil-square-o',
-                disabled: function(){return $(this).hasClass('dir-file');},
-                callback: function(key, opt, e) {
-                    data = opt.$trigger.data();
-                    schedule_modal('edit', data);
-                },
-            },
-            delete: {
-                name: '삭제',
-                icon: 'fa-trash',
-                disabled: function(){return $(this).hasClass('dir-file');},
-                callback: function(key, opt, e) {
-                    data = opt.$trigger.data();
-                    confirm_modal('일정을 삭제할까요?',
-                        'ID: ' + data.id + '<br />작업: ' + TASKS[data.task].name + '<br />내용: ' + data.desc,
-                        function() {
-                        globalSendCommand("delete", data.id, null, null, function(result) {
-                            if (result.ret == 'success') {
-                                globalRequestSearch('1');
-                            }
-                        });
-                    });
-                }
-            },
-            execute: {
-                name: '지금 실행',
-                icon: 'fa-play',
-                callback: function(key, opt, e) {
-                    data = opt.$trigger.data();
-                    confirm_modal('일정을 실행할까요?',
-                        'ID: ' + data.id + '<br />작업: ' + TASKS[data.task].name + '<br />내용: ' + data.desc,
-                        function() {
-                            toggle_schedule_status(data.id, STATUS_KEYS[1]);
-                            globalSendCommand("execute", data.id, null, null, null);
-                        }
-                    );
-                }
-            },
-        },
-    });
-    */
 }
 
 function toggle_schedule_status(id, status) {

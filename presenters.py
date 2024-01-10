@@ -833,6 +833,7 @@ class ToolTrash(BasePage):
         super().__init__(plugin, parent, name=TOOL_TRASH)
         self.db_default = {
             TOOL_TRASH_TASK_STATUS: STATUS_KEYS[0],
+            TOOL_TRASH_LAST_LIST_OPTION: ''
         }
         self.commands.update(
             {
@@ -857,10 +858,11 @@ class ToolTrash(BasePage):
         return self.returns('success', data={'status': CONFIG.get(TOOL_TRASH_TASK_STATUS)})
 
     def command_list(self, request: flask.Request) -> dict:
-        section_id = int(request.form.get('arg1'))
+        section_type, section_id = request.form.get('arg1').split('|')
         page_no = int(request.form.get('arg2'))
         limit = int(request.form.get('arg3'))
-        return self.returns('success', data=PlexmateAider().get_trash_list(section_id, page_no, limit))
+        CONFIG.set(TOOL_TRASH_LAST_LIST_OPTION, f'{section_type}|{section_id}|{page_no}')
+        return self.returns('success', data=PlexmateAider().get_trash_list(int(section_id), page_no, limit))
 
     def command_stop(self, request: flask.Request) -> dict:
         status = CONFIG.get(TOOL_TRASH_TASK_STATUS)
@@ -909,9 +911,14 @@ class ToolTrash(BasePage):
         args['tool_trash_keys'] = TOOL_TRASH_KEYS
         args['tool_trashes'] = TOOL_TRASHES
         args['status_keys'] = STATUS_KEYS
-        args[TOOL_TRASH_TASK_STATUS.lower()] = CONFIG.get(TOOL_TRASH_TASK_STATUS)
-        args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
-        args[SETTING_RCLONE_REMOTE_VFSES] = CONFIG.get(SETTING_RCLONE_REMOTE_VFSES)
+        confs = [
+            TOOL_TRASH_TASK_STATUS,
+            SETTING_RCLONE_REMOTE_VFS,
+            SETTING_RCLONE_REMOTE_VFSES,
+            TOOL_TRASH_LAST_LIST_OPTION
+        ]
+        for conf in confs:
+            args[conf] = CONFIG.get(conf)
         return args
 
     def plugin_load(self) -> None:
