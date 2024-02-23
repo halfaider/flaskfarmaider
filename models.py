@@ -36,6 +36,25 @@ class Job(ModelBase):
     clear_level = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     section_id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
 
+    formdata_mapping = {
+        'sch-task': task,
+        'sch-description': desc,
+        'sch-schedule-mode': schedule_mode,
+        'sch-schedule-interval': schedule_interval,
+        'sch-target-path': target,
+        'sch-vfs': vfs,
+        'sch-recursive': recursive,
+        'sch-recursive-select': recursive,
+        'sch-schedule-auto-start': schedule_auto_start,
+        'sch-schedule-auto-start-select': schedule_auto_start,
+        'sch-scan-mode': scan_mode,
+        'sch-scan-mode-periodic-id': periodic_id,
+        'sch-clear-type': clear_type,
+        'sch-clear-level': clear_level,
+        'sch-clear-section': clear_section,
+        'sch-target-section': section_id,
+    }
+
     def __init__(self, task: str = '', schedule_mode: str = FF_SCHEDULE_KEYS[0], schedule_auto_start: bool = False,
                  desc: str = '', target: str = '', recursive: bool = False, section_id: int = -1,
                  vfs: str = '', scan_mode: str = SCAN_MODE_KEYS[0], periodic_id: int = -1,
@@ -149,6 +168,14 @@ class Job(ModelBase):
             LOGGER.error('작업을 저장하지 못했습니다.')
         finally:
             return model
+
+    def update_formdata_partly(self, formdata: dict[str, list]) -> 'Job':
+        for k, v in formdata.items():
+            LOGGER.info(type(v[0]))
+            key = self.formdata_mapping.get(k)
+            setattr(self, key.name, key.type.python_type(v[0]))
+        self.save()
+        return self
 
     @classmethod
     def get_job(cls, id: int = -1, info: dict = None) -> 'Job':

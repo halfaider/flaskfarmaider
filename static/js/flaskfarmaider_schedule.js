@@ -242,10 +242,12 @@ function disabled_by_schedule_mode(mode) {
             E_INTERVAL.prop('disabled', true);
             E_SCH_AUTO.bootstrapToggle('off');
             E_SCH_AUTO.bootstrapToggle('disable');
+            E_SCH_AUTO_SEL.prop('value', '');
             break;
         case FF_SCHEDULE_KEYS[2]:
             E_INTERVAL.prop('disabled', false);
             E_SCH_AUTO.bootstrapToggle('enable');
+            E_SCH_AUTO_SEL.prop('value', '');
     }
 }
 
@@ -286,6 +288,7 @@ function set_clear_level(type) {
             E_CLEAR_LEVEL.append($('<option></option>').prop('value', 'start2').html('2단계'));
             break;
     }
+    E_CLEAR_LEVEL.prop('value', '');
 }
 
 function execute_job(job_id) {
@@ -344,6 +347,30 @@ function schedule_modal(from, data) {
         E_CLEAR_SECTION.prop('value', data.clear_section);
         E_CLEAR_LEVEL.prop('value', data.clear_level);
         E_TARGET_SECTION.prop('value', data.section_id);
+    } else if (from == 'multiple-edit') {
+        set_form_by_task('multiple-edit');
+        E_MODAL_TITLE.html('일정 일괄 편집 - ' + data);
+        E_SAVE_BTN.data('id', 'multiple|' + data);
+        E_TASK.prop('value', '');
+        E_DESC.prop('value', '');
+        E_PATH.prop('value', '');
+        E_TARGET_SECTION.prop('value', '');
+        E_VFS.prop('value', '');
+        E_RECUR_SEL.prop('value', '');
+        E_SCAN_RADIO_0.prop('checked', false);
+        E_SCAN_RADIO_1.prop('checked', false);
+        E_SCAN_RADIO_2.prop('checked', false);
+        E_SCAN_PERIODIC_ID.prop('value', '');
+        E_SCH_RADIO_0.prop('checked', false);
+        E_SCH_RADIO_1.prop('checked', false);
+        E_SCH_RADIO_2.prop('checked', false);
+        E_INTERVAL.prop('value', '');
+        E_SCH_AUTO_SEL.prop('value', '');
+        E_CLEAR_RADIO_0.prop('checked', false);
+        E_CLEAR_RADIO_1.prop('checked', false);
+        E_CLEAR_RADIO_2.prop('checked', false);
+        E_CLEAR_LEVEL.prop('value', '');
+        E_CLEAR_SECTION.prop('value', '');
     } else {
         // 새로 추가
         set_form_by_task(TASK_KEYS[0]);
@@ -370,7 +397,7 @@ function schedule_modal(from, data) {
         set_clear_level(E_CLEAR_RADIO_0.prop('value'));
         E_MODAL_TITLE.html("일정 추가");
     }
-    E_MODAL.modal({backdrop: 'static', keyboard: false}, 'show');
+    E_MODAL.modal({backdrop: 'static', keyboard: true}, 'show');
 }
 
 function bulid_sch_form_header(title, col) {
@@ -416,9 +443,16 @@ function build_sch_form_text_btn(id, title, value, btn_id, btn_text, col, desc) 
     return element;
 }
 
-function build_sch_form_checkbox(id, title, value, col, desc) {
+function build_sch_form_checkbox(id, title, options, col, desc) {
     element = bulid_sch_form_header(title, col);
     element += '<input id="' + id + '" name="' + id + '" type="checkbox" class="form-control form-control-sm" data-toggle="toggle" />';
+    element += '<select id="' + id + '-select" name="' + id + '-select" class="form-control form-control-sm col-sm-2">';
+    if (options.length > 0) {
+        for (idx in options) {
+            element += '<option value="' + options[idx].value + '">' + options[idx].name + '</option>';
+        }
+    }
+    element += '</select>';
     element += build_sch_form_footer(desc);
     return element;
 }
@@ -451,6 +485,12 @@ function set_form_by_task(task) {
     E_GROUP_SCH.detach();
     E_SCH_RADIO_0.prop('disabled', false);
     E_SCH_RADIO_2.prop('disabled', false);
+    E_RECUR.bootstrapToggle();
+    E_SCH_AUTO.bootstrapToggle();
+    E_RECUR.parent().show();
+    E_RECUR_SEL.hide();
+    E_SCH_AUTO.parent().show();
+    E_SCH_AUTO_SEL.hide();
     switch(task){
         case TASK_KEYS[0]:
             E_SCH_SETTING.append(E_GROUP_PATH);
@@ -478,10 +518,28 @@ function set_form_by_task(task) {
             break;
         case TASK_KEYS[5]:
             E_SCH_SETTING.append(E_GROUP_SCH);
-            E_SCH_RADIO_1.prop('checked', true);
+            if (E_SCH_AUTO.parent().is(":visible")) {
+                E_SCH_RADIO_1.prop('checked', true);
+            }
             disabled_by_schedule_mode(FF_SCHEDULE_KEYS[1]);
             E_SCH_RADIO_0.prop('disabled', true);
             E_SCH_RADIO_2.prop('disabled', true);
+            break;
+        case 'multiple-edit':
+            E_SCH_SETTING.append(E_GROUP_PATH);
+            E_SCH_SETTING.append(E_GROUP_RCLONE);
+            E_SCH_SETTING.append(E_GROUP_SCAN);
+            E_SCH_SETTING.append(E_GROUP_SCH);
+            E_SCH_SETTING.append(E_GROUP_CLEAR);
+            E_INTERVAL.prop('disabled', false);
+            E_PATH.prop('disabled', false);
+            E_PATH_BTN.prop('disabled', false);
+            E_TARGET_SECTION.prop('disabled', false);
+            E_SCAN_PERIODIC_ID.prop('disabled', false);
+            E_RECUR.parent().hide();
+            E_RECUR_SEL.show();
+            E_SCH_AUTO.parent().hide();
+            E_SCH_AUTO_SEL.show();
             break;
     }
 }
@@ -551,7 +609,7 @@ SCH_FORM_PATH = build_sch_form_text_btn('sch-target-path', '로컬 경로', '', 
 SCH_FORM_SECTION = build_sch_form_select('sch-target-section', '라이브러리 섹션', [{value: -1, name: '선택 안 함'}], 5, '새로고침/스캔 할 라이브러리 섹션<br>로컬 경로와 비교하여 하위인 경로가 선택됩니다.')
 SCH_FORM_GROUP_PATH = build_sch_form_group('sch-form-group-path', [SCH_FORM_PATH, SCH_FORM_SECTION, SCH_FORM_LINE]);
 SCH_FORM_VFS = build_sch_form_select('sch-vfs', 'VFS 리모트', VFSES, 5, 'rclone rc로 접근 가능한 리모트 이름<br>ex. gds:');
-SCH_FORM_RECURSIVE = build_sch_form_checkbox('sch-recursive', 'recursive', 'off', 9, 'rclone vfs/refresh의 --recursive 옵션 적용 여부<br>On: 지정된 경로의 모든 하위 경로도 vfs/refresh<br>Off: 지정된 경로만 vfs/refresh');
+SCH_FORM_RECURSIVE = build_sch_form_checkbox('sch-recursive', 'recursive', [{value: true, name: 'On'}, {value: false, name: 'Off'}], 9, 'rclone vfs/refresh의 --recursive 옵션 적용 여부<br>On: 지정된 경로의 모든 하위 경로도 vfs/refresh<br>Off: 지정된 경로만 vfs/refresh');
 SCH_FORM_GROUP_RCLONE = build_sch_form_group('sch-form-group-rclone', [SCH_FORM_VFS, SCH_FORM_RECURSIVE, SCH_FORM_LINE]);
 SCH_FORM_SCAN_TYPE = build_sch_form_radio('sch-scan-mode', '스캔 방식', SCAN_OPTS, 9, '');
 SCH_FORM_SCAN_PERIODIC = build_sch_form_select('sch-scan-mode-periodic-id', '주기적 스캔 작업', [], 9, 'Plexmate 플러그인의 주기적 스캔 작업 목록')
@@ -562,14 +620,15 @@ SCH_FORM_CLEAR_SECTION = build_sch_form_select('sch-clear-section', '파일 정�
 SCH_FORM_GROUP_CLEAR = build_sch_form_group('sch-form-group-clear', [SCH_FORM_CLEAR_TYPE, SCH_FORM_CLEAR_LEVEL, SCH_FORM_CLEAR_SECTION, SCH_FORM_LINE]);
 SCH_FORM_SCH_MODE = build_sch_form_radio('sch-schedule-mode', '일정 방식', SCHEDULE_OPTS, 9, '')
 SCH_FORM_SCH_INTERVAL = build_sch_form_text('sch-schedule-interval', '시간 간격', '', 5, 'Interval(minute 단위) 혹은 Cron 설정');
-SCH_FORM_SCH_AUTO = build_sch_form_checkbox('sch-schedule-auto-start', '시작시 일정 등록', 'off', 9, '');
+SCH_FORM_SCH_AUTO = build_sch_form_checkbox('sch-schedule-auto-start', '시작시 일정 등록', [{value: true, name: 'On'}, {value: false, name: 'Off'}], 9, '');
 SCH_FORM_GROUP_SCH = build_sch_form_group('sch-form-group-sch', [SCH_FORM_SCH_MODE, SCH_FORM_SCH_INTERVAL, SCH_FORM_SCH_AUTO, SCH_FORM_LINE]);
+
 
 E_SCH_SETTING = $('#sch-setting');
 E_SCH_SETTING.append(SCH_FORM_GROUP_TASK);
 E_TASK = $('#sch-task');
 // 일정 업무 선택에 따라 inputs (비)활성화
-E_TASK.change(function() {
+E_TASK.on('change', function(e) {
     set_form_by_task($(this).prop('value'));
 });
 E_DESC = $('#sch-description');
@@ -600,6 +659,10 @@ E_GROUP_PATH = $('#sch-form-group-path');
 E_SCH_SETTING.append(SCH_FORM_GROUP_RCLONE);
 E_VFS = $('#sch-vfs');
 E_RECUR = $('#sch-recursive');
+E_RECUR_SEL = $('#sch-recursive-select');
+E_RECUR.on('change', function(e){
+    E_RECUR_SEL.prop('value', $(this).prop('checked'));
+});
 E_GROUP_RCLONE = $('#sch-form-group-rclone');
 E_SCH_SETTING.append(SCH_FORM_GROUP_SCAN);
 E_SCAN_RADIO_0 = $('#sch-scan-mode0');
@@ -633,6 +696,10 @@ $('input[id^="sch-schedule-mode"]:radio').change(function() {
     disabled_by_schedule_mode($(this).prop('value'));
 });
 E_SCH_AUTO = $('#sch-schedule-auto-start');
+E_SCH_AUTO_SEL = $('#sch-schedule-auto-start-select');
+E_SCH_AUTO.on('change', function(e){
+    E_SCH_AUTO_SEL.prop('value', $(this).prop('checked'));
+});
 E_INTERVAL = $('#sch-schedule-interval');
 E_GROUP_SCH = $('#sch-form-group-sch');
 E_SAVE_BTN = $('#sch-save-btn');
@@ -644,7 +711,7 @@ E_SAVE_BTN.on('click', function() {
     globalSendCommand('save', formdata, null, null, function(result) {
         if (result.ret == 'success') {
             E_MODAL.modal('hide');
-            globalRequestSearch(1);
+            globalRequestSearch(LAST_LIST_OPTIONS[1]);
         }
     });
 });
@@ -656,6 +723,14 @@ E_ADD_BTN.on('click', function(e) {
 });
 E_MODAL_TITLE = $('#sch-add-modal_title');
 E_MODAL = $('#sch-add-modal')
+E_MODAL.on('shown.bs.modal', function (e) {
+    console.log('modal shown');
+});
+E_MODAL.on('hidden.bs.modal', function (e) {
+    E_TASK.on('change', function(e) {
+        set_form_by_task($(this).prop('value'));
+    });
+});
 E_WORKING_DIR = $('#working-directory');
 E_BROWSER_WD = $('#working-directory');
 // 현재 디렉토리
@@ -738,5 +813,39 @@ socket.on('result', function(result) {
             notify(result.data.msg, 'info');
         }
         toggle_schedule_status(result.data.id, result.data.status);
+    }
+});
+
+E_MULTIPLE_DEL = $('#multiple-del');
+E_MULTIPLE_DEL.on('click', function(e) {
+    selected = $('input[class="selectable"]:checked').map((i, el) => el.value).get();
+    if (selected.length > 0) {
+        confirm_modal(
+            '선택한 항목을 삭제할까요?',
+            selected.length + ' 개의 항목이 모두 삭제됩니다.',
+            function() {
+                globalSendCommand('delete', 'selected', selected.join('|'), null, function(result) {
+                    if (result.ret == 'success') {
+                        globalRequestSearch('1');
+                    }
+                    E_SELECT_ALL.prop('checked', false);
+                });
+            }
+        );
+    } else {
+        notify('선택된 항목이 없습니다.', 'warning');
+    }
+});
+
+E_MULTIPLE_EDIT = $('#multiple-edit');
+E_MULTIPLE_EDIT.on('click', function(e) {
+    selected = $('input[class="selectable"]:checked').map((i, el) => el.value).get();
+    if (selected.length > 0) {
+        sel = selected.join('|')
+        console.log(sel);
+        E_TASK.off('change');
+        schedule_modal('multiple-edit', sel);
+    } else {
+        notify('선택된 항목이 없습니다.', 'warning');
     }
 });
