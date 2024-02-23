@@ -744,15 +744,34 @@ class Schedule(BaseModule):
 
     def command_save(self, request: flask.Request) -> dict:
         query = urllib.parse.parse_qs(request.form.get('arg1'))
-        old_job = Job.get_job(int(query.get('id')[0]))
-        job = Job.update_formdata(query)
-        if old_job.id > 0:
-            th = ThreadHasReturn(target=self.schedule_reload, args=(job, old_job), daemon=True, callback=self.callback_sio)
-            th.start()
-        if job.id > 0:
-            return self.returns('success', '저장했습니다.')
+        if query.get('id')[0].startswith('multiple|'):
+            ids = list(map(int, query.pop('id')[0].split('|')[1:]))
+            query.pop('sch-recursive')
+            query.pop('sch-schedule-auto-start')
+            LOGGER.warning(ids)
+            LOGGER.warning(query)
+            if query:
+                for k, v in query.items():
+                    if k in ['sch-recursive', 'sch-recursive-select', 'sch-schedule-auto-start', 'sch-schedule-auto-start-select']:
+                        v[0] = v[0].lower() == 'true'
+                for _id in ids:
+                    old_job = Job.get_job(_id)
+                    job = Job.get_job(_id).update_formdata_partly(query)
+                    th = ThreadHasReturn(target=self.schedule_reload, args=(job, old_job), daemon=True, callback=self.callback_sio)
+                    th.start()
+                return self.returns('success', '수정했습니다.')
+            else:
+                return self.returns('warning', '수정할 항목이 없습니다.')
         else:
-            return self.returns('warning', '저장할 수 없습니다.')
+            old_job = Job.get_job(int(query.get('id')[0]))
+            job = Job.update_formdata(query)
+            if old_job.id > 0:
+                th = ThreadHasReturn(target=self.schedule_reload, args=(job, old_job), daemon=True, callback=self.callback_sio)
+                th.start()
+            if job.id > 0:
+                return self.returns('success', '저장했습니다.')
+            else:
+                return self.returns('warning', '저장할 수 없습니다.')
 
     def command_delete(self, request: flask.Request) -> dict:
         arg1 = request.form.get('arg1')

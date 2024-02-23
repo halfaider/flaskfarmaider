@@ -28,27 +28,6 @@ function init() {
             });
         }
     });
-
-    E_SELECT_ALL_DEL = $('#select-del');
-    E_SELECT_ALL_DEL.on('click', function(e) {
-        selected = $('input[class="selectable"]:checked').map((i, el) => el.value).get();
-        if (selected.length > 0) {
-            confirm_modal(
-                '선택한 항목을 삭제할까요?',
-                selected.length + ' 개의 항목이 모두 삭제됩니다.',
-                function() {
-                    globalSendCommand('delete', 'selected', selected.join('|'), null, function(result) {
-                        if (result.ret == 'success') {
-                            globalRequestSearch('1');
-                        }
-                        E_SELECT_ALL.prop('checked', false);
-                    });
-                }
-            );
-        } else {
-            notify('선택된 항목이 없습니다.', 'warning');
-        }
-    });
 }
 
 function pagination(target, page, total, limit, list_func) {
@@ -125,4 +104,5 @@ function set_plex_sections(type, target) {
         notify('라이브러리 섹션 정보가 없습니다.', 'warning');
         target.append('<option>정보 없음</option>');
     }
+    target.prop('value', '');
 }
