@@ -71,21 +71,21 @@
     </ul>
 </nav>
 <script type="text/javascript">
-    var SECTION_TYPES = JSON.parse('{{ args.section_types|tojson }}');
-    var SECTION_TYPE_KEYS = JSON.parse('{{ args.section_type_keys|tojson }}');
-    var SECTIONS = JSON.parse('{{ args.sections|tojson }}');
-    var TASK_KEYS = JSON.parse('{{ args.task_keys|tojson }}');
-    var TASKS = JSON.parse('{{ args.tasks|tojson }}');
-    var SCAN_MODES = JSON.parse('{{ args.scan_modes|tojson }}');
-    var SCAN_MODE_KEYS = JSON.parse('{{ args.scan_mode_keys|tojson }}');
-    var TOOL_TRASH_KEYS = JSON.parse('{{ args.tool_trash_keys|tojson }}');
-    var TOOL_TRASHES = JSON.parse('{{ args.tool_trashes|tojson }}');
-    var STATUS_KEYS = JSON.parse('{{ args.status_keys|tojson }}');
-    var TOOL_TRASH_TASK_STATUS = '{{ args.tool_trash_task_status }}';
-    var LAST_LIST_OPTIONS = '{{ args.tool_trash_last_list_option }}'.split('|')
+    const SECTION_TYPES = JSON.parse('{{ args.section_types|tojson }}');
+    const SECTION_TYPE_KEYS = JSON.parse('{{ args.section_type_keys|tojson }}');
+    const SECTIONS = JSON.parse('{{ args.sections|tojson }}');
+    const TASK_KEYS = JSON.parse('{{ args.task_keys|tojson }}');
+    const TASKS = JSON.parse('{{ args.tasks|tojson }}');
+    const SCAN_MODES = JSON.parse('{{ args.scan_modes|tojson }}');
+    const SCAN_MODE_KEYS = JSON.parse('{{ args.scan_mode_keys|tojson }}');
+    const TOOL_TRASH_KEYS = JSON.parse('{{ args.tool_trash_keys|tojson }}');
+    const TOOL_TRASHES = JSON.parse('{{ args.tool_trashes|tojson }}');
+    const STATUS_KEYS = JSON.parse('{{ args.status_keys|tojson }}');
+    const TOOL_TRASH_TASK_STATUS = '{{ args.tool_trash_task_status }}';
+    const LAST_LIST_OPTIONS = '{{ args.tool_trash_last_list_option }}'.split('|')
 
     $(function() {
-        init();
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_tool_trash.js') }}")
     });
 </script>

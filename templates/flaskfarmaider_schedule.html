@@ -44,8 +44,8 @@
 <hr class="border border-secondary">
 
 <div class="input-group-append">
-    <button type="button" id="sch-add-btn" class="btn btn-block btn-primary mr-2">일정 추가</button>
-    <button type="button" id="multiple-edit" class="btn btn-outline-success">선택 수정</button>
+    <button type="button" id="sch-add-btn" class="btn btn-block btn-primary">일정 추가</button>
+    <button type="button" id="multiple-edit" class="btn btn-outline-success mx-2">선택 수정</button>
     <button type="button" id="multiple-del" class="btn btn-outline-warning">선택 삭제</button>
 </div>
 <br />
@@ -101,30 +101,32 @@
 
 <script type="text/javascript">
     // assign variables
-    var TASKS = JSON.parse('{{ args.tasks|tojson }}');
-    var TASK_KEYS = JSON.parse('{{ args.task_keys|tojson }}');
-    var STATUSES = JSON.parse('{{ args.statuses|tojson }}');
-    var STATUS_KEYS = JSON.parse('{{ args.status_keys|tojson }}');
-    var FF_SCHEDULE_KEYS = JSON.parse('{{ args.ff_schedule_keys|tojson }}');
-    var FF_SCHEDULES = JSON.parse('{{ args.ff_schedules|tojson }}');
-    var LAST_LIST_OPTIONS = "{{ args[module_name ~ '_last_list_option'] }}".split('|');
-    var VFS = "{{ args.setting_rclone_remote_vfs }}";
-    var SCAN_MODES = JSON.parse('{{ args.scan_modes|tojson }}');
-    var SCAN_MODE_KEYS = JSON.parse('{{ args.scan_mode_keys|tojson }}');
-    var PERIODICS = JSON.parse('{{ args.periodics|tojson }}');
-    var SECTIONS = JSON.parse('{{ args.sections|tojson }}');
-    var SECTION_TYPES = JSON.parse('{{ args.section_types|tojson }}');
-    var SECTION_TYPE_KEYS = JSON.parse('{{ args.section_type_keys|tojson }}');
-    var SEARCH_KEYS = JSON.parse('{{ args.search_keys|tojson }}');
-    var SEARCHES = JSON.parse('{{ args.searches|tojson }}');
-    var VFSES = [];
-    var _VFSES = JSON.parse('{{ args.setting_rclone_remote_vfses.split('|')|tojson }}');
-    for (idx in _VFSES) {
+    const TASKS = JSON.parse('{{ args.tasks|tojson }}');
+    const TASK_KEYS = JSON.parse('{{ args.task_keys|tojson }}');
+    const STATUSES = JSON.parse('{{ args.statuses|tojson }}');
+    const STATUS_KEYS = JSON.parse('{{ args.status_keys|tojson }}');
+    const FF_SCHEDULE_KEYS = JSON.parse('{{ args.ff_schedule_keys|tojson }}');
+    const FF_SCHEDULES = JSON.parse('{{ args.ff_schedules|tojson }}');
+    const LAST_LIST_OPTIONS = "{{ args[module_name ~ '_last_list_option'] }}".split('|');
+    const VFS = "{{ args.setting_rclone_remote_vfs }}";
+    const SCAN_MODES = JSON.parse('{{ args.scan_modes|tojson }}');
+    const SCAN_MODE_KEYS = JSON.parse('{{ args.scan_mode_keys|tojson }}');
+    const PERIODICS = JSON.parse('{{ args.periodics|tojson }}');
+    const SECTIONS = JSON.parse('{{ args.sections|tojson }}');
+    const SECTION_TYPES = JSON.parse('{{ args.section_types|tojson }}');
+    const SECTION_TYPE_KEYS = JSON.parse('{{ args.section_type_keys|tojson }}');
+    const SEARCH_KEYS = JSON.parse('{{ args.search_keys|tojson }}');
+    const SEARCHES = JSON.parse('{{ args.searches|tojson }}');
+    const VFSES = [];
+    const _VFSES = JSON.parse('{{ args.setting_rclone_remote_vfses.split('|')|tojson }}');
+    for (let idx in _VFSES) {
         VFSES.push({value: _VFSES[idx], name: _VFSES[idx]});
     }
+
     $(function() {
-        init();
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_schedule.js') }}")
     });
+
 </script>
 {% endblock %}

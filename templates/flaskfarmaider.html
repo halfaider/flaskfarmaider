@@ -2,9 +2,6 @@
 {% set module_name = args.module_name %}
 {% block head %}
     <title>{{ get_web_title() }}</title>
-    <meta http-equiv="Permissions-Policy" content="interest-cohort=()">
     <link rel="stylesheet" href="{{ url_for('.static', filename='css/flaskfarmaider.css') }}" />
-    <script type="text/javascript" src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
-{% endblock %}
-{% block content %}
+    <script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 {% endblock %}
