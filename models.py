@@ -171,7 +171,6 @@ class Job(ModelBase):
 
     def update_formdata_partly(self, formdata: dict[str, list]) -> 'Job':
         for k, v in formdata.items():
-            LOGGER.info(type(v[0]))
             key = self.formdata_mapping.get(k)
             setattr(self, key.name, key.type.python_type(v[0]))
         self.save()
