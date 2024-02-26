@@ -30,7 +30,13 @@ const SEARCH_OPTS = [
 ]
 
 function browser_command(cmd) {
-    globalSendCommand(cmd.command, cmd.path, cmd.vfs + '|' + cmd.recursive, cmd.scan_mode + "|-1", function(result) {
+    let query = 'target=' + cmd.path;
+    query += '&vfs=' + cmd.vfs;
+    query += '&recursive=' + cmd.recursive;
+    query += '&scan_mode=' + cmd.scan_mode;
+    query += '&periodic_id=-1';
+
+    globalSendCommand(cmd.command, query, null, null, function(result) {
         if (result.ret == 'success' && cmd.command == 'list') {
             E_BROWSER_WD.prop('value', cmd.path);
             list_dir(JSON.parse(result.data));
@@ -229,7 +235,7 @@ function make_list(data) {
         }
         let _id = $(this).data('id');
         let checked = $(this).prop('checked');
-        globalSendCommand('schedule', _id, checked, null, null);
+        globalSendCommand('schedule', 'id=' + _id + '&active=' + checked, null, null, null);
     });
     $('.sch-switch ~ div.toggle-group').on('click', function(e) {
         // collapse까지 bubble up 되는 것 방지
@@ -321,7 +327,7 @@ function execute_job(job_id) {
         'ID: ' + job_id,
         function() {
             toggle_schedule_status(job_id, STATUS_KEYS[1]);
-            globalSendCommand("execute", job_id, null, null, null);
+            globalSendCommand('execute', 'id=' + job_id, null, null, null);
         }
     );
 
@@ -331,7 +337,7 @@ function delete_job(job_id) {
     confirm_modal('일정을 삭제할까요?',
         'ID: ' + job_id,
         function() {
-        globalSendCommand("delete", job_id, null, null, function(result) {
+        globalSendCommand('delete', 'id=' + job_id, null, null, function(result) {
             if (result.ret == 'success') {
                 globalRequestSearch(1);
             }
@@ -340,7 +346,7 @@ function delete_job(job_id) {
 }
 
 function schedule_modal_by_id(from, job_id) {
-    globalSendCommand("get_job", job_id, null, null, function(result) {
+    globalSendCommand("get_job", 'id=' + job_id, null, null, function(result) {
         if (result.ret == 'success') {
             schedule_modal(from, result.data);
         }
@@ -349,9 +355,9 @@ function schedule_modal_by_id(from, job_id) {
 
 function schedule_modal(from, data) {
     if (from == 'edit') {
-        // 편집
+        // 단일 편집
         set_form_by_task(data.task);
-        E_SAVE_BTN.data('id', data.id);
+        E_SAVE_BTN.data('id', [data.id]);
         E_TASK.prop('value', data.task);
         E_DESC.prop('value', data.desc);
         E_PATH.prop('value', data.target);
@@ -375,7 +381,7 @@ function schedule_modal(from, data) {
     } else if (from == 'multiple-edit') {
         set_form_by_task('multiple-edit');
         E_MODAL_TITLE.html('일정 일괄 편집 - ' + data);
-        E_SAVE_BTN.data('id', 'multiple|' + data);
+        E_SAVE_BTN.data('id', data);
         E_TASK.prop('value', '');
         E_DESC.prop('value', '');
         E_PATH.prop('value', '');
@@ -400,7 +406,7 @@ function schedule_modal(from, data) {
         // 새로 추가
         set_form_by_task(TASK_KEYS[0]);
         E_TASK.prop('value', TASK_KEYS[0]);
-        E_SAVE_BTN.data('id', -1);
+        E_SAVE_BTN.data('id', [-1]);
         E_DESC.prop('value', '');
         if (from == 'browser') {
             // 브라우저에서 추가
@@ -641,9 +647,11 @@ E_SCH_AUTO.on('change', function(e){
 });
 // 일정 저장 버튼
 E_SAVE_BTN.on('click', function() {
-    let id = $(this).data('id');
+    let ids = $(this).data('id');
     let formdata = getFormdata('#sch-setting'); // getFormdata()@ff_common1.js
-    formdata += '&id=' + id;
+    for (let i in ids) {
+        formdata += '&id=' + ids[i];
+    }
     globalSendCommand('save', formdata, null, null, function(result) {
         if (result.ret == 'success') {
             E_MODAL.modal('hide');
@@ -736,7 +744,11 @@ E_MULTIPLE_DEL.on('click', function(e) {
             '선택한 항목을 삭제할까요?',
             selected.length + ' 개의 항목이 모두 삭제됩니다.',
             function() {
-                globalSendCommand('delete', 'selected', selected.join('|'), null, function(result) {
+                let query = '';
+                for (let i in selected) {
+                    query += 'id=' + selected[i] + '&';
+                }
+                globalSendCommand('delete', query, null, null, function(result) {
                     if (result.ret == 'success') {
                         globalRequestSearch(1);
                     }
@@ -751,9 +763,8 @@ E_MULTIPLE_DEL.on('click', function(e) {
 E_MULTIPLE_EDIT.on('click', function(e) {
     let selected = $('input[class="selectable"]:checked').map((i, el) => el.value).get();
     if (selected.length > 0) {
-        sel = selected.join('|')
         E_TASK.off('change');
-        schedule_modal('multiple-edit', sel);
+        schedule_modal('multiple-edit', selected);
     } else {
         notify('선택된 항목이 없습니다.', 'warning');
     }

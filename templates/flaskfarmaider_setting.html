@@ -276,7 +276,7 @@
     E_SETTING_TEST_CONN.on('click', function (e) {
         globalSettingSave();
         e.preventDefault();
-        globalSendCommand('command_test_connection', '', '', '', callback_test_connection);
+        globalSendCommand('command_test_connection', null, null, null, callback_test_connection);
     });
     E_GDS_TOOL_REQUEST_SPAN.prop('value', SETTING_GDS_TOOL_REQUEST_SPAN);
     E_GDS_TOOL_REQUEST_AUTO.bootstrapToggle(SETTING_GDS_TOOL_REQUEST_AUTO ? 'on' : 'off');
@@ -289,7 +289,7 @@
         confirm_modal('복사 요청 목록을 삭제할까요?',
             '잔여 기간: ' + span,
             function() {
-                globalSendCommandPage('delete', 'request', span, '', null);
+                globalSendCommandPage('clear_db', 'mod=request&span=' + span, null, null, null);
         });
     });
     E_GDS_TOOL_FP_DEL.on('click', function(e) {
@@ -297,13 +297,13 @@
         confirm_modal('변경사항 목록을 삭제할까요?',
             '잔여 기간: ' + span,
             function() {
-                globalSendCommandPage('delete', 'fp', span, '', null);
+                globalSendCommandPage('clear_db', 'mod=fp&span=' + span, null, null, null);
         });
     });
     E_PLEXMATE_TIMEOVER_BTN.on('click', function (e) {
         range = E_PLEXMATE_TIMEOVER_RANGE.prop('value');
         e.preventDefault();
-        globalSendCommand('check_timeover', range, '', '', null);
+        globalSendCommand('check_timeover', 'range=' + range, null, null, null);
     });
     $(function() {
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")

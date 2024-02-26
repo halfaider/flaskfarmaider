@@ -1,7 +1,8 @@
 function get_list(page_no) {
     let lib_type = E_TRASH_SECTION_TYPE.prop('value');
     let lib_id = E_TRASH_SECTIONS.prop('value');
-    globalSendCommandPage('list', lib_type + '|' + lib_id, page_no, 50, function(result) {
+    let query = 'section_type=' + lib_type + '&section_id=' + lib_id + '&page=' + page_no + '&limit=50'
+    globalSendCommandPage('list', query, null, null, function(result) {
         make_list(result.data);
     });
 }
@@ -33,19 +34,23 @@ function make_list(data) {
     $('.trash-list-command').on('click', function(e) {
         let command = $(this).data('command');
         let path = $(this).data('path');
-        let vfs = E_TRASH_VFS.prop('value');
         // trash 목록은 파일 경로를 보여주고 있으나 새로고침/스캔 시에는 폴더 경로로 요청해야 함.
         path = path.replace(path.replace(/^.*[\\\/]/, ''), '');
-        let recursive = false;
-        let scan_mode = SCAN_MODE_KEYS[2];
-        globalSendCommand(command, path, vfs + '|' + recursive, scan_mode + '|-1', null);
+        let query = 'target=' + path;
+        query += '&vfs=' + E_TRASH_VFS.prop('value');
+        query += '&recursive=false';
+        query += '&scan_mode=' + SCAN_MODE_KEYS[2];
+        query += '&periodic_id=-1';
+        confirm_modal(TASKS[command].name + '을(를) 실행할까요?', path, function() {
+            globalSendCommand(command, query, null, null, null);
+        });
     });
     $('.trash-list-delete').on('click', function(e) {
         let path = $(this).data('path');
         let metadata = $(this).data('metadata');
         let id = $(this).data('id');
         confirm_modal('이 파일을 플렉스에서 삭제할까요?', path, function() {
-            globalSendCommandPage('delete', metadata, id, null, function(result) {
+            globalSendCommandPage('delete', 'metadata_id=' + metadata + '&mediaitem_id=' + id, null, null, function(result) {
                 if (result.ret == 'success') {
                     let page = $('ul.pagination li.active[aria-current=page]').first().text()
                     get_list(page ? page : 1);
@@ -78,7 +83,8 @@ E_TRASH_BTN_STOP.on('click', function(e) {
     globalSendCommandPage('stop', '', '', '', null);
 });
 E_TRASH_BTN_EXCEUTE.on('click', function(e) {
-    globalSendCommandPage(E_TRASH_TASK.prop('value'), E_TRASH_SECTIONS.prop('value'), E_TRASH_VFS.prop('value'), '', null);
+    query = 'section_id=' + E_TRASH_SECTIONS.prop('value') + '&vfs=' +E_TRASH_VFS.prop('value')
+    globalSendCommandPage(E_TRASH_TASK.prop('value'), query, null, null, null);
 });
 // 초기 리스트
 if (!LAST_LIST_OPTIONS[0]) {
