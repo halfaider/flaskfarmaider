@@ -9,7 +9,7 @@ import logging
 
 import flask
 
-from .setup import PluginBase, PluginModuleBase, PluginPageBase, default_route_socketio_module, ModelBase, FrameworkJob
+from .setup import PluginBase, PluginModuleBase, PluginPageBase, default_route_socketio_module, default_route_socketio_page, ModelBase, FrameworkJob
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
 from .models import Job
 from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider, RcloneAider
@@ -60,7 +60,6 @@ class Base:
 
     def __init__(self, *args, **kwds) -> None:
         super().__init__(*args, **kwds)
-        default_route_socketio_module(self)
         self.commands = {
             'default': self.command_default,
         }
@@ -249,6 +248,7 @@ class BaseModule(Base, PluginModuleBase):
 
     def __init__(self, plugin: PluginBase, first_menu: str = None, name: str = None, scheduler_desc: str = None) -> None:
         super().__init__(plugin, first_menu, name, scheduler_desc)
+        default_route_socketio_module(self)
         self.db_default = {}
 
     def get_module(self, module_name: str) -> PluginModuleBase | None:
@@ -394,6 +394,7 @@ class BasePage(Base, PluginPageBase):
 
     def __init__(self, plugin: PluginBase, parent: PluginModuleBase, name: str = None, scheduler_desc: str = None) -> None:
         super().__init__(plugin, parent, name, scheduler_desc)
+        default_route_socketio_page(self)
         self.db_default = {}
 
     def process_menu(self, req: flask.Request) -> flask.Response:
