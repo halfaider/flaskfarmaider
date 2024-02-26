@@ -194,8 +194,6 @@ function make_list(data) {
             col_switch = '<td class="text-center">' + FF_SCHEDULES[FF_SCHEDULE_KEYS[1]]['name'] + '</td>';
         } else {
             col_switch = '<td class="text-center"><input id="sch-switch-' + model.id;
-            col_switch += '" data-id="' + model.id;
-            col_switch += '" data-schedule_mode="' + model.schedule_mode;
             col_switch += '" type="checkbox" ' + ((model.is_include) ? 'checked' : '');
             col_switch += ' data-toggle="toggle" class="sch-switch" /></td>';
         }
@@ -203,9 +201,9 @@ function make_list(data) {
         let col_ftime = '<td class="text-center">' + model.ftime + '</td>';
 
         let col_manage = '<td class="text-center">';
-        col_manage += '<a href="#edit" class="sch-list-edit" data-id="' + model.id + '" title="편집"><i class="fa fa-lg fa-pencil-square-o" aria-hidden="true"></i></a>';
-        col_manage += '<a href="#delete" class="sch-list-delete mx-2 text-warning" data-id="' + model.id + '" title="삭제"><i class="fa fa-lg fa-trash" aria-hidden="true"></i></a>';
-        col_manage += '<a href="#execute" class="sch-list-execute text-info" data-id="' + model.id + '" title="지금 실행"><i class="fa fa-lg fa-play" aria-hidden="true"></i></a>';
+        col_manage += '<a href="#edit" class="sch-list-edit" title="편집"><i class="fa fa-lg fa-pencil-square-o" aria-hidden="true"></i></a>';
+        col_manage += '<a href="#delete" class="sch-list-delete mx-2 text-warning" title="삭제"><i class="fa fa-lg fa-trash" aria-hidden="true"></i></a>';
+        col_manage += '<a href="#execute" class="sch-list-execute text-info" title="지금 실행"><i class="fa fa-lg fa-play" aria-hidden="true"></i></a>';
         col_manage += '</td>';
 
         let col_schedule_mode = '<td class="text-center">';
@@ -217,15 +215,14 @@ function make_list(data) {
         row_sub += '" data-parent="#sch-accordion"><div class="">';
         row_sub += '';
         row_sub += '</div></div></td></tr>';
-        let row_group = '<tr id="list-' + model.id + '" class="" data-toggle="collapse" data-target="#collapse-' + model.id;
-        row_group += '" aria-expanded="true" aria-controls="collapse-' + model.id + '">';
+        let row_group = '<tr id="list-' + model.id + '" class="" data-id="'+ model.id +'" data-schedule_mode="' + model.schedule_mode + '">';
         row_group += col_checkbox + col_id + col_task + col_title + col_status + col_interval + col_ftime + col_schedule_mode + col_switch + col_manage + '</tr>' + row_sub;
         E_SCH_LIST_TBODY.append(row_group);
     }
     // is_include 토글 활성화
     $('.sch-switch').bootstrapToggle();
     $('.sch-switch').on('change', function(e) {
-        let mode = $(this).data('schedule_mode');
+        let mode = $(this).closest('tr').data('schedule_mode');
         if (mode == FF_SCHEDULE_KEYS[0]) {
             if ($(this).prop('checked')) {
                 notify('활성화 할 수 없는 일정 방식입니다.', 'warning');
@@ -233,7 +230,7 @@ function make_list(data) {
             }
             return
         }
-        let _id = $(this).data('id');
+        let _id = $(this).closest('tr').data('id');
         let checked = $(this).prop('checked');
         globalSendCommand('schedule', 'id=' + _id + '&active=' + checked, null, null, null);
     });
@@ -244,13 +241,13 @@ function make_list(data) {
     })
     // 관리 메뉴
     $('.sch-list-edit').on('click', function(e) {
-        schedule_modal_by_id('edit', $(this).data('id'));
+        schedule_modal_by_id('edit', $(this).closest('tr').data('id'));
     });
     $('.sch-list-delete').on('click', function(e) {
-        delete_job($(this).data('id'));
+        delete_job($(this).closest('tr').data('id'));
     });
     $('.sch-list-execute').on('click', function(e) {
-        execute_job($(this).data('id'));
+        execute_job($(this).closest('tr').data('id'));
     });
 }
 
@@ -599,7 +596,6 @@ const E_GLOBAL_SEARCH_ORDER = $('#order');
 const E_GLOBAL_SEARCH_LENGTH = $('#length');
 const E_GLOBAL_SEARCH_OPTION1 = $('#option1');
 const E_GLOBAL_SEARCH_OPTION2 = $('#option2');
-const SOCKET = io.connect(window.location.href)
 const E_MULTIPLE_DEL = $('#multiple-del');
 const E_MULTIPLE_EDIT = $('#multiple-edit');
 const E_SCH_LIST_TBODY = $('#sch-list-table tbody');
@@ -731,9 +727,6 @@ browser_command({
 });
 SOCKET.on('result', function(result) {
     if (result) {
-        if (result.data.msg) {
-            notify(result.data.msg, 'info');
-        }
         toggle_schedule_status(result.data.id, result.data.status);
     }
 });

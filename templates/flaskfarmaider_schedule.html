@@ -99,6 +99,7 @@
 <br />
 <br />
 
+<script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
     // assign variables
     const TASKS = JSON.parse('{{ args.tasks|tojson }}');
@@ -127,6 +128,5 @@
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_schedule.js') }}")
     });
-
 </script>
 {% endblock %}

@@ -3,18 +3,6 @@ const E_CONFIRM_TITLE = $('#confirm_title');
 const E_CONFIRM_BODY = $('#confirm_body');
 const E_CONFIRM_BTN = $('#confirm_button');
 const E_CONFIRM_MODAL = $("#confirm_modal");
-const E_SELECT_ALL = $('#select-all');
-E_SELECT_ALL.on('click', function(e) {
-    if (this.checked) {
-        $('input[class="selectable"]').each(function() {
-            this.checked = true;
-        });
-    } else {
-        $('input[class="selectable"]').each(function() {
-            this.checked = false;
-        });
-    }
-});
 
 function confirm_modal(title, content, func) {
     E_CONFIRM_TITLE.html(title);
