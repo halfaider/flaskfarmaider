@@ -35,40 +35,42 @@ class Job(ModelBase):
     clear_section = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
     clear_level = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     section_id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
-
+    # Column, type, default value
     formdata_mapping = {
-        'sch-task': task,
-        'sch-description': desc,
-        'sch-schedule-mode': schedule_mode,
-        'sch-schedule-interval': schedule_interval,
-        'sch-target-path': target,
-        'sch-vfs': vfs,
-        'sch-recursive': recursive,
-        'sch-recursive-select': recursive,
-        'sch-schedule-auto-start': schedule_auto_start,
-        'sch-schedule-auto-start-select': schedule_auto_start,
-        'sch-scan-mode': scan_mode,
-        'sch-scan-mode-periodic-id': periodic_id,
-        'sch-clear-type': clear_type,
-        'sch-clear-level': clear_level,
-        'sch-clear-section': clear_section,
-        'sch-target-section': section_id,
+        'sch-task': (task, task.type.python_type, TASK_KEYS[0]),
+        'sch-description': (desc, desc.type.python_type, ''),
+        'sch-schedule-mode': (schedule_mode, schedule_mode.type.python_type, FF_SCHEDULE_KEYS[0]),
+        'sch-schedule-interval': (schedule_interval, schedule_interval.type.python_type, '60'),
+        'sch-target-path': (target, target.type.python_type, ''),
+        'sch-vfs': (vfs, vfs.type.python_type, ''),
+        'sch-recursive': (recursive, recursive.type.python_type, False),
+        'sch-recursive-select': (recursive, recursive.type.python_type, False),
+        'sch-schedule-auto-start': (schedule_auto_start, schedule_auto_start.type.python_type, False),
+        'sch-schedule-auto-start-select': (schedule_auto_start, schedule_auto_start.type.python_type, False),
+        'sch-scan-mode': (scan_mode, scan_mode.type.python_type, SCAN_MODE_KEYS[0]),
+        'sch-scan-mode-periodic-id': (periodic_id, periodic_id.type.python_type, -1),
+        'sch-clear-type': (clear_type, clear_type.type.python_type, ''),
+        'sch-clear-level': (clear_level, clear_level.type.python_type, ''),
+        'sch-clear-section': (clear_section, clear_section.type.python_type, -1),
+        'sch-target-section': (section_id, section_id.type.python_type, -1),
     }
 
     def __init__(self, task: str = '', schedule_mode: str = FF_SCHEDULE_KEYS[0], schedule_auto_start: bool = False,
                  desc: str = '', target: str = '', recursive: bool = False, section_id: int = -1,
                  vfs: str = '', scan_mode: str = SCAN_MODE_KEYS[0], periodic_id: int = -1,
-                 clear_type: str = '', clear_level: str = '', clear_section: int = -1) -> None:
+                 clear_type: str = '', clear_level: str = '', clear_section: int = -1, schedule_interval = '60') -> None:
         self.ctime = datetime.datetime.now()
         self.ftime = datetime.datetime(1970, 1, 1)
+        self.status = STATUS_KEYS[0]
+
         self.task = task
         self.schedule_mode = schedule_mode
         self.schedule_auto_start = schedule_auto_start
+        self.schedule_interval = schedule_interval
         self.desc = desc
         self.target = target
         self.recursive = recursive
         self.vfs = vfs
-        self.status = STATUS_KEYS[0]
         self.scan_mode = scan_mode
         self.periodic_id = periodic_id
         self.clear_type = clear_type
@@ -114,67 +116,43 @@ class Job(ModelBase):
         '''override'''
         return super().make_query_search(query, search, field)
 
-    def update(self, info: dict) -> 'Job':
-        self.task = info.get('task', self.task)
-        self.schedule_mode = info.get('schedule_mode', self.schedule_mode)
-        self.schedule_auto_start = info.get('schedule_auto_start', self.schedule_auto_start)
-        self.desc = info.get('desc', self.desc)
-        self.target = info.get('target', self.target)
-        self.recursive = info.get('recursive', self.recursive)
-        self.vfs = info.get('vfs', self.vfs)
-        self.scan_mode = info.get('scan_mode', self.scan_mode)
-        self.periodic_id = info.get('periodic_id', self.periodic_id)
-        self.clear_type = info.get('clear_type', self.clear_type)
-        self.clear_level = info.get('clear_level', self.clear_level)
-        self.clear_section = info.get('clear_section', self.clear_section)
-        self.section_id = info.get('section_id', self.section_id)
+    def update(self, data: dict[str, str | int | bool]) -> 'Job':
+        for k, v in data.items():
+            try:
+                setattr(self, k, v)
+            except:
+                LOGGER.error(traceback.format_exc())
+                continue
         return self
 
     @classmethod
-    def update_formdata(cls, formdata: dict[str, list]) -> 'Job':
-        _id = int(formdata.get('id')[0]) if formdata.get('id') else -1
-        if _id == -1:
-            model = Job()
+    def update_formdata(cls, job_id: int, formdata: dict[str, list]) -> 'Job':
+        if job_id > 0:
+            model = cls.get_by_id(job_id)
         else:
-            model = cls.get_by_id(_id)
-        try:
-            model.task = formdata.get('sch-task')[0] if formdata.get('sch-task') else TASK_KEYS[0]
-            desc = formdata.get('sch-description')[0] if formdata.get('sch-description') else ''
-            model.desc = desc or TASKS[model.task]["name"]
-            model.schedule_mode = formdata.get('sch-schedule-mode')[0] if formdata.get('sch-schedule-mode') else FF_SCHEDULE_KEYS[0]
-            model.schedule_interval = formdata.get('sch-schedule-interval')[0] if formdata.get('sch-schedule-interval') else '60'
-            if model.task == TASK_KEYS[5]:
-                model.target = ''
-                model.schedule_interval = '매 시작'
-            elif model.task == TASK_KEYS[3]:
-                model.target = ''
-            else :
-                model.target = formdata.get('sch-target-path')[0] if formdata.get('sch-target-path') else '/'
-            model.vfs = formdata.get('sch-vfs')[0] if formdata.get('sch-vfs') else 'remote:'
-            recursive = formdata.get('sch-recursive')[0] if formdata.get('sch-recursive') else 'false'
-            model.recursive = recursive.lower() == 'true'
-            schedule_auto_start = formdata.get('sch-schedule-auto-start')[0] if formdata.get('sch-schedule-auto-start') else 'false'
-            model.schedule_auto_start = schedule_auto_start.lower() == 'true'
-            model.scan_mode = formdata.get('sch-scan-mode')[0] if formdata.get('sch-scan-mode') else SCAN_MODE_KEYS[0]
-            model.periodic_id = int(formdata.get('sch-scan-mode-periodic-id')[0]) if formdata.get('sch-scan-mode-periodic-id') else -1
-            model.clear_type = formdata.get('sch-clear-type')[0] if formdata.get('sch-clear-type') else ''
-            model.clear_level = formdata.get('sch-clear-level')[0] if formdata.get('sch-clear-level') else ''
-            model.clear_section = int(formdata.get('sch-clear-section')[0]) if formdata.get('sch-clear-section') else -1
-            model.section_id = int(formdata.get('sch-target-section')[0]) if formdata.get('sch-target-section') else -1
+            model = Job()
 
-            model.save()
-        except:
-            LOGGER.error(traceback.format_exc())
-            LOGGER.error('작업을 저장하지 못했습니다.')
-        finally:
-            return model
+        if formdata.get('sch-task', [-1])[0] == TASK_KEYS[5]:
+            formdata.update({'sch-schedule-interval': ['매 시작']})
 
-    def update_formdata_partly(self, formdata: dict[str, list]) -> 'Job':
+        for key in ['sch-recursive', 'sch-recursive-select', 'sch-schedule-auto-start', 'sch-schedule-auto-start-select']:
+            val = formdata.get(key)
+            if val:
+                formdata[key] = [val[0].lower() == 'true']
+
+        data = {}
         for k, v in formdata.items():
-            key = self.formdata_mapping.get(k)
-            setattr(self, key.name, key.type.python_type(v[0]))
-        self.save()
-        return self
+            try:
+                mapping = model.formdata_mapping.get(k)
+                data[mapping[0].name] = mapping[1](v[0])
+            except:
+                LOGGER.error(f'formdata key: {k}')
+                LOGGER.error(traceback.format_exc())
+                continue
+
+        model.update(data)
+        model.save()
+        return model
 
     @classmethod
     def get_job(cls, id: int = -1, info: dict = None) -> 'Job':

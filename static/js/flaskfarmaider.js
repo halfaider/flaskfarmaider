@@ -1,3 +1,26 @@
+const SOCKET = io.connect(window.location.href);
+const E_SELECT_ALL = $('#select-all');
+
+E_SELECT_ALL.on('click', function(e) {
+    if (this.checked) {
+        $('input[class="selectable"]').each(function() {
+            this.checked = true;
+        });
+    } else {
+        $('input[class="selectable"]').each(function() {
+            this.checked = false;
+        });
+    }
+});
+
+SOCKET.on('result', function(result) {
+    if (result) {
+        if (result.data.msg) {
+            notify(result.data.msg, 'info');
+        }
+    }
+});
+
 function set_plex_sections(type, target, sections) {
     target.empty();
     if (sections[type]) {

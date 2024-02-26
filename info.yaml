@@ -1,5 +1,5 @@
 title: 'Flaskfarmaider'
-version: '1.2.17'
+version: '1.2.19'
 package_name: 'flaskfarmaider'
 developer: 'halfaider'
 description: 'Flaskfarm 보조 플러그인'

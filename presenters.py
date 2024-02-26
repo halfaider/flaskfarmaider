@@ -81,25 +81,16 @@ class Base:
     def prerender(self, sub: str, req: flask.Request) -> None:
         self.set_recent_menu(req)
 
-    def task_command(self, task: str, target: str, vfs: str, scan: str) -> tuple[bool, str]:
-        vfs, recursive = vfs.split('|')
-        if recursive:
-            recursive = recursive.lower() == 'true'
-        else:
-            recursive = False
-        if scan:
-            scan_mode, periodic_id = scan.split('|')
-        else:
-            scan_mode = SCAN_MODE_KEYS[0]
-            periodic_id = '-1'
+    def task_command(self, task: str, query: dict[str, list]) -> tuple[bool, str]:
+        target = query.get('target', [])
         if target:
             job = {
                 'task': task,
-                'target': target,
-                'recursive': recursive,
-                'scan_mode': scan_mode,
-                'periodic_id': int(periodic_id) if periodic_id else -1,
-                'vfs': vfs,
+                'target': target[0],
+                'recursive': query.get('recursive', ['false'])[0].lower() == 'true',
+                'scan_mode': query.get('scan_mode', [SCAN_MODE_KEYS[0]])[0],
+                'periodic_id': int(query.get('periodic_id', ['-1'])[0]),
+                'vfs': query.get('vfs', ['remote:'])[0],
             }
             self.run_async(self.start_job, (Job.get_job(info=job),))
             result, msg = True, '작업을 실행했습니다.'
@@ -154,10 +145,16 @@ class Base:
         finally:
             return flask.jsonify(data)
 
-    def command_default(self, request: flask.Request) -> dict:
+    def pre_command(self, request: flask.Request) -> tuple[str, dict, list]:
         command = request.form.get('command')
+        query = urllib.parse.parse_qs(request.form.get('arg1'))
+        ids =list(map(int, query.pop('id', [-1])))
+        return command, query, ids
+
+    def command_default(self, request: flask.Request) -> dict:
+        command, query, ids = self.pre_command(request)
         if command in TASK_KEYS:
-            result, msg = self.task_command(command, request.form.get('arg1'), request.form.get('arg2'), request.form.get('arg3'))
+            result, msg = self.task_command(command, query)
         else:
             result, msg = False, f'알 수 없는 명령입니다: {command}'
         return self.returns('success' if result else 'warning', msg)
@@ -198,11 +195,11 @@ class Base:
             result, data = False, '등록할 수 없는 일정 방식입니다.'
         return result, data
 
-    def schedule_reload(self, job: Job, old_job: Job) -> None:
-        th = ThreadHasReturn(target=self._schedule_reload, args=(job, old_job), daemon=True, callback=self.callback_sio)
+    def reload_schedule(self, job: Job, old_job: Job) -> None:
+        th = ThreadHasReturn(target=self._reload_schedule, args=(job, old_job), daemon=True, callback=self.callback_sio)
         th.start()
 
-    def _schedule_reload(self, job: Job, old_job: Job) -> Job:
+    def _reload_schedule(self, job: Job, old_job: Job) -> Job:
         msg = ''
         schedule_id = self.create_schedule_id(job.id)
         if FRAMEWORK.scheduler.is_include(schedule_id) and \
@@ -246,7 +243,6 @@ class Base:
             conn.close()
         LOGGER.debug(f'{table} 최종 DB 버전: {version}')
         return version
-
 
 
 class BaseModule(Base, PluginModuleBase):
@@ -590,13 +586,15 @@ class Setting(BaseModule):
         return data
 
     def command_clear_db(self, request: flask.Request) -> dict:
-        mod = request.form.get('arg1')
-        span = int(request.form.get('arg2'))
+        command, query, ids = self.pre_command(request)
+        mod = query.get('mod', ['no_mod'])[0]
+        span = int(query.get('span', ['-1'])[0])
         GDSToolAider().delete(mod, span)
         return self.returns('success', 'DB 정리를 실행합니다.')
 
     def command_check_timeover(self, request: flask.Request) -> dict:
-        num_range = request.form.get('arg1')
+        command, query, ids = self.pre_command(request)
+        num_range = query.get('range', ['0~0'])[0]
         plexmate = PlexmateAider()
         plexmate.check_timeover(num_range)
         return self.returns('success', 'TIMEOUT 항목을 READY로 변경합니다.')
@@ -737,8 +735,20 @@ class Schedule(BaseModule):
                 LOGGER.warning(f'강제로 종료되는 작업: {job.id} {job.desc}')
                 job.set_status(STATUS_KEYS[0])
 
+    def update_job(self, job_id: int, query: dict[str, list]) -> Job:
+        old_job = Job.get_job(job_id)
+        job = Job.update_formdata(job_id, query)
+        if old_job.id > 0:
+            self.reload_schedule(job, old_job)
+        return job
+
+    def command_default(self, request: flask.Request) -> tuple[bool, str]:
+        '''override'''
+        return super().command_default(request)
+
     def command_list(self, request: flask.Request) -> dict:
-        path = request.form.get('arg1')
+        command, query, ids = self.pre_command(request)
+        path = query.get('target', ['/'])[0]
         dir_list = json.dumps(BrowserAider.get_dir(path))
         CONFIG.set(SCHEDULE_WORKING_DIRECTORY, path)
         if dir_list:
@@ -747,39 +757,29 @@ class Schedule(BaseModule):
             return self.returns('warning', '폴더 목록을 생성할 수 없습니다.')
 
     def command_save(self, request: flask.Request) -> dict:
-        query = urllib.parse.parse_qs(request.form.get('arg1'))
-        if query.get('id')[0].startswith('multiple|'):
-            ids = list(map(int, query.pop('id')[0].split('|')[1:]))
-            query.pop('sch-recursive')
-            query.pop('sch-schedule-auto-start')
+        command, query, ids = self.pre_command(request)
+        if len(ids) > 1:
+            query.pop('sch-recursive', None)
+            query.pop('sch-schedule-auto-start', None)
             if query:
-                for k, v in query.items():
-                    if k in ['sch-recursive-select', 'sch-schedule-auto-start-select']:
-                        v[0] = v[0].lower() == 'true'
                 for _id in ids:
-                    old_job = Job.get_job(_id)
-                    job = Job.get_job(_id).update_formdata_partly(query)
-                    self.schedule_reload(job, old_job)
+                    self.update_job(_id, query)
                 return self.returns('success', '수정했습니다.')
             else:
                 return self.returns('warning', '수정할 항목이 없습니다.')
         else:
-            old_job = Job.get_job(int(query.get('id')[0]))
-            job = Job.update_formdata(query)
-            if old_job.id > 0:
-                self.schedule_reload(job, old_job)
+            job = self.update_job(ids[0], query)
             if job.id > 0:
                 return self.returns('success', '저장했습니다.')
             else:
                 return self.returns('warning', '저장할 수 없습니다.')
 
     def command_delete(self, request: flask.Request) -> dict:
-        arg1 = request.form.get('arg1')
-        if arg1 == 'selected':
-            selected = [ int(_id) for _id in request.form.get('arg2').split('|') ]
+        command, query, ids = self.pre_command(request)
+        if len(ids) > 1:
             not_deleted = []
-            LOGGER.info(f'selected for deletion: {selected}')
-            for _id in selected:
+            LOGGER.info(f'to be deleted: {ids}')
+            for _id in ids:
                 if Job.delete_by_id(_id):
                     self.set_schedule(_id, False)
                 else:
@@ -790,33 +790,30 @@ class Schedule(BaseModule):
             else:
                 return self.returns('success', f'모두 삭제 했습니다.')
         else:
-            job_id = int(arg1)
-            if Job.delete_by_id(job_id):
-                self.set_schedule(job_id, False)
-                return self.returns('success', f'삭제 했습니다: ID {job_id}')
+            if Job.delete_by_id(ids[0]):
+                self.set_schedule(ids[0], False)
+                return self.returns('success', f'삭제 했습니다: ID {ids[0]}')
             else:
-                return self.returns('warning',  f'삭제할 수 없습니다: ID {job_id}')
+                return self.returns('warning',  f'삭제할 수 없습니다: ID {ids[0]}')
 
     def command_execute(self, request: flask.Request) -> dict:
-        job_id = int(request.form.get('arg1'))
-        self.run_async(self.start_job, (Job.get_job(job_id),))
+        command, query, ids = self.pre_command(request)
+        self.run_async(self.start_job, (Job.get_job(ids[0]),))
         return self.returns('success', '일정을 실행했습니다.')
 
     def command_schedule(self, request: flask.Request) -> dict:
-        job_id = int(request.form.get('arg1'))
-        active = request.form.get('arg2').lower() == 'true'
-        result, msg = self.set_schedule(job_id, active)
+        command, query, ids = self.pre_command(request)
+        active = query.get('active', ['false'])[0].lower() == 'true'
+        result, msg = self.set_schedule(ids[0], active)
         return self.returns('success' if result else 'warning', msg)
 
     def command_get_job(self, request: flask.Request) -> dict:
-        job_id = int(request.form.get('arg1'))
-        job = Job.get_by_id(job_id)
+        command, query, ids = self.pre_command(request)
+        job = Job.get_by_id(ids[0])
         if job:
             return self.returns('success', data=job.as_dict())
         else:
-            return self.returns('warning', f'일정을 찾을 수 없습니다: ID {job_id}')
-
-
+            return self.returns('warning', f'일정을 찾을 수 없습니다: ID {ids[0]}')
 
 
 class Manual(BaseModule):
@@ -877,9 +874,11 @@ class ToolTrash(BasePage):
         return self.returns('success', data={'status': CONFIG.get(TOOL_TRASH_TASK_STATUS)})
 
     def command_list(self, request: flask.Request) -> dict:
-        section_type, section_id = request.form.get('arg1').split('|')
-        page_no = int(request.form.get('arg2'))
-        limit = int(request.form.get('arg3'))
+        command, query, ids = self.pre_command(request)
+        section_type = query.get('section_type', ['movie'])[0]
+        section_id = int(query.get('section_id', ['-1'])[0])
+        page_no = int(query.get('page', ['1'])[0])
+        limit = int(query.get('limit', ['30'])[0])
         CONFIG.set(TOOL_TRASH_LAST_LIST_OPTION, f'{section_type}|{section_id}|{page_no}')
         return self.returns('success', data=PlexmateAider().get_trash_list(int(section_id), page_no, limit))
 
@@ -893,20 +892,21 @@ class ToolTrash(BasePage):
 
     @check_status
     def command_delete(self, request: flask.Request) -> dict:
-        metadata_id = int(request.form.get('arg1'))
-        mediaitem_id = int(request.form.get('arg2'))
+        command, query, ids = self.pre_command(request)
+        metadata_id = int(query.get('metadata_id', ['-1'])[0])
+        mediaitem_id = int(query.get('mediaitem_id', ['-1'])[0])
         result, msg = PlexmateAider().delete_media(metadata_id, mediaitem_id)
         return self.returns('success' if result else 'warning', msg)
 
     @check_status
     def command_default(self, request: flask.Request) -> dict:
         '''override'''
-        command = request.form.get('command')
+        command, query, ids = self.pre_command(request)
         if command in TOOL_TRASH_KEYS:
             job = Job.get_job()
             job.task = command
-            job.section_id = int(request.form.get('arg1'))
-            job.vfs = request.form.get('arg2')
+            job.section_id = int(query.get('section_id', ['-1'])[0])
+            job.vfs = query.get('vfs', ['remote:'])[0]
             self.run_async(self.start_job, (job,))
             return self.returns('success', f'작업을 실행했습니다.')
         else:

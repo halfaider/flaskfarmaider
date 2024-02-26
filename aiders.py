@@ -96,15 +96,19 @@ class JobAider(Aider):
         if not job.task == TOOL_TRASH_KEYS[2]:
             rclone_aider = RcloneAider()
             trashes: dict = plex_aider.get_trashes(job.section_id, 1, -1)
-            paths = {pathlib.Path(row['file']).parent for row in trashes}
-            for path in paths:
-                if CONFIG.get(TOOL_TRASH_TASK_STATUS) != STATUS_KEYS[1]:
-                    LOGGER.info(f'작업을 중지합니다.')
-                    break
-                if refresh:
-                    rclone_aider.vfs_refresh(path, job.recursive, job.vfs)
-                if scan:
-                    plex_aider.scan(SCAN_MODE_KEYS[2], str(path), -1, job.section_id)
+            if trashes:
+                paths = {pathlib.Path(row['file']).parent for row in trashes}
+                for path in paths:
+                    if CONFIG.get(TOOL_TRASH_TASK_STATUS) != STATUS_KEYS[1]:
+                        LOGGER.info(f'작업을 중지합니다.')
+                        break
+                    if refresh:
+                        rclone_aider.vfs_refresh(path, job.recursive, job.vfs)
+                    if scan:
+                        plex_aider.scan(SCAN_MODE_KEYS[2], str(path), -1, job.section_id)
+            else:
+                LOGGER.info('이용 불가 파일이 없습니다.')
+                empty = False
         if empty and CONFIG.get(TOOL_TRASH_TASK_STATUS) == STATUS_KEYS[1]:
             plex_aider.empty_trash(job.section_id)
 

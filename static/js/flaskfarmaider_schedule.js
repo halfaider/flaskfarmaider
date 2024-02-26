@@ -30,7 +30,13 @@ const SEARCH_OPTS = [
 ]
 
 function browser_command(cmd) {
-    globalSendCommand(cmd.command, cmd.path, cmd.vfs + '|' + cmd.recursive, cmd.scan_mode + "|-1", function(result) {
+    let query = 'target=' + cmd.path;
+    query += '&vfs=' + cmd.vfs;
+    query += '&recursive=' + cmd.recursive;
+    query += '&scan_mode=' + cmd.scan_mode;
+    query += '&periodic_id=-1';
+
+    globalSendCommand(cmd.command, query, null, null, function(result) {
         if (result.ret == 'success' && cmd.command == 'list') {
             E_BROWSER_WD.prop('value', cmd.path);
             list_dir(JSON.parse(result.data));
@@ -188,8 +194,6 @@ function make_list(data) {
             col_switch = '<td class="text-center">' + FF_SCHEDULES[FF_SCHEDULE_KEYS[1]]['name'] + '</td>';
         } else {
             col_switch = '<td class="text-center"><input id="sch-switch-' + model.id;
-            col_switch += '" data-id="' + model.id;
-            col_switch += '" data-schedule_mode="' + model.schedule_mode;
             col_switch += '" type="checkbox" ' + ((model.is_include) ? 'checked' : '');
             col_switch += ' data-toggle="toggle" class="sch-switch" /></td>';
         }
@@ -197,9 +201,9 @@ function make_list(data) {
         let col_ftime = '<td class="text-center">' + model.ftime + '</td>';
 
         let col_manage = '<td class="text-center">';
-        col_manage += '<a href="#edit" class="sch-list-edit" data-id="' + model.id + '" title="편집"><i class="fa fa-lg fa-pencil-square-o" aria-hidden="true"></i></a>';
-        col_manage += '<a href="#delete" class="sch-list-delete mx-2 text-warning" data-id="' + model.id + '" title="삭제"><i class="fa fa-lg fa-trash" aria-hidden="true"></i></a>';
-        col_manage += '<a href="#execute" class="sch-list-execute text-info" data-id="' + model.id + '" title="지금 실행"><i class="fa fa-lg fa-play" aria-hidden="true"></i></a>';
+        col_manage += '<a href="#edit" class="sch-list-edit" title="편집"><i class="fa fa-lg fa-pencil-square-o" aria-hidden="true"></i></a>';
+        col_manage += '<a href="#delete" class="sch-list-delete mx-2 text-warning" title="삭제"><i class="fa fa-lg fa-trash" aria-hidden="true"></i></a>';
+        col_manage += '<a href="#execute" class="sch-list-execute text-info" title="지금 실행"><i class="fa fa-lg fa-play" aria-hidden="true"></i></a>';
         col_manage += '</td>';
 
         let col_schedule_mode = '<td class="text-center">';
@@ -211,15 +215,14 @@ function make_list(data) {
         row_sub += '" data-parent="#sch-accordion"><div class="">';
         row_sub += '';
         row_sub += '</div></div></td></tr>';
-        let row_group = '<tr id="list-' + model.id + '" class="" data-toggle="collapse" data-target="#collapse-' + model.id;
-        row_group += '" aria-expanded="true" aria-controls="collapse-' + model.id + '">';
+        let row_group = '<tr id="list-' + model.id + '" class="" data-id="'+ model.id +'" data-schedule_mode="' + model.schedule_mode + '">';
         row_group += col_checkbox + col_id + col_task + col_title + col_status + col_interval + col_ftime + col_schedule_mode + col_switch + col_manage + '</tr>' + row_sub;
         E_SCH_LIST_TBODY.append(row_group);
     }
     // is_include 토글 활성화
     $('.sch-switch').bootstrapToggle();
     $('.sch-switch').on('change', function(e) {
-        let mode = $(this).data('schedule_mode');
+        let mode = $(this).closest('tr').data('schedule_mode');
         if (mode == FF_SCHEDULE_KEYS[0]) {
             if ($(this).prop('checked')) {
                 notify('활성화 할 수 없는 일정 방식입니다.', 'warning');
@@ -227,9 +230,9 @@ function make_list(data) {
             }
             return
         }
-        let _id = $(this).data('id');
+        let _id = $(this).closest('tr').data('id');
         let checked = $(this).prop('checked');
-        globalSendCommand('schedule', _id, checked, null, null);
+        globalSendCommand('schedule', 'id=' + _id + '&active=' + checked, null, null, null);
     });
     $('.sch-switch ~ div.toggle-group').on('click', function(e) {
         // collapse까지 bubble up 되는 것 방지
@@ -238,13 +241,13 @@ function make_list(data) {
     })
     // 관리 메뉴
     $('.sch-list-edit').on('click', function(e) {
-        schedule_modal_by_id('edit', $(this).data('id'));
+        schedule_modal_by_id('edit', $(this).closest('tr').data('id'));
     });
     $('.sch-list-delete').on('click', function(e) {
-        delete_job($(this).data('id'));
+        delete_job($(this).closest('tr').data('id'));
     });
     $('.sch-list-execute').on('click', function(e) {
-        execute_job($(this).data('id'));
+        execute_job($(this).closest('tr').data('id'));
     });
 }
 
@@ -321,7 +324,7 @@ function execute_job(job_id) {
         'ID: ' + job_id,
         function() {
             toggle_schedule_status(job_id, STATUS_KEYS[1]);
-            globalSendCommand("execute", job_id, null, null, null);
+            globalSendCommand('execute', 'id=' + job_id, null, null, null);
         }
     );
 
@@ -331,7 +334,7 @@ function delete_job(job_id) {
     confirm_modal('일정을 삭제할까요?',
         'ID: ' + job_id,
         function() {
-        globalSendCommand("delete", job_id, null, null, function(result) {
+        globalSendCommand('delete', 'id=' + job_id, null, null, function(result) {
             if (result.ret == 'success') {
                 globalRequestSearch(1);
             }
@@ -340,7 +343,7 @@ function delete_job(job_id) {
 }
 
 function schedule_modal_by_id(from, job_id) {
-    globalSendCommand("get_job", job_id, null, null, function(result) {
+    globalSendCommand("get_job", 'id=' + job_id, null, null, function(result) {
         if (result.ret == 'success') {
             schedule_modal(from, result.data);
         }
@@ -349,9 +352,9 @@ function schedule_modal_by_id(from, job_id) {
 
 function schedule_modal(from, data) {
     if (from == 'edit') {
-        // 편집
+        // 단일 편집
         set_form_by_task(data.task);
-        E_SAVE_BTN.data('id', data.id);
+        E_SAVE_BTN.data('id', [data.id]);
         E_TASK.prop('value', data.task);
         E_DESC.prop('value', data.desc);
         E_PATH.prop('value', data.target);
@@ -375,7 +378,7 @@ function schedule_modal(from, data) {
     } else if (from == 'multiple-edit') {
         set_form_by_task('multiple-edit');
         E_MODAL_TITLE.html('일정 일괄 편집 - ' + data);
-        E_SAVE_BTN.data('id', 'multiple|' + data);
+        E_SAVE_BTN.data('id', data);
         E_TASK.prop('value', '');
         E_DESC.prop('value', '');
         E_PATH.prop('value', '');
@@ -400,7 +403,7 @@ function schedule_modal(from, data) {
         // 새로 추가
         set_form_by_task(TASK_KEYS[0]);
         E_TASK.prop('value', TASK_KEYS[0]);
-        E_SAVE_BTN.data('id', -1);
+        E_SAVE_BTN.data('id', [-1]);
         E_DESC.prop('value', '');
         if (from == 'browser') {
             // 브라우저에서 추가
@@ -593,7 +596,6 @@ const E_GLOBAL_SEARCH_ORDER = $('#order');
 const E_GLOBAL_SEARCH_LENGTH = $('#length');
 const E_GLOBAL_SEARCH_OPTION1 = $('#option1');
 const E_GLOBAL_SEARCH_OPTION2 = $('#option2');
-const SOCKET = io.connect(window.location.href)
 const E_MULTIPLE_DEL = $('#multiple-del');
 const E_MULTIPLE_EDIT = $('#multiple-edit');
 const E_SCH_LIST_TBODY = $('#sch-list-table tbody');
@@ -641,9 +643,11 @@ E_SCH_AUTO.on('change', function(e){
 });
 // 일정 저장 버튼
 E_SAVE_BTN.on('click', function() {
-    let id = $(this).data('id');
+    let ids = $(this).data('id');
     let formdata = getFormdata('#sch-setting'); // getFormdata()@ff_common1.js
-    formdata += '&id=' + id;
+    for (let i in ids) {
+        formdata += '&id=' + ids[i];
+    }
     globalSendCommand('save', formdata, null, null, function(result) {
         if (result.ret == 'success') {
             E_MODAL.modal('hide');
@@ -723,9 +727,6 @@ browser_command({
 });
 SOCKET.on('result', function(result) {
     if (result) {
-        if (result.data.msg) {
-            notify(result.data.msg, 'info');
-        }
         toggle_schedule_status(result.data.id, result.data.status);
     }
 });
@@ -736,7 +737,11 @@ E_MULTIPLE_DEL.on('click', function(e) {
             '선택한 항목을 삭제할까요?',
             selected.length + ' 개의 항목이 모두 삭제됩니다.',
             function() {
-                globalSendCommand('delete', 'selected', selected.join('|'), null, function(result) {
+                let query = '';
+                for (let i in selected) {
+                    query += 'id=' + selected[i] + '&';
+                }
+                globalSendCommand('delete', query, null, null, function(result) {
                     if (result.ret == 'success') {
                         globalRequestSearch(1);
                     }
@@ -751,9 +756,8 @@ E_MULTIPLE_DEL.on('click', function(e) {
 E_MULTIPLE_EDIT.on('click', function(e) {
     let selected = $('input[class="selectable"]:checked').map((i, el) => el.value).get();
     if (selected.length > 0) {
-        sel = selected.join('|')
         E_TASK.off('change');
-        schedule_modal('multiple-edit', sel);
+        schedule_modal('multiple-edit', selected);
     } else {
         notify('선택된 항목이 없습니다.', 'warning');
     }
