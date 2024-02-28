@@ -595,13 +595,12 @@ class PlexmateAider(PluginAider):
         }
         section = self.get_section_by_id(section_id)
         try:
-            max_tries = 60
             counter = 0
-            while self.check_library_update():
-                time.sleep(5)
+            while self.check_library_update(section_id):
+                time.sleep(10)
                 counter += 1
-                if counter > max_tries:
-                    raise Exception(f'라이브러리를 계속 스캔 중이라 휴지통 비우기를 취소합니다.')
+                if counter > 36:
+                    raise Exception(f'라이브러리({section_id})를 스캔 중이라 휴지통 비우기를 취소합니다.')
             response = self.request('PUT', url, params=params)
             if str(response.status_code)[0] == '2':
                 LOGGER.info(f'휴지통 비우기 명령을 전송했습니다: {section.get("name")}')
@@ -625,23 +624,24 @@ class PlexmateAider(PluginAider):
             LOGGER.error(traceback.format_exc())
             return {}
 
-    def check_library_update(self) -> bool:
-        is_scanning = False
+    def check_library_update(self, section_id: int) -> bool:
         container = self.get_activities().get('MediaContainer')
         if container:
             for act in container.get('Activity', []):
                 if act.get('type') == 'library.update.section':
-                    LOGGER.debug(f"section_id={act.get('Context', {}).get('librarySectionID')} title='{act.get('title')}'")
-                    is_scanning = True
-                    break
+                    updating_section_id = int(act.get('Context', {}).get('librarySectionID'))
+                    if updating_section_id == section_id:
+                        LOGGER.debug(f"status=scanning section_id={updating_section_id} title='{act.get('title')}' progress={act.get('progress')}")
+                        return True
+
         perodics = self.get_module('periodic').web_list_model
         with FRAMEWORK.app.app_context():
             query = FRAMEWORK.db.session.query(perodics).filter(perodics.status == 'working')
             workings = query.all()
             if workings:
-                LOGGER.debug(f'section_id={workings[0].section_id} pid={workings[0].process_pid}')
-                is_scanning = True
-        return is_scanning
+                LOGGER.debug(f'status=working section_id={workings[0].section_id} pid={workings[0].process_pid}')
+                return True
+        return False
 
 
 class GDSToolAider(PluginAider):
