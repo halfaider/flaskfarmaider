@@ -323,12 +323,8 @@ class PluginAider(Aider):
         super().__init__(name)
 
     @property
-    def plugin(self):
-        plugin = FRAMEWORK.PluginManager.get_plugin_instance(self.name)
-        if plugin:
-            return plugin
-        else:
-            raise Exception(f'플러그인을 찾을 수 없습니다: {self.name}')
+    def plugin(self) -> PluginModuleBase | None:
+        return FRAMEWORK.PluginManager.get_plugin_instance(self.name)
 
     def dict_factory(cursor: sqlite3.Cursor, row: tuple) -> dict:
         d = {}
