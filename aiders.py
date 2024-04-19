@@ -487,10 +487,6 @@ class PlexmateAider(PluginAider):
         return targets
 
     def web_scan(self, section_id: int, location: str = None) -> None:
-        '''
-        웹 스캔의 activity 추적은 정확하지 않아 명령만 전달하는 방식으로 실행
-        정확한 추적은 바이너리 스캔의 activity 옵션으로 가능해 보임
-        '''
         url = f'{self.plugin.ModelSetting.get("base_url")}/library/sections/{section_id}/refresh'
         params = {
             'X-Plex-Token': self.plugin.ModelSetting.get('base_token'),
@@ -506,14 +502,25 @@ class PlexmateAider(PluginAider):
         except:
             LOGGER.error(traceback.format_exc())
 
-
     def scan(self, scan_mode: str, target: str = None, periodic_id: int = -1, section_id: int = -1) -> None:
         if scan_mode == SCAN_MODE_KEYS[2]:
+            '''
+            웹 스캔의 완료를 추적하는 방식이 정확하지 않음.
+                - 스캔이 밀려 있을 경우 activity는 현재 스캔만 보여줌
+                - library_sections 테이블의 updated_at이 스캔 종료 후 1분 뒤에 변경됨
+            서버에 스캔 명령만 전달하는 방식으로 실행(서버에서 알아서 순차적으로 스캔하도록...)
+            '''
             targets = self.get_targets(target, section_id)
             if targets:
                 LOGGER.debug(f'섹션 ID 검색 결과: {set(targets.values())}')
                 for location, section_id in targets.items():
+                    #before = self.get_section_updated_at(section_id)
                     self.web_scan(section_id, location)
+                    #for i in range(120):
+                    #    after = self.get_section_updated_at(section_id)
+                    #    LOGGER.info(f"{before=}")
+                    #    LOGGER.info(f"{after=}")
+                    #    time.sleep(1)
             else:
                 LOGGER.error(f'섹션 ID를 찾을 수 없습니다: {target}')
         elif scan_mode == SCAN_MODE_KEYS[1]:
@@ -556,6 +563,9 @@ class PlexmateAider(PluginAider):
             job = {}
         finally:
             return job
+
+    def get_section_updated_at(self, section_id: int) -> int:
+        return self.db.library_section(section_id)['updated_at']
 
     def clear_section(self, section_id: int, clear_type: str, clear_level: str) -> None:
         mod = self.get_module('clear')

@@ -640,6 +640,9 @@ class Setting(BaseModule):
                 'status': response.status_code,
                 'agent': request.user_agent,
                 'length': response.content_length,
+                'form': urllib.parse.urlencode(request.form, doseq=False),
+                'headers': request.headers,
+                'hostname': urllib.parse.urlparse(request.base_url).hostname,
             }
             file = CONFIG.get(SETTING_LOGGING_ACCESS_FILE) or f"{FRAMEWORK.config.get('path_data', '/data')}/log/access.log"
             level = FRAMEWORK.SystemModelSetting.get_int('log_level') or logging.DEBUG
