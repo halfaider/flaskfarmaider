@@ -51,7 +51,8 @@ class Aider:
 
     @staticmethod
     def request(method: str = 'POST', url: str = None, data: dict = None, timeout: int | tuple = None, **kwds: dict) -> requests.Response:
-        timeout = CONFIG.get_int(SETTING_STARTUP_TIMEOUT) if CONFIG.get_int(SETTING_STARTUP_TIMEOUT) > 0 else timeout
+        _timeout = CONFIG.get_int(SETTING_STARTUP_TIMEOUT)
+        timeout = _timeout if _timeout > 0 else timeout
         try:
             if method.upper() == 'JSON':
                 return requests.request('POST', url, json=data or {}, timeout=timeout, **kwds)
@@ -844,7 +845,9 @@ class StartupAider(Aider):
         if startup_executable:
             for command in commands:
                 command = shlex.split(command)
-                result: subprocess.CompletedProcess = self.sub_run(*command, timeout=CONFIG.get_int(SETTING_STARTUP_TIMEOUT) or 60)
+                timeout = CONFIG.get_int(SETTING_STARTUP_TIMEOUT)
+                timeout = timeout if timeout > 0 or None
+                result: subprocess.CompletedProcess = self.sub_run(*command, timeout=timeout)
                 if result.returncode == 0:
                     msg = '성공'
                 else:
