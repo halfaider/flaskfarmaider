@@ -846,7 +846,7 @@ class StartupAider(Aider):
             for command in commands:
                 command = shlex.split(command)
                 timeout = CONFIG.get_int(SETTING_STARTUP_TIMEOUT)
-                timeout = timeout if timeout > 0 or None
+                timeout = timeout if timeout > 0 else None
                 result: subprocess.CompletedProcess = self.sub_run(*command, timeout=timeout)
                 if result.returncode == 0:
                     msg = '성공'
