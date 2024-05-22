@@ -50,12 +50,13 @@ class Aider:
         return target
 
     @staticmethod
-    def request(method: str = 'POST', url: str = None, data: dict = None, **kwds: dict) -> requests.Response:
+    def request(method: str = 'POST', url: str = None, data: dict = None, timeout: int | tuple = None, **kwds: dict) -> requests.Response:
+        timeout = CONFIG.get_int(SETTING_STARTUP_TIMEOUT) if CONFIG.get_int(SETTING_STARTUP_TIMEOUT) > 0 else timeout
         try:
             if method.upper() == 'JSON':
-                return requests.request('POST', url, json=data or {}, **kwds)
+                return requests.request('POST', url, json=data or {}, timeout=timeout, **kwds)
             else:
-                return requests.request(method, url, data=data, **kwds)
+                return requests.request(method, url, data=data, timeout=timeout, **kwds)
         except:
             tb = traceback.format_exc()
             LOGGER.error(tb)
@@ -383,9 +384,9 @@ class PlexmateAider(PluginAider):
 
     def get_trashes(self, section_id: int, page_no: int = 1, limit: int = 10) -> dict:
         query = '''
-        SELECT media_items.id, media_items.metadata_item_id, media_items.deleted_at, media_parts.file
+        SELECT media_items.id, media_items.metadata_item_id, media_items.deleted_at, media_parts.file, media_parts.deleted_at
         FROM media_parts, media_items
-        WHERE media_items.deleted_at != ''
+        WHERE media_parts.deleted_at != ''
             AND media_items.library_section_id = {section_id}
             AND media_items.id = media_parts.media_item_id
         ORDER BY media_parts.file
@@ -684,14 +685,13 @@ class RcloneAider(Aider):
     def vfs_stats(self, fs: str) -> requests.Response:
         return self.command("vfs/stats", data={"fs": fs})
 
-    def command(self, command: str, data: dict = None, timeout: tuple = (10, 3600)) -> requests.Response:
+    def command(self, command: str, data: dict = None) -> requests.Response:
         LOGGER.debug(f'{command}: {data}')
         return self.request(
             "JSON",
             f'{CONFIG.get(SETTING_RCLONE_REMOTE_ADDR)}/{command}',
             data=data,
-            auth=(CONFIG.get(SETTING_RCLONE_REMOTE_USER), CONFIG.get(SETTING_RCLONE_REMOTE_PASS)),
-            timeout=timeout
+            auth=(CONFIG.get(SETTING_RCLONE_REMOTE_USER), CONFIG.get(SETTING_RCLONE_REMOTE_PASS))
         )
 
     def _vfs_list(self) -> requests.Response:

@@ -38,6 +38,7 @@ dependencies:
     repo: 'https://github.com/soju6jan/gds_tool'
     plugins:
       - sjva
+      - support_site
   make_yaml:
     repo: 'https://github.com/kihyyo/make_yaml'
     plugins:
@@ -71,6 +72,8 @@ dependencies:
       - 'bash /data/install_rclone.sh'
   support_site:
     repo: 'https://github.com/flaskfarm/support_site'
+    plugins:
+      - wv_tool
   metadata:
     repo: 'https://github.com/flaskfarm/metadata'
     plugins:
