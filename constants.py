@@ -135,14 +135,9 @@ OPTS = {
         'uri': __package__,
         'name': __package__.upper(),
         'list': [
-            {
-                'uri': SETTING,
-                'name': '설정',
-            },
-            {
-                'uri': SCHEDULE,
-                'name': '일정',
-            },
+            {'uri': SETTING, 'name': '설정'},
+            {'uri': SCHEDULE, 'name': '일정'},
+            {'uri': 'watcher', 'name': '감시'},
             {
                 'uri': TOOL,
                 'name': '도구',
@@ -150,14 +145,8 @@ OPTS = {
                     {'uri': TOOL_TRASH, 'name': 'Plex 휴지통 스캔'},
                 ]
             },
-            {
-                'uri': MANUAL,
-                'name': '도움말',
-            },
-            {
-                'uri': LOG,
-                'name': '로그',
-            },
+            {'uri': MANUAL, 'name': '도움말'},
+            {'uri': LOG, 'name': '로그'},
         ]
     },
     'setting_menu': None,

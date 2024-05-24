@@ -1,0 +1,49 @@
+{% extends 'flaskfarmaider.html' %}
+{% block content %}
+
+{{ macros.m_modal_start('add-modal', '감시 추가', 'modal-lg') }}
+<form id='setting'></form>
+{{ macros.m_modal_end_with_button(
+    [
+      ['save-btn', '감시 저장'],
+    ]
+) }}
+
+<div class="input-group-append">
+    <button type="button" id="add-btn" class="btn btn-block btn-primary">감시 추가</button>
+    <button type="button" id="multiple-edit" class="btn btn-outline-success mx-2">선택 수정</button>
+    <button type="button" id="multiple-del" class="btn btn-outline-warning">선택 삭제</button>
+</div>
+<br />
+<table id="list-table" class="table table-hover table-sm table-striped align-bottom table-responsive-sm">
+    <thead>
+        <tr class="text-primary">
+            <th scope="col" class="w-auto text-center"><input type="checkbox" class="btn-check" id="select-all" autocomplete="off"></th>
+            <th scope="col" class="w-auto text-center">ID</th>
+            <th scope="col" class="w-auto text-center">감시자</th>
+            <th scope="col" class="w-auto">경로</th>
+            <th scope="col" class="w-auto text-center">활성화</th>
+            <th scope="col" class="w-auto text-center">관리</th>
+        </tr>
+    </thead>
+    <tbody class="table-group-divider align-middle">
+    </tbody>
+    <tfoot>
+    </tfoot>
+</table>
+
+<div id="page1"></div>
+<div id="page2" disalbed class="d-none"></div>
+
+<script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
+<script type="text/javascript">
+    $(function() {
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_watcher.js') }}")
+    });
+</script>
+
+
+{{ args }}
+
+{% endblock %}

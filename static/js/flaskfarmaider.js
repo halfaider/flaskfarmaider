@@ -121,6 +121,14 @@ function build_form_text(id, title, value, col, desc) {
     return element;
 }
 
+function build_form_input(id, title, value, col, desc, is_number) {
+    let element = build_form_header(title, col);
+    input_type = (is_number) ? 'number' : 'text';
+    element += '<input id="' + id + '" name="' + id + '" type="' + input_type +'" class="form-control form-control-sm" value="' + value + '" />';
+    element += build_form_footer(desc);
+    return element;
+}
+
 function build_form_text_btn(id, title, value, btn_id, btn_text, col, desc) {
     let element = build_form_header(title, col);
     element += '<input id="' + id + '" name="' + id + '" type="text" class="form-control form-control-sm" value="' + value + '" />';
@@ -144,6 +152,28 @@ function build_form_checkbox(id, title, options, col, desc) {
     return element;
 }
 
+function build_form_checkbox2(id, title, options, col, desc) {
+    let element = build_form_header(title, col);
+    element += '<input id="' + id + '" name="' + id + '" type="checkbox" class="form-control form-control-sm" data-toggle="toggle" />';
+    element += build_form_footer(desc);
+    return element;
+}
+
+function build_form_checkbox_multi(id, title, options, col, desc) {
+    let element = build_form_header(title, col);
+    if (options.length > 0) {
+        for (let idx in options) {
+            _id = id + '-' + options[idx].value;
+            element += '<div class="form-check form-check-inline">'
+            element += '<input id="' + _id + '" name="' + id + '" value="' + options[idx].value + '" type="checkbox" class="form-check-input '+ id +'" />';
+            element += '<label class="form-check-label" for="'+ _id + '">' + options[idx].name + '</label>';
+            element += '</div>'
+        }
+    }
+    element += build_form_footer(desc);
+    return element;
+}
+
 function build_form_radio(id, title, options, col, desc) {
     let element = build_form_header(title, col);
     for (let idx in options) {
@@ -162,4 +192,20 @@ function build_form_group(id, elements) {
     }
     element += '</div';
     return element
+}
+
+function build_form_textarea(id, title, value, col, row, desc) {
+    let element = build_form_header(title, col);
+    element += '<textarea id="' + id + '" name="' + id + '" rows="' + row + '" class="form-control form-control-sm col-md-12">' + value + '</textarea>';
+    element += build_form_footer(desc);
+    return element;
+}
+
+function get_form_data(form_id) {
+    let toggle_boxes = $(form_id + ' input[type=checkbox][data-toggle=toggle]');
+    toggle_boxes.each(function(idx, item) {
+        ($(item).prop('checked')) ? $(item).prop('value', 'True') : $(item).prop('value', 'False');
+    });
+    let form_data = $(form_id).serialize();
+    return form_data;
 }

@@ -11,11 +11,16 @@ import platform
 import time
 import locale
 import logging
+import typing as T
 
 import yaml
 import requests
 import flask
 import flask_login
+from watchdog.observers.inotify import InotifyObserver
+from watchdog.observers.polling import PollingObserverVFS, PollingObserver
+from watchdog.events import PatternMatchingEventHandler, FileSystemEvent
+from watchdog.observers.api import BaseObserver, ObservedWatch
 
 from .setup import PluginModuleBase, ModelBase, system_plugin
 from .setup import FRAMEWORK, LOGGER, CONFIG
@@ -905,3 +910,88 @@ class WindowsAider(StartupAider):
     def get_commands_from_packages(self, require_packages) -> list[str]:
         LOGGER.warning(f'윈도우는 패키지 설치 명령어를 "commands" 혹은 "실행할 명령어"로 실행')
         return []
+
+
+class WatchAider(Aider):
+
+    OBSERVER_CLASSES = {
+        'inotify': InotifyObserver,
+        #'polling': PollingObserverVFS
+        'polling':PollingObserver
+    }
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._observers = []
+
+    @property
+    def observers(self):
+        return self._observers
+
+    def _register_observer(self, path: str, patterns: T.Optional[T.Iterable] = None, ignore_patterns: T.Optional[T.Iterable] = None,
+                       ignore_directories: bool = False, case_sensitive: bool = False, polling_interval: int = 60, recurisve: bool = False) -> None:
+        handler = DefaultEventHandler(patterns, ignore_patterns, ignore_directories, case_sensitive)
+        observer = PollingObserverVFS(os.stat, os.scandir, polling_interval)
+        watch: ObservedWatch = observer.schedule(handler, path, recursive=recurisve)
+        self.observers.append(observer)
+
+    def register(self, profile: dict) -> BaseObserver:
+        observer_cls = self.OBSERVER_CLASSES.get(profile.get('observer'), self.OBSERVER_CLASSES['inotify'])
+        #if profile['observer'] == 'polling':
+        #    observer = observer_cls(os.stat, os.scandir, profile.get('timeout') or 1)
+        #else:
+        #    observer = observer_cls(profile.get('timeout') or 1)
+
+        observer = observer_cls(profile.get('timeout') or 1)
+
+        handler = DefaultEventHandler(profile.get('patterns'), profile.get('ignore_patterns'), profile.get('ignore_directories') or False, profile.get('case_sensitive') or True)
+        observer.schedule(handler, profile.get('path'), recursive=profile.get('recursive') or True)
+        observer.daemon = True
+        observer.name = f"watch-{profile.get('id')}"
+        LOGGER.info(f'{observer.name=}')
+        observer.start()
+        LOGGER.info(f'join {observer=}')
+        observer.join(1)
+        LOGGER.info(f'{observer=}')
+        LOGGER.warning(f'{observer.name} is started...')
+        self.observers.append(observer)
+        return observer.ident
+
+    def unregister(self, observer: BaseObserver) -> None:
+        LOGGER.info(f'stopping: {observer.name}')
+        observer.stop()
+        observer.join()
+        self.observers.remove(observer)
+
+    def unregister_by_ident(self, ident: int) -> None:
+        for observer in list(self.observers):
+            if observer.ident == ident:
+                self.unregister(observer)
+
+    def unregister_all(self) -> None:
+        for observer in list(self.observers):
+            self.unregister(observer)
+
+
+class DefaultEventHandler(PatternMatchingEventHandler):
+
+    def __init__(self, patterns: T.Optional[T.Iterable] = None, ignore_patterns: T.Optional[T.Iterable] = None,
+                ignore_directories: bool = False, case_sensitive: bool = False) -> None:
+        super().__init__(patterns, ignore_patterns, ignore_directories, case_sensitive)
+
+    def event_to_dict(self, event: FileSystemEvent) -> dict:
+        return {
+            'is_file': not event.is_directory,
+            'type': event.event_type,
+            'path': event.src_path
+        }
+
+    def on_any_event(self, event: FileSystemEvent) -> None:
+        super().on_any_event(event)
+        bowow: dict = self.event_to_dict(event)
+        LOGGER.info(f'{bowow}')
+        if bowow.get('is_file') and bowow.get('type') == 'created':
+            target = bowow.get('path').replace('/mnt/cloud/gds-metadata', '/mnt/cloud/gds')
+            PlexmateAider().scan(SCAN_MODE_KEYS[0], target)
+
+

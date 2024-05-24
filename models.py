@@ -92,7 +92,7 @@ class Job(ModelBase):
         return super().get_paging_info(count, current_page, page_size)
 
     @classmethod
-    def get_by_id(cls, id) -> 'Job':
+    def get_by_id(cls, id) -> ModelBase:
         '''override'''
         return super().get_by_id(id)
 
@@ -116,7 +116,7 @@ class Job(ModelBase):
         '''override'''
         return super().make_query_search(query, search, field)
 
-    def update(self, data: dict[str, str | int | bool]) -> 'Job':
+    def update(self, data: dict[str, str | int | bool]) -> ModelBase:
         for k, v in data.items():
             try:
                 setattr(self, k, v)
@@ -126,7 +126,7 @@ class Job(ModelBase):
         return self
 
     @classmethod
-    def update_formdata(cls, job_id: int, formdata: dict[str, list]) -> 'Job':
+    def update_formdata(cls, job_id: int, formdata: dict[str, list]) -> ModelBase:
         if job_id > 0:
             model = cls.get_by_id(job_id)
         else:
@@ -155,7 +155,7 @@ class Job(ModelBase):
         return model
 
     @classmethod
-    def get_job(cls, id: int = -1, info: dict = None) -> 'Job':
+    def get_job(cls, id: int = -1, info: dict = None) -> ModelBase:
         if id > 0:
             job = cls.get_by_id(id)
         elif info:
@@ -178,7 +178,7 @@ class Job(ModelBase):
                 query = query.order_by(desc(getattr(cls, order)))
             return query
 
-    def set_status(self, status: str, save: bool = True) -> 'Job':
+    def set_status(self, status: str, save: bool = True) -> ModelBase:
         if status in STATUS_KEYS:
             self.status = status
             if status == STATUS_KEYS[2]:
@@ -218,3 +218,134 @@ class Job(ModelBase):
             LOGGER.error(traceback.format_exc())
         finally:
             return data
+
+
+class Watch(ModelBase):
+
+    P = PLUGIN
+    __tablename__ = f'{PLUGIN.package_name}_watches'
+    __bind_key__ = PLUGIN.package_name
+
+    id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer, primary_key=True)
+    enable = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
+    status = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    description = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    path = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    observer = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    events = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    handlers = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    patterns = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    ignore_patterns = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    ignore_directory = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
+    case_sensitive = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
+    polling_interval = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
+    timeout = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
+    recursive = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
+
+    # Column, type, default value
+    formdata_mapping = {
+        'watch-enable': (enable, enable.type.python_type, False),
+        'watch-status': (status, status.type.python_type, STATUS_KEYS[0]),
+        'watch-description': (description, description.type.python_type, ''),
+        'watch-path': (path, path.type.python_type, ''),
+        'watch-observer': (observer, observer.type.python_type, ''),
+        'watch-events': (events, events.type.python_type, ''),
+        'watch-handlers': (handlers, handlers.type.python_type, ''),
+        'watch-patterns': (patterns, patterns.type.python_type, ''),
+        'watch-ignore-patterns': (ignore_patterns, ignore_patterns.type.python_type, ''),
+        'watch-ignore-directory': (ignore_directory, ignore_directory.type.python_type, False),
+        'watch-ignore-directory-select': (ignore_directory, ignore_directory.type.python_type, False),
+        'watch-case-sensitive': (case_sensitive, case_sensitive.type.python_type, True),
+        'watch-case-sensitive-select': (case_sensitive, case_sensitive.type.python_type, True),
+        'watch-timeout': (timeout, timeout.type.python_type, 60),
+        'watch-recursive': (recursive, recursive.type.python_type, True),
+    }
+
+    @classmethod
+    def make_query(cls, request: Request, order: str = 'desc', keyword: str = '', option1: str = 'observer', option2: str = 'all') -> Query:
+        '''override'''
+        with FRAMEWORK.app.app_context():
+            query = cls.make_query_search(FRAMEWORK.db.session.query(cls), keyword, getattr(cls, option1))
+            if option2 != 'all':
+                query = query.filter(getattr(cls, option1) == option2)
+            if order in ['desc', 'asc']:
+                query = query.order_by(desc(cls.id) if order == 'desc' else cls.id)
+            else:
+                query = query.order_by(desc(getattr(cls, order)))
+            return query
+
+    @classmethod
+    def web_list(cls, request: Request) -> dict:
+        '''override'''
+        data = {}
+        data['list'] = []
+        opt_page = int(request.form.get('page') or 1 )
+        page_size = int(request.form.get('length') or 30)
+        opt_order = request.form.get('order', 'desc')
+        opt_option1 = request.form.get('option1', 'observer')
+        opt_option2 = request.form.get('option2', 'all')
+        opt_keyword = request.form.get('keyword')
+        try:
+            query = cls.make_query(request, opt_order, opt_keyword, opt_option1, opt_option2)
+            total = query.count()
+            query = query.limit(page_size).offset((opt_page - 1) * page_size)
+            for row in query.all():
+                item = row.as_dict()
+                data['list'].append(item)
+            data['paging'] = cls.get_paging_info(total, opt_page, page_size)
+            CONFIG.set(f'watcher_last_list_option', f'{opt_order}|{opt_page}|{page_size}|{opt_keyword or ""}|{opt_option1 or ""}|{opt_option2 or ""}')
+        except:
+            LOGGER.error(traceback.format_exc())
+        finally:
+            return data
+
+    @classmethod
+    def get_model(cls, id: int = -1, data: dict = None) -> ModelBase:
+        if id > 0:
+            model = cls.get_by_id(id)
+        elif data:
+            model = cls().update(data)
+        else:
+            model = cls()
+            model.id = id
+        return model
+
+    def update(self, data: dict[str, str | int | bool]) -> ModelBase:
+        for k, v in data.items():
+            try:
+                setattr(self, k, v)
+            except:
+                LOGGER.error(traceback.format_exc())
+                continue
+        return self
+
+    @classmethod
+    def update_formdata(cls, model_id: int, formdata: dict[str, list]) -> ModelBase:
+        if model_id > 0:
+            model = cls.get_by_id(model_id)
+        else:
+            model = cls()
+
+        for key in ['watch-enable', 'watch-ignore-directory', 'watch-case-sensitive', 'watch-recursive']:
+            val = formdata.get(key)
+            if val:
+                formdata[key] = [val[0].lower() == 'true']
+
+        for key in ['watch-events', 'watch-handlers']:
+            val = formdata.get(key)
+            if val:
+                formdata[key] = [('|').join(formdata.get(key))]
+
+        data = {}
+        for k, v in formdata.items():
+            try:
+                mapping = model.formdata_mapping.get(k)
+                data[mapping[0].name] = mapping[1](v[0])
+            except:
+                LOGGER.error(f'formdata key: {k}')
+                LOGGER.error(traceback.format_exc())
+                continue
+
+        model.update(data)
+        model.save()
+        return model

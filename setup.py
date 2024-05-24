@@ -18,5 +18,6 @@ from .presenters import Setting
 from .presenters import Schedule
 from .presenters import Manual
 from .presenters import Tool
+from .presenters import Watcher
 
-PLUGIN.set_module_list([Setting, Schedule, Manual, Tool])
+PLUGIN.set_module_list([Setting, Schedule, Manual, Tool, Watcher])

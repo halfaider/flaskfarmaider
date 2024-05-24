@@ -11,8 +11,8 @@ import flask
 
 from .setup import PluginBase, PluginModuleBase, PluginPageBase, default_route_socketio_module, default_route_socketio_page, ModelBase, FrameworkJob
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
-from .models import Job
-from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider, RcloneAider
+from .models import Job, Watch
+from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSToolAider, RcloneAider, WatchAider
 from .migrations import migrate_schedule, migrate_setting
 from .constants import *
 
@@ -820,6 +820,13 @@ class Schedule(BaseModule):
             return self.returns('warning', f'일정을 찾을 수 없습니다: ID {ids[0]}')
 
 
+    def process_api(self, sub: str, req: flask.Request) -> flask.Response:
+        '''override'''
+        LOGGER.warning('api')
+        return flask.jsonify({})
+        return super().process_api(sub, req)
+
+
 class Manual(BaseModule):
 
     def __init__(self, plugin: PluginBase) -> None:
@@ -953,3 +960,110 @@ class ToolTrash(BasePage):
         '''override'''
         super().plugin_unload()
         CONFIG.set(TOOL_TRASH_TASK_STATUS, STATUS_KEYS[0])
+
+
+class Watcher(BaseModule):
+
+    def __init__(self, plugin: PluginBase) -> None:
+        super().__init__(plugin, name='watcher')
+        self.db_default = {
+            'watcher_last_list_option': '',
+        }
+        self.commands.update(
+            {
+                'save': self.command_save,
+                'delete': self.command_delete,
+                'get': self.command_get,
+            }
+        )
+        self.web_list_model = Watch
+        self.watch_aider = WatchAider()
+
+    def command_get(self, request: flask.Request) -> dict:
+        command, query, ids = self.pre_command(request)
+        LOGGER.debug(f'{command=} {query=} {ids=}')
+        model = self.web_list_model.get_by_id(ids[0])
+        if model:
+            return self.returns('success', data=model.as_dict())
+        else:
+            return self.returns('warning', f'데이터를 찾을 수 없습니다: ID {ids[0]}')
+
+    def command_delete(self, request: flask.Request) -> dict:
+        command, query, ids = self.pre_command(request)
+        LOGGER.debug(f'{command=} {query=} {ids=}')
+        if len(ids) > 1:
+            not_deleted = []
+            LOGGER.info(f'to be deleted: {ids}')
+            for _id in ids:
+                model = self.web_list_model.get_by_id(_id)
+                if model and self.web_list_model.delete_by_id(model.id):
+                    self.reload_watch(model)
+                else:
+                    not_deleted.append(_id)
+            if len(not_deleted) > 0:
+                LOGGER.warning(f'could not delete: {not_deleted}')
+                return self.returns('warning', f'일부는 삭제할 수 없었습니다.')
+            else:
+                return self.returns('success', f'모두 삭제 했습니다.')
+        else:
+            model = self.web_list_model.get_by_id(ids[0])
+            if model and self.web_list_model.delete_by_id(model.id):
+                self.reload_watch(model)
+                return self.returns('success', f'삭제 했습니다: ID {ids[0]}')
+            else:
+                return self.returns('warning',  f'삭제할 수 없습니다: ID {ids[0]}')
+
+    def command_save(self, request: flask.Request) -> dict:
+        command, query, ids = self.pre_command(request)
+        LOGGER.debug(f'{command=} {query=} {ids=}')
+        if len(ids) > 1:
+            return self.returns('success', '저장했습니다.')
+        else:
+            model = self.update_model(ids[0], query)
+            if model.id > 0:
+                return self.returns('success', '저장했습니다.')
+            else:
+                return self.returns('warning', '저장할 수 없습니다.')
+
+    def reload_watch(self, model: ModelBase) -> None:
+        LOGGER.debug(f'reload_watch(): {model.id}')
+
+    def update_model(self, model_id: int, query: dict[str, list]) -> ModelBase:
+        old_model = self.web_list_model.get_model(model_id)
+        model = self.web_list_model.update_formdata(model_id, query)
+        if old_model.id > 0:
+            self.reload_watch(model)
+        return model
+
+    def get_template_args(self) -> dict:
+        '''override'''
+        args = super().get_template_args()
+        for k in self.db_default.keys():
+            args[k] = CONFIG.get(k)
+        return args
+
+    @FRAMEWORK.celery.task()
+    def start_observers(self, models: ModelBase) -> None:
+        for model in models:
+            if model.enable:
+                self.watch_aider.register(model.as_dict())
+                model.status = STATUS_KEYS[1]
+                model.save()
+
+    def plugin_load(self) -> None:
+        super().plugin_load()
+        models = self.web_list_model.get_list()
+        LOGGER.info(f'{models=}')
+        self.run_async(self.start_observers, args=(self, models,), daemon=True)
+
+    def plugin_unload(self) -> None:
+        '''override'''
+        super().plugin_unload()
+        for observer in self.watch_aider.observers:
+            prefix, _id = observer.name.split('-')
+            model = self.web_list_model.get_by_id(int(_id))
+            model.status = STATUS_KEYS[3]
+            model.save()
+            self.watch_aider.unregister(observer)
+            model.status = STATUS_KEYS[0]
+            model.save()
