@@ -514,7 +514,8 @@ class Setting(BaseModule):
             SETTING_LOGGING_LOGIN: 'false',
             SETTING_LOGGING_ACCESS: 'false',
             SETTING_LOGGING_ACCESS_FILE: '/data/log/access.log',
-            SETTING_LOGGING_ACCESS_FORMAT: '{remote} {method} "{path}" {status}'
+            SETTING_LOGGING_ACCESS_FORMAT: '{remote} {method} "{path}" {status}',
+            'setting_rclone_path_test': 'true',
         }
         self.commands.update({'command_test_connection': self.command_test_conn})
         self.commands['clear_db'] = self.command_clear_db
@@ -529,30 +530,7 @@ class Setting(BaseModule):
     def get_template_args(self) -> dict:
         '''override'''
         args = super().get_template_args()
-        confs = [
-            SETTING_RCLONE_REMOTE_ADDR,
-            SETTING_RCLONE_REMOTE_VFS,
-            SETTING_RCLONE_REMOTE_VFSES,
-            SETTING_RCLONE_REMOTE_USER,
-            SETTING_RCLONE_REMOTE_PASS,
-            SETTING_RCLONE_MAPPING,
-            SETTING_PLEXMATE_MAX_SCAN_TIME,
-            SETTING_PLEXMATE_TIMEOVER_RANGE,
-            SETTING_PLEXMATE_PLEX_MAPPING,
-            SETTING_STARTUP_EXECUTABLE,
-            SETTING_STARTUP_COMMANDS,
-            SETTING_STARTUP_TIMEOUT,
-            SETTING_STARTUP_DEPENDENCIES,
-            SETTING_GDS_TOOL_REQUEST_SPAN,
-            SETTING_GDS_TOOL_REQUEST_AUTO,
-            SETTING_GDS_TOOL_FP_SPAN,
-            SETTING_GDS_TOOL_FP_AUTO,
-            SETTING_LOGGING_LOGIN,
-            SETTING_LOGGING_ACCESS,
-            SETTING_LOGGING_ACCESS_FILE,
-            SETTING_LOGGING_ACCESS_FORMAT,
-        ]
-        for conf in confs:
+        for conf in self.db_default.keys():
             args[conf] = CONFIG.get(conf)
         args[SETTING_LOGGING_LOGIN_FILE] = f"{FRAMEWORK.config['path_data']}/log/system.log"
         try:

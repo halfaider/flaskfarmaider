@@ -74,6 +74,12 @@
         col='8',
         row='5'
     ) }}
+    {{ macros.setting_checkbox(
+        module_name + '_rclone_path_test',
+        '로컬 경로 검사',
+        args[module_name + '_rclone_path_test'],
+        desc=['vfs/refresh 요청 전 로컬 경로 검사 여부', 'Off시 로컬 경로를 검사하지 않습니다.', '로컬 경로를 검사하지 않으면 plex_mate의 ready 항목을 새로고침할 때 실패할 수 있습니다.']
+    ) }}
 {{ macros.m_tab_content_end() }}
 {{ macros.m_tab_content_start('plexmate', false) }}
     {{ macros.setting_input_text(
