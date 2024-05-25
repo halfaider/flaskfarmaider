@@ -946,7 +946,7 @@ class WatchAider(Aider):
 
         handler = DefaultEventHandler(profile.get('patterns'), profile.get('ignore_patterns'), profile.get('ignore_directories') or False, profile.get('case_sensitive') or True)
         observer.schedule(handler, profile.get('path'), recursive=profile.get('recursive') or True)
-        observer.daemon = True
+        observer.daemon = False
         observer.name = f"watch-{profile.get('id')}"
         LOGGER.info(f'{observer.name=}')
         observer.start()
