@@ -732,7 +732,7 @@ class RcloneAider(Aider):
             response = self._vfs_refresh(self.update_path(local_path, mappings), recursive, fs)
             result, reason = self.is_successful(response)
             if not result:
-                LOGGER.error(f'새로고침 실패: {reason}: {test_dirs[-1]}')
+                LOGGER.error(f'새로고침 실패: {reason}: {local_path}')
             return response
         # 이미 존재하는 파일이면 패스, 존재하지 않은 파일/폴더, 존재하는 폴더이면 진행
         local_path = pathlib.Path(local_path)
