@@ -11,7 +11,8 @@ import platform
 import time
 import locale
 import logging
-import typing as T
+import sys
+from typing import Iterable, Optional, TYPE_CHECKING
 
 import yaml
 import requests
@@ -20,7 +21,7 @@ import flask_login
 from watchdog.observers.inotify import InotifyObserver
 from watchdog.observers.polling import PollingObserverVFS, PollingObserver
 from watchdog.events import PatternMatchingEventHandler, FileSystemEvent
-from watchdog.observers.api import BaseObserver, ObservedWatch
+from watchdog.observers.api import BaseObserver, ObservedWatch, BaseObserverSubclassCallable
 
 from .setup import PluginModuleBase, ModelBase, system_plugin
 from .setup import FRAMEWORK, LOGGER, CONFIG
@@ -914,12 +915,6 @@ class WindowsAider(StartupAider):
 
 class WatchAider(Aider):
 
-    OBSERVER_CLASSES = {
-        'inotify': InotifyObserver,
-        #'polling': PollingObserverVFS
-        'polling':PollingObserver
-    }
-
     def __init__(self) -> None:
         super().__init__()
         self._observers = []
@@ -928,7 +923,26 @@ class WatchAider(Aider):
     def observers(self):
         return self._observers
 
-    def _register_observer(self, path: str, patterns: T.Optional[T.Iterable] = None, ignore_patterns: T.Optional[T.Iterable] = None,
+    def get_observer(force_observer: Optional[str] = None) -> BaseObserverSubclassCallable:
+        Observer: BaseObserverSubclassCallable
+        match force_observer:
+            case 'polling':
+                from watchers.observers import SimplePollingObserver as Observer
+            case 'kqueue':
+                from watchdog.observers.kqueue import KqueueObserver as Observer
+            case 'inotify':
+                from watchdog.observers.inotify import InotifyObserver as Observer
+            case 'fsevents':
+                from watchdog.observers.fsevents import FSEventsObserver as Observer
+            case _:
+                # TYPE_CHECKING is True, but False at runtime.
+                if (not TYPE_CHECKING and force_observer == 'winapi') or (TYPE_CHECKING and sys.platform.startswith("win")):
+                    from watchdog.observers.read_directory_changes import WindowsApiObserver as Observer
+                else:
+                    from watchdog.observers import Observer
+        return Observer
+
+    def _register_observer(self, path: str, patterns: Optional[Iterable] = None, ignore_patterns: Optional[Iterable] = None,
                        ignore_directories: bool = False, case_sensitive: bool = False, polling_interval: int = 60, recurisve: bool = False) -> None:
         handler = DefaultEventHandler(patterns, ignore_patterns, ignore_directories, case_sensitive)
         observer = PollingObserverVFS(os.stat, os.scandir, polling_interval)
@@ -971,27 +985,3 @@ class WatchAider(Aider):
     def unregister_all(self) -> None:
         for observer in list(self.observers):
             self.unregister(observer)
-
-
-class DefaultEventHandler(PatternMatchingEventHandler):
-
-    def __init__(self, patterns: T.Optional[T.Iterable] = None, ignore_patterns: T.Optional[T.Iterable] = None,
-                ignore_directories: bool = False, case_sensitive: bool = False) -> None:
-        super().__init__(patterns, ignore_patterns, ignore_directories, case_sensitive)
-
-    def event_to_dict(self, event: FileSystemEvent) -> dict:
-        return {
-            'is_file': not event.is_directory,
-            'type': event.event_type,
-            'path': event.src_path
-        }
-
-    def on_any_event(self, event: FileSystemEvent) -> None:
-        super().on_any_event(event)
-        bowow: dict = self.event_to_dict(event)
-        LOGGER.info(f'{bowow}')
-        if bowow.get('is_file') and bowow.get('type') == 'created':
-            target = bowow.get('path').replace('/mnt/cloud/gds-metadata', '/mnt/cloud/gds')
-            PlexmateAider().scan(SCAN_MODE_KEYS[0], target)
-
-

@@ -1042,23 +1042,14 @@ class Watcher(BaseModule):
             args[k] = CONFIG.get(k)
         return args
 
-    @FRAMEWORK.celery.task(bind=True)
-    def start_observers(self, aider: WatchAider, models: list) -> None:
-        for model in models:
-            if model.enable:
-                aider.register(model.as_dict())
-                model.status = STATUS_KEYS[1]
-                model.save()
-
     def plugin_load(self) -> None:
         super().plugin_load()
-        # 셀러리 대기 후 실행하면 메인 프로세스는 괜찮은데 셀러리가 블럭킹 걸림...
-        while not CELERY_ACTIVE:
-            LOGGER.info(f'wait fot celery...')
-            time.sleep(5)
         models = self.web_list_model.get_list()
-        LOGGER.info(f'models type: {type(models)}')
-        self.run_async(self.start_observers, args=(self.watch_aider, models), daemon=False)
+        for model in models:
+            if model.enable:
+                self.watch_aider.register(model.as_dict())
+                model.status = STATUS_KEYS[1]
+                model.save()
 
     def plugin_unload(self) -> None:
         '''override'''
