@@ -742,32 +742,36 @@ class RcloneAider(Aider):
             reason = '이미 존재하는 파일입니다'
             response._content = bytes(reason, 'utf-8')
             LOGGER.debug(f'{reason}: {local_path}')
-        else:
-            # vfs/refresh 용 존재하는 경로 찾기
-            test_dirs = [local_path]
-            already_exists = test_dirs[0].exists()
-            while not test_dirs[-1].exists():
-                test_dirs.append(test_dirs[-1].parent)
-            LOGGER.debug(f"경로 검사: {str(test_dirs)}")
-            mappings = self.parse_mappings(CONFIG.get(SETTING_RCLONE_MAPPING))
-            while test_dirs:
-                # vfs/refresh 후
-                response = self._vfs_refresh(self.update_path(str(test_dirs[-1]), mappings), recursive, fs)
-                # 타겟이 존재하는지 점검
-                if local_path.exists():
-                    # 존재하지 않았던 폴더면 vfs/refresh
-                    if not local_path.is_file() and not already_exists:
-                        self._vfs_refresh(self.update_path(str(local_path), mappings), recursive, fs)
-                        # 새로운 폴더를 새로고침 후 한번 더 타겟 경로 존재 점검
-                        if not local_path.exists() and len(test_dirs) > 1: continue
-                    break
-                else:
-                    result, reason = self.is_successful(response)
-                    if not result:
-                        LOGGER.error(f'새로고침 실패: {reason}: {test_dirs[-1]}')
-                        break
-                # 타겟이 아직 존재하지 않으면 다음 상위 경로로 시도
+            return response
+        # vfs/refresh 용 존재하는 경로 찾기
+        test_dirs = [local_path] # file: 존재하지 않음, foler: 존재함, 존재하지 않음
+        already_exists = test_dirs[0].exists()
+        while not test_dirs[-1].exists():
+            test_dirs.append(test_dirs[-1].parent) # [children ... parents ... until path exists]
+        LOGGER.debug(f"경로 검사: {str(test_dirs)}")
+        mappings = self.parse_mappings(CONFIG.get(SETTING_RCLONE_MAPPING))
+        while test_dirs:
+            # vfs/refresh 후
+            response = self._vfs_refresh(self.update_path(str(test_dirs[-1]), mappings), recursive, fs)
+            # 타겟이 존재하는지 점검
+            if local_path.exists():
+                # 타겟이 존재하지 않았던 '폴더'면 vfs/refresh
+                if not local_path.is_file() and not already_exists:
+                    self._vfs_refresh(self.update_path(str(local_path), mappings), recursive, fs)
+                # 타겟 폴더가 존재하므로 종료
+                break
+            # 타겟이 여전히 존재하지 않으면 결과 점검
+            result, reason = self.is_successful(response)
+            if not result:
+                LOGGER.error(f'새로고침 실패: {reason}: {test_dirs[-1]}')
+                # 새로고침에 실패했으면 다음 자식 경로의 새로고침도 실패하므로 종료
+                break
+            # 다음 테스트 대상이 타겟이면 종료, 아니면 반복
+            if len(test_dirs) > 2:
                 test_dirs.pop()
+            else:
+                LOGGER.warning(f'새로고침 후에도 대상이 존재하지 않습니다: {str(local_path)}')
+                break
         return response
 
     def vfs_forget(self, local_path: str, fs: str = None) -> requests.Response:
