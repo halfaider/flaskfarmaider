@@ -680,8 +680,13 @@ class RcloneAider(Aider):
         super().__init__()
 
     def get_metadata_cache(self, fs: str) -> tuple[int, int]:
-        result = self.vfs_stats(fs).json().get("metadataCache")
-        return result.get('dirs', 0), result.get('files', 0)
+        try:
+            response = self.vfs_stats(fs)
+            result = response.json().get('metadataCache')
+            return result.get('dirs', 0), result.get('files', 0)
+        except Exception as e:
+            LOGGER.warning(repr(e))
+            return 0, 0
 
     def vfs_stats(self, fs: str) -> requests.Response:
         return self.command("vfs/stats", data={"fs": fs})
