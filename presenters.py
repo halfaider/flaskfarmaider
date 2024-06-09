@@ -1,6 +1,6 @@
 import json
 import traceback
-import urllib
+import urllib.parse
 from threading import Thread
 import sqlite3
 import time

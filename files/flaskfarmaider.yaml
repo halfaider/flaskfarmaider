@@ -126,3 +126,7 @@ dependencies:
     plugins:
       - plex_mate
       - gds_tool
+  alive:
+    repo: 'https://github.com/by275/alive'
+    commands:
+      - 'pip install streamlink<6.6'
