@@ -31,7 +31,7 @@ class Aider:
 
     @staticmethod
     def get_readable_time(_time: float) -> str:
-        return datetime.datetime.utcfromtimestamp(_time).strftime('%b %d %H:%M')
+        return datetime.datetime.fromtimestamp(_time, datetime.timezone.utc).strftime('%b %d %H:%M')
 
     @staticmethod
     def parse_mappings(text: str) -> dict[str, str]:
