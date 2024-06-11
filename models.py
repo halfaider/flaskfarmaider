@@ -1,5 +1,6 @@
 import datetime
 import traceback
+import json
 
 from flask.wrappers import Request
 from flask_sqlalchemy.query import Query
@@ -122,7 +123,6 @@ class Job(ModelBase):
                 setattr(self, k, v)
             except:
                 LOGGER.error(traceback.format_exc())
-                continue
         return self
 
     @classmethod
@@ -148,7 +148,6 @@ class Job(ModelBase):
             except:
                 LOGGER.error(f'formdata key: {k}')
                 LOGGER.error(traceback.format_exc())
-                continue
 
         model.update(data)
         model.save()
@@ -227,38 +226,45 @@ class Watch(ModelBase):
     __bind_key__ = PLUGIN.package_name
 
     id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer, primary_key=True)
-    enable = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
-    status = FRAMEWORK.db.Column(FRAMEWORK.db.String)
-    description = FRAMEWORK.db.Column(FRAMEWORK.db.String)
-    path = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     observer = FRAMEWORK.db.Column(FRAMEWORK.db.String)
-    events = FRAMEWORK.db.Column(FRAMEWORK.db.String)
-    handlers = FRAMEWORK.db.Column(FRAMEWORK.db.String)
-    patterns = FRAMEWORK.db.Column(FRAMEWORK.db.String)
-    ignore_patterns = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    timeout = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
+
+    enable = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
     ignore_directory = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
     case_sensitive = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
-    polling_interval = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
-    timeout = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
     recursive = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
+
+    paths = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    events = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    events_interval = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
+    patterns = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    ignore_patterns = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    mappings = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    conduits = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+
+    status = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    description = FRAMEWORK.db.Column(FRAMEWORK.db.String)
 
     # Column, type, default value
     formdata_mapping = {
+        'watch-observer': (observer, observer.type.python_type, 'auto'),
+        'watch-timeout': (timeout, timeout.type.python_type, 60),
+
         'watch-enable': (enable, enable.type.python_type, False),
+        'watch-ignore-directory': (ignore_directory, ignore_directory.type.python_type, False),
+        'watch-case-sensitive': (case_sensitive, case_sensitive.type.python_type, True),
+        'watch-recursive': (recursive, recursive.type.python_type, False),
+
+        'watch-paths': (paths, paths.type.python_type, '[]'),
+        'watch-events': (events, events.type.python_type, '["created", "deleted", "moved", "modified", "opened", "closed"]'),
+        'watch-events-interval': (events_interval, events_interval.type.python_type, 2),
+        'watch-patterns': (patterns, patterns.type.python_type, '["*"]'),
+        'watch-ignore-patterns': (ignore_patterns, ignore_patterns.type.python_type, '[]'),
+        'watch-mappings': (mappings, mappings.type.python_type, '[]'),
+        'watch-conduits': (conduits, conduits.type.python_type, '{}'),
+
         'watch-status': (status, status.type.python_type, STATUS_KEYS[0]),
         'watch-description': (description, description.type.python_type, ''),
-        'watch-path': (path, path.type.python_type, ''),
-        'watch-observer': (observer, observer.type.python_type, ''),
-        'watch-events': (events, events.type.python_type, ''),
-        'watch-handlers': (handlers, handlers.type.python_type, ''),
-        'watch-patterns': (patterns, patterns.type.python_type, ''),
-        'watch-ignore-patterns': (ignore_patterns, ignore_patterns.type.python_type, ''),
-        'watch-ignore-directory': (ignore_directory, ignore_directory.type.python_type, False),
-        'watch-ignore-directory-select': (ignore_directory, ignore_directory.type.python_type, False),
-        'watch-case-sensitive': (case_sensitive, case_sensitive.type.python_type, True),
-        'watch-case-sensitive-select': (case_sensitive, case_sensitive.type.python_type, True),
-        'watch-timeout': (timeout, timeout.type.python_type, 60),
-        'watch-recursive': (recursive, recursive.type.python_type, True),
     }
 
     @classmethod
@@ -289,9 +295,7 @@ class Watch(ModelBase):
             query = cls.make_query(request, opt_order, opt_keyword, opt_option1, opt_option2)
             total = query.count()
             query = query.limit(page_size).offset((opt_page - 1) * page_size)
-            for row in query.all():
-                item = row.as_dict()
-                data['list'].append(item)
+            data['list'] = [row.as_dict() for row in query.all()]
             data['paging'] = cls.get_paging_info(total, opt_page, page_size)
             CONFIG.set(f'watcher_last_list_option', f'{opt_order}|{opt_page}|{page_size}|{opt_keyword or ""}|{opt_option1 or ""}|{opt_option2 or ""}')
         except:
@@ -316,7 +320,6 @@ class Watch(ModelBase):
                 setattr(self, k, v)
             except:
                 LOGGER.error(traceback.format_exc())
-                continue
         return self
 
     @classmethod
@@ -326,26 +329,72 @@ class Watch(ModelBase):
         else:
             model = cls()
 
-        for key in ['watch-enable', 'watch-ignore-directory', 'watch-case-sensitive', 'watch-recursive']:
+        for key in ['watch-paths', 'watch-patterns', 'watch-ignore-patterns', 'watch-mappings']:
             val = formdata.get(key)
             if val:
-                formdata[key] = [val[0].lower() == 'true']
+                formdata[key] = [json.dumps(val[0].splitlines())]
 
-        for key in ['watch-events', 'watch-handlers']:
+        # check boxes
+        for key in [
+                    'watch-ignore-directory',
+                    'watch-case-sensitive',
+                    'watch-recursive',
+                    'watch-enable',
+                    'watch-events-created',
+                    'watch-events-deleted',
+                    'watch-events-moved',
+                    'watch-events-modified',
+                    'watch-events-opened',
+                    'watch-events-closed',
+                    'watch-conduits-shell',
+                    'watch-conduits-rclone',
+                    'watch-conduits-plex_mate',
+                    'watch-conduits-plex',
+                ]:
             val = formdata.get(key)
             if val:
-                formdata[key] = [('|').join(formdata.get(key))]
+                formdata[key] = [(val[0].lower() == 'true' or val[0].lower() == 'on')]
+
+        events = set()
+        for _event in {'created', 'deleted', 'moved', 'modified', 'opened', 'closed'}:
+            if formdata.pop(f'watch-events-{_event}', [False])[0]:
+                events.add(_event)
+        if events:
+            formdata['watch-events'] = [json.dumps(events)]
+        conduits = {}
+        for conduit in {'shell', 'rclone', 'plex', 'plex_mate'}:
+            if formdata.pop(f'watch-conduits-{conduit}', [False])[0]:
+                conduits[conduit] = {}
+                priority = formdata.pop(f'watch-conduits-{conduit}-priority', None)
+                mappings = formdata.pop(f'watch-conduits-{conduit}-mappings', None)
+                if priority:
+                    conduits[conduit]['priority'] = priority[0]
+                if mappings:
+                    conduits[conduit]['mappings'] = mappings[0].splitlines()
+                if conduit == 'shell':
+                    command = formdata.pop(f'watch-conduits-shell-command', None)
+                    if command:
+                        conduits[conduit]['command'] = command[0]
+                elif conduit == 'rclone':
+                    vfs = formdata.pop(f'watch-conduits-rclone-vfs', None)
+                    if vfs:
+                        conduits[conduit]['vfs'] = vfs[0]
+            else:
+                for key in list(formdata.keys()):
+                    if f'watch-conduits-{conduit}-' in key:
+                        formdata.pop(key)
+        if conduits:
+            formdata['watch-conduits'] = [json.dumps(conduits)]
 
         data = {}
         for k, v in formdata.items():
             try:
-                mapping = model.formdata_mapping.get(k)
+                mapping = cls.formdata_mapping.get(k)
                 data[mapping[0].name] = mapping[1](v[0])
             except:
                 LOGGER.error(f'formdata key: {k}')
                 LOGGER.error(traceback.format_exc())
-                continue
-
+        PLUGIN.logger.debug(data)
         model.update(data)
         model.save()
         return model

@@ -2,7 +2,228 @@
 {% block content %}
 
 {{ macros.m_modal_start('add-modal', '감시 추가', 'modal-lg') }}
-<form id='setting'></form>
+<form id="setting">
+    <div class="form-group row mx-2">
+        <div class="col pl-0">
+            <label for="watch-observer"><strong>감시자</strong></label>
+            <select id="watch-observer" name="watch-observer" class="form-control form-control-sm">
+                <option value="auto" selected="selected">Auto</option>
+                <option value="polling">Polling</option>
+            </select>
+            <small class="form-text text-muted">
+                Auto: 자동으로 선택<br/>Polling: 주기적으로 디렉토리 스캔
+            </small>
+        </div>
+        <div class="col pr-0">
+            <label for="watch-timeout"><strong>타임아웃 / Polling 간격</strong></label>
+            <input id="watch-timeout" name="watch-timeout" class="form-control form-control-sm" type="number" value="60" required>
+            <small class="form-text text-muted">
+                이벤트 감지 및 polling을 시도하는 간격<br>단위: 초
+            </small>
+        </div>
+    </div>
+    <div class="form-group row mx-2">
+        <div class="col-3 pl-0 pt-4">
+            <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="watch-ignore-directory" name="watch-ignore-directory">
+                <label class="custom-control-label" for="watch-ignore-directory"><strong>디렉토리 제외</strong></label>
+            </div>
+            <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="watch-case-sensitive" name="watch-case-sensitive">
+                <label class="custom-control-label" for="watch-case-sensitive"><strong>대소문자 구분</strong></label>
+            </div>
+            <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="watch-recursive" name="watch-recursive">
+                <label class="custom-control-label" for="watch-recursive"><strong>Recursive</strong></label>
+            </div>
+            <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="watch-enable" name="watch-enable">
+                <label class="custom-control-label" for="watch-enable"><strong>활성화</strong></label>
+            </div>
+        </div>
+        <div class="col pr-0">
+            <label for="watch-paths"><strong>감시 경로(필수)</strong></label>
+            <textarea id="watch-paths" name="watch-paths" class="form-control form-control-sm" rows="3" placeholder="/path/to/be/observed..." required></textarea>
+            <small class="form-text text-muted">
+                줄바꿈으로 구분
+            </small>
+        </div>
+
+    </div>
+    <div class="form-group row mx-2">
+        <div class="col pl-0">
+            <label for="watch-events"><strong>파일 이벤트</strong></label>
+            <div id="watch-events" class="custom-control">
+                <div class="custom-control custom-switch custom-control-inline">
+                    <input type="checkbox" class="custom-control-input" id="watch-events-created" name="watch-events-created">
+                    <label class="custom-control-label" for="watch-events-created">생성</label>
+                </div>
+                <div class="custom-control custom-switch custom-control-inline">
+                    <input type="checkbox" class="custom-control-input" id="watch-events-deleted" name="watch-events-deleted">
+                    <label class="custom-control-label" for="watch-events-deleted">삭제</label>
+                </div>
+                <div class="custom-control custom-switch custom-control-inline">
+                    <input type="checkbox" class="custom-control-input" id="watch-events-moved" name="watch-events-moved">
+                    <label class="custom-control-label" for="watch-events-moved">이동</label>
+                </div>
+                <div class="custom-control custom-switch custom-control-inline">
+                    <input type="checkbox" class="custom-control-input" id="watch-events-modified" name="watch-events-modified">
+                    <label class="custom-control-label" for="watch-events-modified">수정</label>
+                </div>
+                <div class="custom-control custom-switch custom-control-inline">
+                    <input type="checkbox" class="custom-control-input" id="watch-events-opened" name="watch-events-opened">
+                    <label class="custom-control-label" for="watch-events-opened">열림</label>
+                </div>
+                <div class="custom-control custom-switch custom-control-inline">
+                    <input type="checkbox" class="custom-control-input" id="watch-events-closed" name="watch-events-closed">
+                    <label class="custom-control-label" for="watch-events-closed">닫힘</label>
+                </div>
+            </div>
+            <small class="form-text text-muted">
+                처리할 파일 이벤트<br>중복 선택
+            </small>
+        </div>
+        <div class="col pr-0">
+            <label for="watch-events-interval"><strong>파일 이벤트 처리 간격</strong></label>
+            <input id="watch-events-interval" name="watch-events-interval" class="form-control form-control-sm" type="number" value="2" required>
+            <small class="form-text text-muted">
+                여러 파일 이벤트를 동시에 처리할 경우 처리 간격<br>단위: 초
+            </small>
+        </div>
+    </div>
+    <div class="form-group row mx-2">
+        <div class="col pl-0">
+            <label for="watch-patterns"><strong>일치 패턴</strong></label>
+            <textarea id="watch-patterns" name="watch-patterns" class="form-control form-control-sm" rows="3" placeholder="*/path/*.mp4"></textarea>
+            <small class="form-text text-muted">
+                패턴과 일치하는 경로만 포함<br>줄바꿈으로 구분<br><a href="https://docs.python.org/ko/3/library/pathlib.html#pathlib.PurePath.match" target="_blank" rel="noopener noreferrer">pathlib.PurePath.match</a>
+            </small>
+        </div>
+        <div class="col pr-0">
+            <label for="watch-ignore-patterns"><strong>제외 패턴</strong></label>
+            <textarea id="watch-ignore-patterns" name="watch-ignore-patterns" class="form-control form-control-sm" rows="3" placeholder="*.json"></textarea>
+            <small class="form-text text-muted">
+                패턴과 일치하는 경로 제외<br>줄바꿈으로 구분<br><a href="https://docs.python.org/ko/3/library/pathlib.html#pathlib.PurePath.match" target="_blank" rel="noopener noreferrer">pathlib.PurePath.match</a>
+            </small>
+        </div>
+    </div>
+    <div class="form-group row mx-2">
+        <label for="watch-mappings"><strong>기본 경로 규칙</strong></label>
+        <textarea id="watch-mappings" name="watch-mappings" class="form-control form-control-sm" rows="3" placeholder="/mnt/gds-metadata/GDRIVE:/mnt/gds/GDRIVE"></textarea>
+        <small class="form-text text-muted">
+            기본 경로 변경 규칙<br>경로 규칙이 없는 작업은 기본 경로 규칙을 사용<br>줄바꿈으로 구분
+        </small>
+    </div>
+    <h5 class="row pl-3">작업</h5>
+    <hr/>
+    <div class="form-group row mx-2">
+        <div class="col pl-0">
+            <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="watch-conduits-shell" name="watch-conduits-shell">
+                <label class="custom-control-label" for="watch-conduits-shell"><strong>Shell command</strong></label>
+            </div>
+            <div class="form-group row pl-5 pr-3">
+                <label for="watch-conduits-shell-priority" class="px-0">우선 순위</label>
+                <input id="watch-conduits-shell-priority" name="watch-conduits-shell-priority" class="form-control form-control-sm" type="number" value="30" required>
+                <small class="form-text text-muted">
+                    우선 순위의 숫자가 높을 수록 먼저 실행
+                </small>
+            </div>
+            <div class="form-group row pl-5 pr-3">
+                <label for="watch-conduits-shell-mappings" class="px-0">경로 규칙</label>
+                <textarea id="watch-conduits-shell-mappings" name="watch-conduits-shell-mappings" class="form-control form-control-sm" rows="3" placeholder="/mnt/gds-metadata/GDRIVE:/mnt/gds/GDRIVE"></textarea>
+                <small class="form-text text-muted">
+                    경로 변경 규칙<br>줄바꿈으로 구분
+                </small>
+            </div>
+            <div class="form-group row pl-5 pr-3">
+                <label for="watch-conduits-shell-command" class="px-0">명령어</label>
+                <input id="watch-conduits-shell-command" name="watch-conduits-shell-command" class="form-control form-control-sm" placeholder="/data/commands/script.sh">
+                <small class="form-text text-muted">
+                    쉘에서 실행할 명령어
+                </small>
+            </div>
+        </div>
+        <div class="col pr-0">
+            <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="watch-conduits-rclone" name="watch-conduits-rclone">
+                <label class="custom-control-label" for="watch-conduits-rclone"><strong>Rclone RC vfs/refresh</strong></label>
+            </div>
+            <div class="form-group row pl-5 pr-3">
+                <label for="watch-conduits-rclone-priority" class="px-0">우선순위</label>
+                <input id="watch-conduits-rclone-priority" name="watch-conduits-rclone-priority" class="form-control form-control-sm" type="number" value="50" required>
+                <small class="form-text text-muted">
+                    우선 순위의 숫자가 높을 수록 먼저 실행
+                </small>
+            </div>
+            <div class="form-group row pl-5 pr-3">
+                <label for="watch-conduits-rclone-mappings" class="px-0">경로 규칙</label>
+                <textarea id="watch-conduits-rclone-mappings" name="watch-conduits-rclone-mappings" class="form-control form-control-sm" rows="3" placeholder="/mnt/gds-metadata/GDRIVE:/ROOT/GDRIVE/VIDEO"></textarea>
+                <small class="form-text text-muted">
+                    경로 변경 규칙<br>줄바꿈으로 구분
+                </small>
+            </div>
+            <div class="form-group row pl-5 pr-3">
+                <label for="watch-conduits-rclone-vfs" class="px-0">리모트</label>
+                <select id="watch-conduits-rclone-vfs" name="watch-conduits-rclone-vfs" class="form-control form-control-sm">
+                    {% for vfs in args.setting_rclone_remote_vfses.split('|') %}
+                        {% if vfs == args.setting_rclone_remote_vfs %}
+                    <option value="{{ vfs }}" selected>{{ vfs }}</option>
+                        {% else %}
+                    <option value="{{ vfs }}">{{ vfs }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+                <small class="form-text text-muted">
+                    요청을 보낼 리모트
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group row mx-2">
+        <div class="col pl-0">
+            <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="watch-conduits-plex_mate" name="watch-conduits-plex_mate">
+                <label class="custom-control-label" for="watch-conduits-plex_mate"><strong>plex_mate Scan</strong></label>
+            </div>
+            <div class="form-group row pl-5 pr-3">
+                <label for="watch-conduits-plex_mate-priority" class="px-0">우선 순위</label>
+                <input id="watch-conduits-plex_mate-priority" name="watch-conduits-plex_mate-priority" class="form-control form-control-sm" type="number" value="40" required>
+                <small class="form-text text-muted">
+                    우선 순위의 숫자가 높을 수록 먼저 실행
+                </small>
+            </div>
+            <div class="form-group row pl-5 pr-3">
+                <label for="watch-conduits-plex_mate-mappings" class="px-0">경로 규칙</label>
+                <textarea id="watch-conduits-plex_mate-mappings" name="watch-conduits-plex_mate-mappings" class="form-control form-control-sm" rows="3" placeholder="/mnt/gds-metadata/GDRIVE:/mnt/gds/GDRIVE"></textarea>
+                <small class="form-text text-muted">
+                    경로 변경 규칙<br>줄바꿈으로 구분
+                </small>
+            </div>
+        </div>
+        <div class="col pr-0">
+            <div class="custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="watch-conduits-plex" name="watch-conduits-plex">
+                <label class="custom-control-label" for="watch-conduits-plex"><strong>Plex Web API Scan</strong></label>
+            </div>
+            <div class="form-group row pl-5 pr-3">
+                <label for="watch-conduits-plex-priority" class="px-0 text-right">우선 순위</label>
+                <input id="watch-conduits-plex-priority" name="watch-conduits-plex-priority" class="form-control form-control-sm" type="number" value="40" required>
+                <small class="form-text text-muted">
+                    우선 순위의 숫자가 높을 수록 먼저 실행
+                </small>
+            </div>
+            <div class="form-group row pl-5 pr-3">
+                <label for="watch-conduits-plex-mappings" class="px-0">경로 규칙</label>
+                <textarea id="watch-conduits-plex-mappings" name="watch-conduits-plex-mappings" class="form-control form-control-sm" rows="3" placeholder="/mnt/gds-metadata/GDRIVE:/mnt/gds/GDRIVE"></textarea>
+                <small class="form-text text-muted">
+                    경로 변경 규칙<br>줄바꿈으로 구분
+                </small>
+            </div>
+        </div>
+    </div>
+</form>
 {{ macros.m_modal_end_with_button(
     [
       ['save-btn', '감시 저장'],
@@ -37,13 +258,21 @@
 
 <script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
+    // assign variables
+    const STATUSES = JSON.parse('{{ args.statuses|tojson }}');
+    const STATUS_KEYS = JSON.parse('{{ args.status_keys|tojson }}');
+    const LAST_LIST_OPTIONS = "{{ args[module_name ~ '_last_list_option'] }}".split('|');
+    const VFS = '{{ args.setting_rclone_remote_vfs }}';
+    const VFSES = [];
+    const _VFSES = JSON.parse('{{ args.setting_rclone_remote_vfses.split('|')|tojson }}');
+    for (let idx in _VFSES) {
+        VFSES.push({value: _VFSES[idx], name: _VFSES[idx]});
+    }
     $(function() {
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_watcher.js') }}")
     });
 </script>
 
-
 {{ args }}
-
 {% endblock %}

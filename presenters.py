@@ -1005,6 +1005,11 @@ class Watcher(BaseModule):
 
     def reload_watch(self, model: ModelBase) -> None:
         LOGGER.debug(f'reload_watch(): {model.id}')
+        if model.enable:
+            self.run_async(self.register_observer, (self.watch_aider, model))
+            #self.watch_aider.register(model.as_dict())
+        else:
+            self.watch_aider.unregister_by_name(f'observer-{model.id}')
 
     def update_model(self, model_id: int, query: dict[str, list]) -> ModelBase:
         old_model = self.web_list_model.get_model(model_id)
@@ -1018,10 +1023,15 @@ class Watcher(BaseModule):
         args = super().get_template_args()
         for k in self.db_default.keys():
             args[k] = CONFIG.get(k)
+        args['setting_rclone_remote_vfses'] = CONFIG.get('setting_rclone_remote_vfses')
+        args[SETTING_RCLONE_REMOTE_VFS] = CONFIG.get(SETTING_RCLONE_REMOTE_VFS)
+        args['status_keys'] = STATUS_KEYS
+        args['statuses'] = STATUSES
         return args
 
     def plugin_load(self) -> None:
         super().plugin_load()
+        return
         models = self.web_list_model.get_list()
         for model in models:
             if model.enable:
@@ -1032,7 +1042,7 @@ class Watcher(BaseModule):
     def plugin_unload(self) -> None:
         '''override'''
         super().plugin_unload()
-        for observer in self.watch_aider.observers:
+        for observer in self.watch_aider.observers.values():
             prefix, _id = observer.name.split('-')
             model = self.web_list_model.get_by_id(int(_id))
             model.status = STATUS_KEYS[3]
@@ -1040,3 +1050,7 @@ class Watcher(BaseModule):
             self.watch_aider.unregister(observer)
             model.status = STATUS_KEYS[0]
             model.save()
+
+    @FRAMEWORK.celery.task(bind=True)
+    def register_observer(self, aider: WatchAider, model: ModelBase) -> dict:
+        aider.register(model.as_dict())

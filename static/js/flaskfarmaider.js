@@ -103,7 +103,8 @@ function build_form_footer(desc) {
 
 function build_form_select(id, title, options, col, desc) {
     let element = build_form_header(title, col);
-    element += '<select id="' + id + '" name="' + id + '" class="form-control form-control-sm">';
+    element += '<select id="' + id + '" name="' + id + '" class="custom-select">';
+    element += '<option selected>Choose...</option>';
     if (options.length > 0) {
         for (let idx in options) {
             element += '<option value="' + options[idx].value + '">' + options[idx].name + '</option>';
@@ -201,11 +202,11 @@ function build_form_textarea(id, title, value, col, row, desc) {
     return element;
 }
 
-function get_form_data(form_id) {
-    let toggle_boxes = $(form_id + ' input[type=checkbox][data-toggle=toggle]');
-    toggle_boxes.each(function(idx, item) {
-        ($(item).prop('checked')) ? $(item).prop('value', 'True') : $(item).prop('value', 'False');
-    });
-    let form_data = $(form_id).serialize();
-    return form_data;
+function join_by(item_list, delimiter = '\r\n') {
+    let _list = JSON.parse(item_list);
+    if (_list !== null) {
+        return _list.join(delimiter);
+    } else {
+        return '';
+    }
 }

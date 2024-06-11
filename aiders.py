@@ -12,6 +12,7 @@ import time
 import locale
 import logging
 import sys
+import json
 from typing import Iterable, Optional, TYPE_CHECKING
 
 import yaml
@@ -26,6 +27,7 @@ from watchdog.observers.api import BaseObserver, ObservedWatch, BaseObserverSubc
 from .setup import PluginModuleBase, ModelBase, system_plugin
 from .setup import FRAMEWORK, LOGGER, CONFIG
 from .constants import *
+from .watcher.tricks import SimpleTrick
 
 DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml')
 
@@ -37,7 +39,7 @@ class Aider:
 
     @staticmethod
     def get_readable_time(_time: float) -> str:
-        return datetime.datetime.fromtimestamp(_time, datetime.timezone.utc).strftime('%b %d %H:%M')
+        return datetime.datetime.fromtimestamp(_time).strftime('%b %d %H:%M')
 
     @staticmethod
     def parse_mappings(text: str) -> dict[str, str]:
@@ -933,17 +935,17 @@ class WatchAider(Aider):
 
     def __init__(self) -> None:
         super().__init__()
-        self._observers = []
+        self._observers = {}
 
     @property
     def observers(self):
         return self._observers
 
-    def get_observer(force_observer: Optional[str] = None) -> BaseObserverSubclassCallable:
+    def get_observer(self, force_observer: Optional[str] = None) -> BaseObserverSubclassCallable:
         Observer: BaseObserverSubclassCallable
         match force_observer:
             case 'polling':
-                from watchers.observers import SimplePollingObserver as Observer
+                from .watcher.observers import SimplePollingObserver as Observer
             case 'kqueue':
                 from watchdog.observers.kqueue import KqueueObserver as Observer
             case 'inotify':
@@ -958,46 +960,34 @@ class WatchAider(Aider):
                     from watchdog.observers import Observer
         return Observer
 
-    def _register_observer(self, path: str, patterns: Optional[Iterable] = None, ignore_patterns: Optional[Iterable] = None,
-                       ignore_directories: bool = False, case_sensitive: bool = False, polling_interval: int = 60, recurisve: bool = False) -> None:
-        handler = DefaultEventHandler(patterns, ignore_patterns, ignore_directories, case_sensitive)
-        observer = PollingObserverVFS(os.stat, os.scandir, polling_interval)
-        watch: ObservedWatch = observer.schedule(handler, path, recursive=recurisve)
-        self.observers.append(observer)
-
     def register(self, profile: dict) -> BaseObserver:
-        observer_cls = self.OBSERVER_CLASSES.get(profile.get('observer'), self.OBSERVER_CLASSES['inotify'])
-        #if profile['observer'] == 'polling':
-        #    observer = observer_cls(os.stat, os.scandir, profile.get('timeout') or 1)
-        #else:
-        #    observer = observer_cls(profile.get('timeout') or 1)
+        observer_cls = self.get_observer(profile.get('observer'))
+        observer = observer_cls(profile.get('timeout'))
+        observer.name = f"observer-{profile.get('id')}"
 
-        observer = observer_cls(profile.get('timeout') or 1)
+        paths = json.loads(profile.get('paths'))
+        recursive = profile.get('recursive')
+        handler = SimpleTrick(profile.get('patterns'), profile.get('ignore_patterns'), profile.get('ignore_directory'), profile.get('case_sensitive'))
 
-        handler = DefaultEventHandler(profile.get('patterns'), profile.get('ignore_patterns'), profile.get('ignore_directories') or False, profile.get('case_sensitive') or True)
-        observer.schedule(handler, profile.get('path'), recursive=profile.get('recursive') or True)
-        observer.daemon = False
-        observer.name = f"watch-{profile.get('id')}"
+        for path in paths:
+            observer.schedule(handler, path, recursive)
+            LOGGER.debug(f'Watching: {path!r}')
         LOGGER.info(f'{observer.name=}')
         observer.start()
-        LOGGER.info(f'join {observer=}')
-        observer.join(1)
-        LOGGER.info(f'{observer=}')
-        LOGGER.warning(f'{observer.name} is started...')
-        self.observers.append(observer)
+        self.observers[observer.name] = observer
         return observer.ident
 
     def unregister(self, observer: BaseObserver) -> None:
-        LOGGER.info(f'stopping: {observer.name}')
-        observer.stop()
-        observer.join()
-        self.observers.remove(observer)
+        if observer:
+            LOGGER.info(f'stopping: {observer.name}')
+            observer.unschedule_all()
+            observer.stop()
+            observer.join()
+            self.observers.pop(observer.name, None)
 
-    def unregister_by_ident(self, ident: int) -> None:
-        for observer in list(self.observers):
-            if observer.ident == ident:
-                self.unregister(observer)
+    def unregister_by_name(self, name: str) -> None:
+        self.unregister(self.observers.get(name))
 
     def unregister_all(self) -> None:
-        for observer in list(self.observers):
+        for observer in dict(self.observers).values():
             self.unregister(observer)

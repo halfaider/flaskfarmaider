@@ -43,11 +43,11 @@ $('#add-btn').on('click', function(e) {
 // 저장 버튼
 $('#save-btn').on('click', function() {
     let ids = $(this).data('id');
-    //let formdata = getFormdata('#setting');
-    let formdata = get_form_data('#setting');
+    let formdata = getFormdata('#setting');
     for (let i in ids) {
         formdata += '&id=' + ids[i];
     }
+    console.log(formdata);
     globalSendCommand('save', formdata, null, null, function(result) {
         if (result.ret == 'success') {
             $('#add-modal').modal('hide');
