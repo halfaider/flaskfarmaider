@@ -28,6 +28,7 @@ from .setup import PluginModuleBase, ModelBase, system_plugin
 from .setup import FRAMEWORK, LOGGER, CONFIG
 from .constants import *
 from .watcher.tricks import SimpleTrick
+from .watcher.conduits import DummyConduit
 
 DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml')
 
@@ -965,9 +966,24 @@ class WatchAider(Aider):
         observer = observer_cls(profile.get('timeout'))
         observer.name = f"observer-{profile.get('id')}"
 
+        conduits = [
+            {
+                'name': 'dummy',
+                'events': {'created', 'deleted', 'moved', 'modified', 'opened', 'closed'},
+                'priority': 0,
+                'class': 'flaskfarmaider.watcher.conduits.DummyConduit',
+            }
+        ]
         paths = json.loads(profile.get('paths'))
         recursive = profile.get('recursive')
-        handler = SimpleTrick(profile.get('patterns'), profile.get('ignore_patterns'), profile.get('ignore_directory'), profile.get('case_sensitive'))
+        handler = SimpleTrick(
+            profile.get('patterns'),
+            profile.get('ignore_patterns'),
+            profile.get('ignore_directory'),
+            profile.get('case_sensitive'),
+            conduits,
+            profile.get('events_interval')
+        )
 
         for path in paths:
             observer.schedule(handler, path, recursive)

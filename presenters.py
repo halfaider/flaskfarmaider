@@ -102,9 +102,11 @@ class Base:
             result = func.apply_async(args=args, kwargs=kwargs, link=self.celery_link.s(), **opts)
             # 결과는 serve 중인 메인 스레드에 출력해야 하므로
             Thread(target=result.get, kwargs={'on_message': self.callback_sio, 'propagate': False}, daemon=True).start()
+            LOGGER.debug(f'run by celery')
         else:
             th = ThreadHasReturn(target=func, args=args, kwargs=kwargs, daemon=True, callback=self.callback_sio)
             th.start()
+            LOGGER.debug(f'run by Thread')
 
     @FRAMEWORK.celery.task
     def celery_link(result) -> None:
@@ -1011,6 +1013,12 @@ class Watcher(BaseModule):
         else:
             self.watch_aider.unregister_by_name(f'observer-{model.id}')
 
+    @FRAMEWORK.celery.task(bind=True)
+    def register_observer(self, aider: WatchAider, model: ModelBase) -> None:
+        aider.register(model.as_dict())
+        model.status = STATUS_KEYS[1]
+        model.save()
+
     def update_model(self, model_id: int, query: dict[str, list]) -> ModelBase:
         old_model = self.web_list_model.get_model(model_id)
         model = self.web_list_model.update_formdata(model_id, query)
@@ -1051,6 +1059,3 @@ class Watcher(BaseModule):
             model.status = STATUS_KEYS[0]
             model.save()
 
-    @FRAMEWORK.celery.task(bind=True)
-    def register_observer(self, aider: WatchAider, model: ModelBase) -> dict:
-        aider.register(model.as_dict())
