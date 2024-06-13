@@ -8,6 +8,7 @@ import functools
 import logging
 
 import flask
+from watchdog.observers.api import BaseObserver
 
 from .setup import PluginBase, PluginModuleBase, PluginPageBase, default_route_socketio_module, default_route_socketio_page, ModelBase, FrameworkJob
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
@@ -91,20 +92,24 @@ class Base:
             result, msg = False, '경로 정보가 없습니다.'
         return result, msg
 
-    def run_async(self, func: callable, args: tuple = (), kwargs: dict = {}, **opts) -> None:
-        if celery_is_active():
+    def run_async(self, func: callable, args: tuple = (), kwargs: dict = {}, force_celery: bool = False, **opts) -> None:
+        if force_celery or celery_is_active():
             result = func.apply_async(args=args, kwargs=kwargs, link=self.celery_link.s(), **opts)
             # 결과는 serve 중인 메인 스레드에 출력해야 하므로
-            Thread(target=result.get, kwargs={'on_message': self.callback_sio, 'propagate': False}, daemon=True).start()
-            LOGGER.debug(f'Run by celery')
+            thread = Thread(target=result.get, kwargs={'on_message': self.callback_sio, 'propagate': False})
+            thread.start()
+            thread.name = f'{func.__name__}-{thread.ident}'
+            LOGGER.debug(f'Run by celery: {func.__name__}()')
         else:
             th = ThreadHasReturn(target=func, args=args, kwargs=kwargs, daemon=True, callback=self.callback_sio)
             th.start()
-            LOGGER.debug(f'Run by Thread')
+            th.name = f'{func.__name__}-{th.ident}'
+            LOGGER.debug(f'Run by Thread: {func.__name__}()')
 
     @FRAMEWORK.celery.task
     def celery_link(result) -> None:
-        pass
+        LOGGER.debug(result.get('status'))
+        LOGGER.debug(result.get('result'))
 
     @FRAMEWORK.celery.task(bind=True)
     def start_job(self, job: ModelBase) -> dict:
@@ -129,6 +134,8 @@ class Base:
             return job
 
     def callback_sio(self, data: dict) -> None:
+        LOGGER.debug(data.get('status'))
+        LOGGER.debug(data.get('result'))
         self.socketio_callback('result', {'status': data.get('status'), 'data': data.get('result')})
 
     def process_command(self, command: str, arg1: str, arg2: str, arg3: str, request: flask.Request) -> flask.Response:
@@ -1002,16 +1009,48 @@ class Watcher(BaseModule):
     def reload_watch(self, model: ModelBase) -> None:
         LOGGER.debug(f'reload_watch(): {model.id}')
         if model.enable:
-            self.run_async(self.register_observer, (self.watch_aider, model))
-            #self.watch_aider.register(model.as_dict())
+            LOGGER.warning(WatchAider.observers)
+            LOGGER.warning(id(WatchAider.observers))
+            #self.run_async(self.run_on_celery, (observer, model), force_celery=True)
+            #ThreadHasReturn(target=self.run_on_celery, args=(observer, model), callback=self.callback_sio).start()
+            self.run_async(self.run_on_celery, (model,), force_celery=True)
+            LOGGER.warning(WatchAider.observers)
+            LOGGER.warning(id(WatchAider.observers))
         else:
-            self.watch_aider.unregister_by_name(f'observer-{model.id}')
+            LOGGER.warning(WatchAider.observers)
+            LOGGER.warning(id(WatchAider.observers))
+            WatchAider.unregister_by_name(f'observer-{model.id}')
+            model.status = STATUS_KEYS[0]
+            model.save()
+            LOGGER.warning(WatchAider.observers)
+            LOGGER.warning(id(WatchAider.observers))
 
     @FRAMEWORK.celery.task(bind=True)
-    def register_observer(self, aider: WatchAider, model: ModelBase) -> None:
-        aider.register(model.as_dict())
-        model.status = STATUS_KEYS[1]
-        model.save()
+    def run_on_celery(task, model: ModelBase) -> None:
+        '''
+        self.watch_aider 객체가 task에 전달될 때 매번 다른 객체로 인식됨(이전 task의 객체와도 다름)
+        객체에 정보를 저장할 수 없음
+        observer 객체를 미리 받아서 start를 여기서 하는 걸로
+
+        observer 객체를 serialize 할 수 없음
+        결국 쓰레드로 실행하면?
+        쓰레드로 실행하면 메인 쓰레드 블럭킹
+
+        '''
+        WatchAider.observers[model.id] = model
+        LOGGER.warning(WatchAider.observers)
+        LOGGER.warning(id(WatchAider.observers))
+        observer = WatchAider.register(model.as_dict())
+        observer.start()
+        if observer.ident:
+            model.status = STATUS_KEYS[1]
+            model.save()
+            msg = f'{observer.name}을 시작했습니다.'
+        else:
+            msg = f'{observer.name}을 시작할 수 없었어요.'
+        LOGGER.warning(WatchAider.observers)
+        LOGGER.warning(id(WatchAider.observers))
+        return {'msg': msg}
 
     def update_model(self, model_id: int, query: dict[str, list]) -> ModelBase:
         old_model = self.web_list_model.get_model(model_id)

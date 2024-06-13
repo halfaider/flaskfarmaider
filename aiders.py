@@ -24,11 +24,14 @@ from watchdog.observers.polling import PollingObserverVFS, PollingObserver
 from watchdog.events import PatternMatchingEventHandler, FileSystemEvent
 from watchdog.observers.api import BaseObserver, ObservedWatch, BaseObserverSubclassCallable
 
+from support import SupportSubprocess
+
 from .setup import PluginModuleBase, ModelBase, system_plugin
 from .setup import FRAMEWORK, LOGGER, CONFIG
 from .constants import *
 from .watcher.tricks import SimpleTrick
 from .watcher.conduits import DummyConduit
+
 
 DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml')
 
@@ -934,15 +937,13 @@ class WindowsAider(StartupAider):
 
 class WatchAider(Aider):
 
+    observers = {}
+
     def __init__(self) -> None:
         super().__init__()
-        self._observers = {}
 
-    @property
-    def observers(self):
-        return self._observers
-
-    def get_observer(self, force_observer: Optional[str] = None) -> BaseObserverSubclassCallable:
+    @classmethod
+    def get_observer(cls, force_observer: Optional[str] = None) -> BaseObserverSubclassCallable:
         Observer: BaseObserverSubclassCallable
         match force_observer:
             case 'polling':
@@ -961,11 +962,12 @@ class WatchAider(Aider):
                     from watchdog.observers import Observer
         return Observer
 
-    def register(self, profile: dict) -> BaseObserver:
-        observer_cls = self.get_observer(profile.get('observer'))
+    @classmethod
+    def register(cls, profile: dict) -> BaseObserver:
+        LOGGER.warning(f'{cls.observers=}')
+        observer_cls = cls.get_observer(profile.get('observer'))
         observer = observer_cls(profile.get('timeout'))
         observer.name = f"observer-{profile.get('id')}"
-
         conduits = [
             {
                 'name': 'dummy',
@@ -984,26 +986,31 @@ class WatchAider(Aider):
             conduits,
             profile.get('events_interval')
         )
-
         for path in paths:
             observer.schedule(handler, path, recursive)
             LOGGER.debug(f'Watching: {path!r}')
-        LOGGER.info(f'{observer.name=}')
-        observer.start()
-        self.observers[observer.name] = observer
-        return observer.ident
+        LOGGER.warning(f'{cls.observers=}')
+        cls.observers[observer.name] = observer
+        LOGGER.warning(f'{cls.observers=}')
+        return observer
 
+    @classmethod
     def unregister(self, observer: BaseObserver) -> None:
         if observer:
             LOGGER.info(f'stopping: {observer.name}')
             observer.unschedule_all()
             observer.stop()
-            observer.join()
-            self.observers.pop(observer.name, None)
+            if observer.ident:
+                observer.join()
 
-    def unregister_by_name(self, name: str) -> None:
-        self.unregister(self.observers.get(name))
+    @classmethod
+    def unregister_by_name(cls, name: str) -> None:
+        LOGGER.warning(f'{cls.observers=}')
+        observer = cls.observers.get(name)
+        cls.unregister(observer)
 
-    def unregister_all(self) -> None:
-        for observer in dict(self.observers).values():
-            self.unregister(observer)
+    @classmethod
+    def unregister_all(cls) -> None:
+        for observer in dict(cls.observers).values():
+            cls.unregister(observer)
+            cls.observers.pop(observer.name, None)
