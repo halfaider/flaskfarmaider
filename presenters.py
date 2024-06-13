@@ -16,18 +16,12 @@ from .aiders import BrowserAider, SettingAider, JobAider, PlexmateAider, GDSTool
 from .migrations import migrate_schedule, migrate_setting
 from .constants import *
 
-CELERY_INSPECT = FRAMEWORK.celery.control.inspect()
-CELERY_ACTIVE = False
 
-
-def check_celery() -> None:
-    global CELERY_ACTIVE
-    while True:
-        CELERY_ACTIVE = True if CELERY_INSPECT.active() else False
-        time.sleep(5)
-
-
-Thread(target=check_celery, daemon=True).start()
+def celery_is_active() -> bool:
+    try:
+        return True if FRAMEWORK.celery.control.inspect().stats() else False
+    except:
+        return False
 
 
 class ThreadHasReturn(Thread):
@@ -98,15 +92,15 @@ class Base:
         return result, msg
 
     def run_async(self, func: callable, args: tuple = (), kwargs: dict = {}, **opts) -> None:
-        if CELERY_ACTIVE:
+        if celery_is_active():
             result = func.apply_async(args=args, kwargs=kwargs, link=self.celery_link.s(), **opts)
             # 결과는 serve 중인 메인 스레드에 출력해야 하므로
             Thread(target=result.get, kwargs={'on_message': self.callback_sio, 'propagate': False}, daemon=True).start()
-            LOGGER.debug(f'run by celery')
+            LOGGER.debug(f'Run by celery')
         else:
             th = ThreadHasReturn(target=func, args=args, kwargs=kwargs, daemon=True, callback=self.callback_sio)
             th.start()
-            LOGGER.debug(f'run by Thread')
+            LOGGER.debug(f'Run by Thread')
 
     @FRAMEWORK.celery.task
     def celery_link(result) -> None:
