@@ -96,18 +96,18 @@ class Base:
             result = func.apply_async(args=args, kwargs=kwargs, link=self.celery_link.s(), **opts)
             # 결과는 serve 중인 메인 스레드에 출력해야 하므로
             Thread(target=result.get, kwargs={'on_message': self.callback_sio, 'propagate': False}, daemon=True).start()
-            LOGGER.debug(f'Run by celery')
+            LOGGER.debug(f'Run by celery: {func.__name__}()')
         else:
             th = ThreadHasReturn(target=func, args=args, kwargs=kwargs, daemon=True, callback=self.callback_sio)
             th.start()
-            LOGGER.debug(f'Run by Thread')
+            LOGGER.debug(f'Run by Thread: {func.__name__}()')
 
     @FRAMEWORK.celery.task
     def celery_link(result) -> None:
         pass
 
     @FRAMEWORK.celery.task(bind=True)
-    def start_job(self, job: ModelBase) -> dict:
+    def start_job(task, job: ModelBase) -> dict:
         try:
             if job.id and job.id > 0:
                 job.set_status(STATUS_KEYS[1])
