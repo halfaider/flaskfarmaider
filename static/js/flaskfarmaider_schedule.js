@@ -60,9 +60,9 @@ function list_dir(result) {
         } else {
             link_classes = 'dir-folder';
         }
-        let td_name = '<td class="pl-3 w-75"><span href="#" class="dir-name pr-5' + link_classes +'"><i class="fa fa-2 ' + name_i_classes + '" aria-hidden="true"></i>' + result[index].name + '</span></td>';
-        let td_size = '<td class="text-right">' + result[index].size + '</td>';
-        let td_mtime = '<td class="text-center">' + result[index].mtime + '</td></tr>';
+        let td_name = '<td style="width: 70%" class="pl-3"><span href="#" class="dir-name pr-5' + link_classes +'"><i class="fa fa-2 ' + name_i_classes + '" aria-hidden="true"></i>' + result[index].name + '</span></td>';
+        let td_size = '<td style="width: 10%" class="text-right">' + result[index].size + '</td>';
+        let td_mtime = '<td style="width: 20%" class="text-center">' + result[index].mtime + '</td></tr>';
         let tr_group = '<tr role="button" data-path="' + result[index].path + '" class="dir-btn browser-context-menu btn-neutral dir-index-' + index + ' ' + link_classes + '">' + td_name + td_size + td_mtime + '</tr>';
         if (index == 0) {
             E_BROWSER_PARENT.append(tr_group);
