@@ -39,12 +39,15 @@ class Aider:
         if text:
             settings = text.splitlines()
             for setting in settings:
-                source, target = setting.split(':')
+                source, target = setting.rsplit(':', 1)
                 mappings[source.strip()] = target.strip()
         return mappings
 
     @staticmethod
     def update_path(target: str, mappings: dict) -> str:
+        # 윈도우 경로 변경시
+        if '\\' in target:
+            target = target.replace('\\', '/')
         for k, v in mappings.items():
             target = target.replace(k, v)
         return target
