@@ -1,15 +1,3 @@
-import pathlib
-
-SETTING = 'setting'
-SCHEDULE = 'schedule'
-TOOL = 'tool'
-TOOL_TRASH = 'trash'
-MANUAL = 'manual'
-LOG = 'log'
-PKG_PATH = pathlib.Path(__file__).parent
-README = PKG_PATH / 'README.md'
-DEPEND_SOURCE_YAML = PKG_PATH / 'files' / f'{__package__}.yaml'
-
 TASK_KEYS = ('refresh_scan', 'refresh', 'scan', 'pm_ready_refresh', 'clear', 'startup', 'forget')
 TASKS = {
     TASK_KEYS[0]: {'key': TASK_KEYS[0], 'name': '새로고침 후 스캔', 'desc': 'Rclone 리모트 콘트롤 서버에 vfs/refresh 요청 후 플렉스 스캔', 'enable': False},
@@ -90,72 +78,36 @@ PLEX_MEDIA_TYPE_VALUES = {
     42: 'optimizedVersion'
 }
 
-SETTING_DB_VERSION = f'{SETTING}_db_version'
-SETTING_DB_VERSIONS = ['1', '2']
-SETTING_RCLONE_REMOTE_ADDR = f'{SETTING}_rclone_remote_addr'
-SETTING_RCLONE_REMOTE_VFS = f'{SETTING}_rclone_remote_vfs'
-SETTING_RCLONE_REMOTE_VFSES = f'{SETTING}_rclone_remote_vfses'
-SETTING_RCLONE_REMOTE_USER = f'{SETTING}_rclone_remote_user'
-SETTING_RCLONE_REMOTE_PASS = f'{SETTING}_rclone_remote_pass'
-SETTING_RCLONE_MAPPING = f'{SETTING}_rclone_remote_mapping'
-SETTING_PLEXMATE_MAX_SCAN_TIME = f'{SETTING}_plexmate_max_scan_time'
-SETTING_PLEXMATE_TIMEOVER_RANGE = f'{SETTING}_plexmate_timeover_range'
-SETTING_PLEXMATE_PLEX_MAPPING = f'{SETTING}_plexmate_plex_mapping'
-SETTING_STARTUP_EXECUTABLE = f'{SETTING}_startup_executable'
-SETTING_STARTUP_COMMANDS = f'{SETTING}_startup_commands'
-SETTING_STARTUP_TIMEOUT = f'{SETTING}_startup_timeout'
-SETTING_STARTUP_DEPENDENCIES = f'{SETTING}_startup_dependencies'
-
-SETTING_GDS_TOOL_REQUEST_SPAN = f'{SETTING}_gds_tool_request_span'
-SETTING_GDS_TOOL_REQUEST_AUTO = f'{SETTING}_gds_tool_request_auto'
-SETTING_GDS_TOOL_REQUEST_TOTAL = f'{SETTING}_gds_tool_request_total'
-SETTING_GDS_TOOL_FP_SPAN = f'{SETTING}_gds_tool_fp_span'
-SETTING_GDS_TOOL_FP_AUTO = f'{SETTING}_gds_tool_fp_auto'
-SETTING_GDS_TOOL_FP_TOTAL = f'{SETTING}_gds_tool_fp_total'
-SETTING_LOGGING_LOGIN = f'{SETTING}_logging_login'
-SETTING_LOGGING_LOGIN_FILE = f'{SETTING}_logging_login_file'
-SETTING_LOGGING_ACCESS = f'{SETTING}_logging_access'
-SETTING_LOGGING_ACCESS_FILE = f'{SETTING}_logging_access_file'
-SETTING_LOGGING_ACCESS_FORMAT = f'{SETTING}_logging_access_format'
-
-SCHEDULE_WORKING_DIRECTORY = f'{SCHEDULE}_working_directory'
-SCHEDULE_LAST_LIST_OPTION = f'{SCHEDULE}_last_list_option'
-SCHEDULE_DB_VERSION = f'{SCHEDULE}_db_version'
-SCHEDULE_DB_VERSIONS = ['1', '2', '3', '4', '5', '6']
-
-TOOL_TRASH_TASK_STATUS = f'{TOOL}_{TOOL_TRASH}_task_status'
-TOOL_TRASH_LAST_LIST_OPTION = f'{TOOL}_{TOOL_TRASH}_last_list_option'
-
 OPTS = {
     'filepath' : __file__,
     'use_db': True,
     'use_default_setting': True,
-    'home_module': SCHEDULE,
+    'home_module': 'schedule',
     'menu': {
         'uri': __package__,
         'name': __package__.upper(),
         'list': [
             {
-                'uri': SETTING,
+                'uri': 'setting',
                 'name': '설정',
             },
             {
-                'uri': SCHEDULE,
+                'uri': 'schedule',
                 'name': '일정',
             },
             {
-                'uri': TOOL,
+                'uri': 'tool',
                 'name': '도구',
                 'list': [
-                    {'uri': TOOL_TRASH, 'name': 'Plex 휴지통 스캔'},
+                    {'uri': 'trash', 'name': 'Plex 휴지통 스캔'},
                 ]
             },
             {
-                'uri': MANUAL,
+                'uri': 'manual',
                 'name': '도움말',
             },
             {
-                'uri': LOG,
+                'uri': 'log',
                 'name': '로그',
             },
         ]

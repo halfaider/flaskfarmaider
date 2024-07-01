@@ -4,18 +4,15 @@ import traceback
 from flask.wrappers import Request
 from flask_sqlalchemy.query import Query
 from sqlalchemy import desc
-from sqlalchemy.orm.attributes import InstrumentedAttribute
 
-from .setup import ModelBase
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
-from .constants import *
+from .api import BaseModel
+from .constants import TASK_KEYS, STATUS_KEYS, FF_SCHEDULE_KEYS, SCAN_MODE_KEYS, SEARCH_KEYS
 
 
-class Job(ModelBase):
+class Job(BaseModel):
 
-    P = PLUGIN
     __tablename__ = f'{PLUGIN.package_name}_jobs'
-    __bind_key__ = PLUGIN.package_name
 
     id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer, primary_key=True)
     ctime = FRAMEWORK.db.Column(FRAMEWORK.db.DateTime)
@@ -78,51 +75,12 @@ class Job(ModelBase):
         self.clear_section = clear_section
         self.section_id = section_id
 
-    def as_dict(self) -> dict:
-        '''override'''
-        return super().as_dict()
-
-    def save(self) -> None:
-        '''override'''
-        super().save()
-
-    @classmethod
-    def get_paging_info(cls, count: int, current_page: int, page_size: int) -> dict | None:
-        '''override'''
-        return super().get_paging_info(count, current_page, page_size)
-
-    @classmethod
-    def get_by_id(cls, id) -> 'Job':
-        '''override'''
-        return super().get_by_id(id)
-
-    @classmethod
-    def get_list(cls, by_dict: bool = False) -> list | None:
-        '''override'''
-        return super().get_list(by_dict)
-
-    @classmethod
-    def delete_by_id(cls, id: int) -> bool:
-        '''override'''
-        return super().delete_by_id(id)
-
-    @classmethod
-    def delete_all(cls, day: int | str | None = None) -> int:
-        '''override'''
-        return super().delete_all(day)
-
-    @classmethod
-    def make_query_search(cls, query: Query, search: str, field: InstrumentedAttribute) -> Query:
-        '''override'''
-        return super().make_query_search(query, search, field)
-
     def update(self, data: dict[str, str | int | bool]) -> 'Job':
         for k, v in data.items():
             try:
                 setattr(self, k, v)
             except:
                 LOGGER.error(traceback.format_exc())
-                continue
         return self
 
     @classmethod
@@ -202,7 +160,7 @@ class Job(ModelBase):
         opt_option2 = request.form.get('option2', 'all')
         opt_keyword = request.form.get('keyword')
         try:
-            sch_mod = PLUGIN.logic.get_module(SCHEDULE)
+            sch_mod = PLUGIN.logic.get_module('schedule')
             query = cls.make_query(request, opt_order, opt_keyword, opt_option1, opt_option2)
             total = query.count()
             query = query.limit(page_size).offset((opt_page - 1) * page_size)
@@ -213,7 +171,7 @@ class Job(ModelBase):
                 item['is_running'] = FRAMEWORK.scheduler.is_running(sch_id)
                 data['list'].append(item)
             data['paging'] = cls.get_paging_info(total, opt_page, page_size)
-            CONFIG.set(f'{SCHEDULE}_last_list_option', f'{opt_order}|{opt_page}|{page_size}|{opt_keyword or ""}|{opt_option1 or ""}|{opt_option2 or ""}')
+            CONFIG.set('schedule_last_list_option', f'{opt_order}|{opt_page}|{page_size}|{opt_keyword or ""}|{opt_option1 or ""}|{opt_option2 or ""}')
         except:
             LOGGER.error(traceback.format_exc())
         finally:

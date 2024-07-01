@@ -19,52 +19,9 @@ import flask_login
 
 from .setup import PluginModuleBase, ModelBase, system_plugin
 from .setup import FRAMEWORK, LOGGER, CONFIG
-from .constants import *
-
-DEPEND_USER_YAML = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml')
-
-
-class Aider:
-
-    def __init__(self, name: str = None) -> None:
-        self.name = name
-
-    @staticmethod
-    def get_readable_time(_time: float) -> str:
-        return datetime.datetime.fromtimestamp(_time, datetime.timezone.utc).strftime('%b %d %H:%M')
-
-    @staticmethod
-    def parse_mappings(text: str) -> dict[str, str]:
-        mappings = {}
-        if text:
-            settings = text.splitlines()
-            for setting in settings:
-                source, target = setting.split(':')
-                mappings[source.strip()] = target.strip()
-        return mappings
-
-    @staticmethod
-    def update_path(target: str, mappings: dict) -> str:
-        for k, v in mappings.items():
-            target = target.replace(k, v)
-        return target
-
-    @staticmethod
-    def request(method: str = 'POST', url: str = None, data: dict = None, timeout: int | tuple = None, **kwds: dict) -> requests.Response:
-        _timeout = CONFIG.get_int(SETTING_STARTUP_TIMEOUT)
-        timeout = _timeout if _timeout > 0 else timeout
-        try:
-            if method.upper() == 'JSON':
-                return requests.request('POST', url, json=data or {}, timeout=timeout, **kwds)
-            else:
-                return requests.request(method, url, data=data, timeout=timeout, **kwds)
-        except:
-            tb = traceback.format_exc()
-            LOGGER.error(tb)
-            response = requests.Response()
-            response._content = bytes(tb, 'utf-8')
-            response.status_code = 0
-            return response
+from .api import Aider
+from .constants import TASK_KEYS, TOOL_TRASH_KEYS, STATUS_KEYS, SCAN_MODE_KEYS, SECTION_TYPE_KEYS
+from .util import dict_factory
 
 
 class JobAider(Aider):
@@ -101,7 +58,7 @@ class JobAider(Aider):
             if trashes:
                 paths = {pathlib.Path(row['file']).parent for row in trashes}
                 for path in paths:
-                    if CONFIG.get(TOOL_TRASH_TASK_STATUS) != STATUS_KEYS[1]:
+                    if CONFIG.get('tool_trash_task_status') != STATUS_KEYS[1]:
                         LOGGER.info(f'작업을 중지합니다.')
                         break
                     if refresh:
@@ -111,7 +68,7 @@ class JobAider(Aider):
             else:
                 LOGGER.info('이용 불가 파일이 없습니다.')
                 empty = False
-        if empty and CONFIG.get(TOOL_TRASH_TASK_STATUS) == STATUS_KEYS[1]:
+        if empty and CONFIG.get('tool_trash_task_status') == STATUS_KEYS[1]:
             plex_aider.empty_trash(job.section_id)
 
     def start_forget(self, job: ModelBase) -> None:
@@ -137,8 +94,8 @@ class JobAider(Aider):
         '''pm_ready_refresh'''
         plex_aider = PlexmateAider()
         # plexmate
-        plex_aider.check_scanning(CONFIG.get_int(SETTING_PLEXMATE_MAX_SCAN_TIME))
-        plex_aider.check_timeover(CONFIG.get(SETTING_PLEXMATE_TIMEOVER_RANGE))
+        plex_aider.check_scanning(CONFIG.get_int('setting_plexmate_max_scan_time'))
+        plex_aider.check_timeover(CONFIG.get('setting_plexmate_timeover_range'))
         # refresh
         targets = {s.target for s in plex_aider.get_scan_items('READY')}
         if targets:
@@ -185,28 +142,30 @@ class SettingAider(Aider):
     # system 플러그인은 플러그인 매니저에 등록되지 않으므로 직접 임포트
     system_route = system_plugin.logic.get_module('route')
     system_route_process_command = system_route.process_command
+    depend_source_yaml = pathlib.Path(__file__).parent / 'files' / f'{__package__}.yaml'
+    depend_user_yaml = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml')
 
     def __init__(self) -> None:
         super().__init__()
 
-    @staticmethod
-    def depends(text: str = None) -> str:
+    @classmethod
+    def depends(cls, text: str = None) -> str:
         try:
-            if not DEPEND_USER_YAML.exists():
-                shutil.copyfile(DEPEND_SOURCE_YAML, DEPEND_USER_YAML)
+            if not cls.depend_user_yaml.exists():
+                shutil.copyfile(cls.depend_source_yaml, cls.depend_user_yaml)
             if text:
-                with DEPEND_USER_YAML.open(mode='w', encoding='utf-8', newline='\n') as file:
+                with cls.depend_user_yaml.open(mode='w', encoding='utf-8', newline='\n') as file:
                     file.write(text)
                     depends = text
             else:
-                with DEPEND_USER_YAML.open(encoding='utf-8', newline='\n') as file:
+                with cls.depend_user_yaml.open(encoding='utf-8', newline='\n') as file:
                     depends = file.read()
             return depends
         except:
             LOGGER.error(traceback.format_exc())
             if text: return text
             else:
-                with DEPEND_SOURCE_YAML.open(encoding='utf-8', newline='\n') as file:
+                with cls.depend_source_yaml.open(encoding='utf-8', newline='\n') as file:
                     return file.read()
 
     @staticmethod
@@ -251,24 +210,6 @@ class SettingAider(Aider):
                 flask_login.login_user(FRAMEWORK.users[username], remember=remember)
                 return flask.jsonify('redirect')
 
-    @staticmethod
-    def get_rotating_file_logger(path: str,
-                                 name: str = None,
-                                 fmt: logging.Formatter = logging.Formatter(u'[%(asctime)s] %(message)s'),
-                                 max_bytes: int = 5 * 1024 * 1024,
-                                 level: int = logging.DEBUG) -> logging.Logger:
-        log_file = pathlib.Path(path)
-        if not name:
-            name = log_file.name
-        logger = logging.getLogger(name)
-        logger.setLevel(level)
-        if not logger.handlers:
-            handler = logging.handlers.RotatingFileHandler(filename=log_file, maxBytes=max_bytes, backupCount=5, encoding='utf8', delay=True)
-            handler.setFormatter(fmt)
-            handler.setLevel(level)
-            logger.addHandler(handler)
-        return logger
-
 
 class BrowserAider(Aider):
 
@@ -285,7 +226,6 @@ class BrowserAider(Aider):
                     target_list.append(BrowserAider.pack_dir(entry))
                 except Exception as e:
                     LOGGER.warning(e)
-                    continue
             target_list = sorted(target_list, key=lambda entry: (entry.get('is_file'), entry.get('name')))
             parent_pack = BrowserAider.pack_dir(target_path.parent)
             parent_pack['name'] = '..'
@@ -328,19 +268,13 @@ class PluginAider(Aider):
     def plugin(self) -> PluginModuleBase | None:
         return FRAMEWORK.PluginManager.get_plugin_instance(self.name)
 
-    def dict_factory(cursor: sqlite3.Cursor, row: tuple) -> dict:
-        d = {}
-        for idx, col in enumerate(cursor.description):
-            d[col[0]] = row[idx]
-        return d
-
     def check_plugin(func: callable) -> callable:
         @functools.wraps(func)
-        def wrap(*args, **kwds):
-            if args[0].plugin:
-                return func(*args, **kwds)
+        def wrap(self, *args, **kwds):
+            if self.plugin:
+                return func(self, *args, **kwds)
             else:
-                raise Exception(f'플러그인을 찾을 수 없습니다: {args[0].name}')
+                raise Exception(f'플러그인을 찾을 수 없습니다: {self.name}')
         return wrap
 
     @check_plugin
@@ -395,7 +329,7 @@ class PlexmateAider(PluginAider):
         '''
         offset = (page_no - 1) * limit
         with sqlite3.connect(self.plugin.ModelSetting.get('base_path_db')) as con:
-            con.row_factory = PluginAider.dict_factory
+            con.row_factory = dict_factory
             cs = con.cursor()
             return cs.execute(query.format(section_id=section_id, limit=limit, offset=offset)).fetchall()
 
@@ -472,7 +406,7 @@ class PlexmateAider(PluginAider):
                     over.set_status('READY', save=True)
 
     def get_targets(self, target: str, section_id: int = -1) -> dict[str, int]:
-        mappings = self.parse_mappings(CONFIG.get(SETTING_PLEXMATE_PLEX_MAPPING))
+        mappings = self.parse_mappings(CONFIG.get('setting_plexmate_plex_mapping'))
         target = pathlib.Path(self.update_path(target, mappings))
         # section_id DB 패치가 안 됐을 경우 대비
         if section_id and int(section_id) > 0:
@@ -495,14 +429,12 @@ class PlexmateAider(PluginAider):
             'path': location,
         }
         section = self.get_section_by_id(section_id)
-        try:
-            response = self.request('GET', url, params=params)
-            if str(response.status_code)[0] == '2':
-                LOGGER.info(f'스캔 전송: {section.get("name")}: {location}')
-            else:
-                raise Exception(f'스캔 전송 실패: {response.text}')
-        except:
-            LOGGER.error(traceback.format_exc())
+
+        response = self.request('GET', url, params=params)
+        if str(response.status_code)[0] == '2':
+            LOGGER.info(f'스캔 전송: {section.get("name")}: {location}')
+        else:
+            LOGGER.error(f'스캔 전송 실패: {response.text}')
 
     def scan(self, scan_mode: str, target: str = None, periodic_id: int = -1, section_id: int = -1) -> None:
         if scan_mode == SCAN_MODE_KEYS[2]:
@@ -602,20 +534,19 @@ class PlexmateAider(PluginAider):
             'X-Plex-Token': self.plugin.ModelSetting.get('base_token')
         }
         section = self.get_section_by_id(section_id)
-        try:
-            counter = 0
-            while self.check_library_update(section_id):
-                time.sleep(10)
-                counter += 1
-                if counter > 36:
-                    raise Exception(f'라이브러리({section_id})를 스캔 중이라 휴지통 비우기를 취소합니다.')
-            response = self.request('PUT', url, params=params)
-            if str(response.status_code)[0] == '2':
-                LOGGER.info(f'휴지통 비우기 명령을 전송했습니다: {section.get("name")}')
-            else:
-                raise Exception(f'휴지통 비우기 명령을 전달할 수 없습니다: {response.text}')
-        except Exception as e:
-            LOGGER.error(traceback.format_exc())
+
+        counter = 0
+        while self.check_library_update(section_id):
+            time.sleep(10)
+            counter += 1
+            if counter > 36:
+                LOGGER.error(f'라이브러리({section_id})를 스캔 중이라 휴지통 비우기를 취소합니다.')
+                return
+        response = self.request('PUT', url, params=params)
+        if str(response.status_code)[0] == '2':
+            LOGGER.info(f'휴지통 비우기 명령을 전송했습니다: {section.get("name")}')
+        else:
+            LOGGER.error(f'휴지통 비우기 명령을 전달할 수 없습니다: {response.text}')
 
     def get_activities(self) -> dict:
         url = f'{self.plugin.ModelSetting.get("base_url")}/activities'
@@ -695,9 +626,9 @@ class RcloneAider(Aider):
         LOGGER.debug(f'{command}: {data}')
         return self.request(
             "JSON",
-            f'{CONFIG.get(SETTING_RCLONE_REMOTE_ADDR)}/{command}',
+            f'{CONFIG.get("setting_rclone_remote_addr")}/{command}',
             data=data,
-            auth=(CONFIG.get(SETTING_RCLONE_REMOTE_USER), CONFIG.get(SETTING_RCLONE_REMOTE_PASS))
+            auth=(CONFIG.get('setting_rclone_remote_user'), CONFIG.get('setting_rclone_remote_pass'))
         )
 
     def _vfs_list(self) -> requests.Response:
@@ -705,14 +636,14 @@ class RcloneAider(Aider):
 
     def vfs_list(self) -> list:
         response = self._vfs_list()
-        vfses = [CONFIG.get(SETTING_RCLONE_REMOTE_VFS)]
+        vfses = [CONFIG.get('setting_rclone_remote_vfs')]
         if int(str(response.status_code)[0]) == 2:
             vfses = response.json().get('vfses', vfses)
         return sorted(vfses)
 
     def _vfs_refresh(self, remote_path: str, recursive: bool = False, fs: str = None, forget: bool = False) -> requests.Response:
         data = {
-            'fs': fs or CONFIG.get(SETTING_RCLONE_REMOTE_VFS),
+            'fs': fs or CONFIG.get('setting_rclone_remote_vfs'),
             'dir': remote_path
         }
         if forget:
@@ -733,7 +664,7 @@ class RcloneAider(Aider):
 
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> requests.Response:
         if not CONFIG.get('setting_rclone_path_test').lower() == 'true':
-            mappings = self.parse_mappings(CONFIG.get(SETTING_RCLONE_MAPPING))
+            mappings = self.parse_mappings(CONFIG.get('setting_rclone_mapping'))
             response = self._vfs_refresh(self.update_path(local_path, mappings), recursive, fs)
             result, reason = self.is_successful(response)
             if not result:
@@ -754,7 +685,7 @@ class RcloneAider(Aider):
         while not test_dirs[-1].exists():
             test_dirs.append(test_dirs[-1].parent) # [children ... parents ... until path exists]
         LOGGER.debug(f"경로 검사: {str(test_dirs)}")
-        mappings = self.parse_mappings(CONFIG.get(SETTING_RCLONE_MAPPING))
+        mappings = self.parse_mappings(CONFIG.get('setting_rclone_mapping'))
         while test_dirs:
             # vfs/refresh 후
             response = self._vfs_refresh(self.update_path(str(test_dirs[-1]), mappings), recursive, fs)
@@ -780,7 +711,7 @@ class RcloneAider(Aider):
         return response
 
     def vfs_forget(self, local_path: str, fs: str = None) -> requests.Response:
-        mappings = self.parse_mappings(CONFIG.get(SETTING_RCLONE_MAPPING))
+        mappings = self.parse_mappings(CONFIG.get('setting_rclone_mapping'))
         response = self._vfs_refresh(self.update_path(local_path, mappings), fs=fs, forget=True)
         result, reason = self.is_successful(response)
         if not result:
@@ -817,7 +748,7 @@ class StartupAider(Aider):
                 stdout: int = subprocess.PIPE, stderr: int = subprocess.STDOUT,
                 encoding: str = locale.getpreferredencoding(),
                 **kwds: dict) -> subprocess.CompletedProcess:
-        startup_executable = CONFIG.get(SETTING_STARTUP_EXECUTABLE)
+        startup_executable = CONFIG.get('setting_startup_executable')
         startup_executable = startup_executable.lower() == 'true'
         if not startup_executable:
             msg = f'실행이 허용되지 않았어요.'
@@ -840,7 +771,7 @@ class StartupAider(Aider):
         require_plugins, require_packages, require_commands = self.get_require_plugins(plugins_installed, depends)
 
         # 1. Commands from the setting
-        executable_commands = CONFIG.get(SETTING_STARTUP_COMMANDS).splitlines()
+        executable_commands = CONFIG.get('setting_startup_commands').splitlines()
         # 2. Commands of installing required packages
         executable_commands.extend(self.get_commands_from_packages(require_packages))
         # 3. Commands from plugin dependencies
@@ -856,12 +787,12 @@ class StartupAider(Aider):
         self.execute(executable_commands, require_plugins, depends)
 
     def execute(self, commands: list[str], require_plugins: set[str] = {}, depends: dict = {}) -> None:
-        startup_executable = CONFIG.get(SETTING_STARTUP_EXECUTABLE)
+        startup_executable = CONFIG.get('setting_startup_executable')
         startup_executable = startup_executable.lower() == 'true'
         if startup_executable:
             for command in commands:
                 command = shlex.split(command)
-                timeout = CONFIG.get_int(SETTING_STARTUP_TIMEOUT)
+                timeout = CONFIG.get_int('setting_startup_timeout')
                 timeout = timeout if timeout > 0 else None
                 result: subprocess.CompletedProcess = self.sub_run(*command, timeout=timeout)
                 if result.returncode == 0:
