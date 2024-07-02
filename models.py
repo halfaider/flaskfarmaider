@@ -12,7 +12,7 @@ from .constants import TASK_KEYS, STATUS_KEYS, FF_SCHEDULE_KEYS, SCAN_MODE_KEYS,
 
 class ScheduleModel(Model):
 
-    __tablename__ = f'{PLUGIN.package_name}_jobs'
+    __tablename__ = f'{PLUGIN.package_name}_schedules'
 
     id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer, primary_key=True)
     ctime = FRAMEWORK.db.Column(FRAMEWORK.db.DateTime)

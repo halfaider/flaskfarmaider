@@ -12,13 +12,16 @@ def migrate_schedule(ver: str, table, cs: sqlite3.Cursor) -> None:
         '4': migrate_schedule_v5,
         '5': migrate_schedule_v6,
         '6': migrate_schedule_v7,
+        '7': migrate_schedule_v8,
     }
     migrations.get(ver, migrate_schedule_v1)(cs, table)
+
 
 def migrate_setting(ver: str, table, cs: sqlite3.Cursor) -> None:
     migrations = {
         '1': migrate_setting_v2,
         '2': migrate_setting_v3,
+        '3': migrate_setting_v4,
     }
     migrations.get(ver, migrate_setting_v1)(cs, table)
 
@@ -145,12 +148,25 @@ def migrate_schedule_v6(cs: sqlite3.Cursor, table: str) -> None:
     except Exception as e:
         LOGGER.error(e)
 
+
 def migrate_schedule_v7(cs: sqlite3.Cursor, table: str) -> None:
+    LOGGER.debug('DB 버전 7 로 마이그레이션')
+    try:
+        row = cs.execute(f'SELECT name FROM sqlite_master WHERE type="table" AND name="flaskfarmaider_jobs"').fetchone()
+        if row:
+            cs.execute(f'ALTER TABLE "flaskfarmaider_jobs" RENAME TO "flaskfarmaider_schedules"')
+    except Exception as e:
+        LOGGER.error(e)
+
+
+def migrate_schedule_v8(cs: sqlite3.Cursor, table: str) -> None:
+    # Reseved for future use
     pass
 
 
 def migrate_setting_v1(cs: sqlite3.Cursor, table: str) -> None:
     LOGGER.warning(f'DB 버전 확인 필요')
+
 
 def migrate_setting_v2(cs: sqlite3.Cursor, table: str) -> None:
     LOGGER.debug('DB 버전 2 로 마이그레이션')
@@ -170,5 +186,18 @@ def migrate_setting_v2(cs: sqlite3.Cursor, table: str) -> None:
         except Exception as e:
             LOGGER.error(e)
 
+
 def migrate_setting_v3(cs: sqlite3.Cursor, table: str) -> None:
+    LOGGER.debug('DB 버전 3 으로 마이그레이션')
+    for key in ['setting_gds_tool_request_span', 'setting_gds_tool_request_auto', 'setting_gds_tool_fp_span', 'setting_gds_tool_fp_auto']:
+        try:
+            row = cs.execute(f'SELECT id FROM "{table}" WHERE key="{key}"').fetchone()
+            if row:
+                cs.execute(f'DELETE FROM "{table} WHERE KEY="{key}"')
+        except Exception as e:
+            LOGGER.error(e)
+
+
+def migrate_setting_v4(cs: sqlite3.Cursor, table: str) -> None:
+    # Reseved for future use
     pass

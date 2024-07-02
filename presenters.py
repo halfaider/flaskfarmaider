@@ -128,7 +128,7 @@ class Schedule(ModuleBase):
         '''override'''
         super().migration()
         version = CONFIG.get(f'{self.name}_db_version')
-        version = self._migration(version, self.__DB_VERSIONS, f'{PLUGIN.package_name}_jobs', migrate_schedule)
+        version = self._migration(version, self.__DB_VERSIONS, f'{PLUGIN.package_name}_schedules', migrate_schedule)
         CONFIG.set(f'{self.name}_db_version', version)
 
     def get_template_args(self) -> dict:
