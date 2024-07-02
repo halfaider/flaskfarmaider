@@ -1,9 +1,14 @@
 import sqlite3
 import logging
 import pathlib
+import datetime
+import os
+import traceback
 from threading import Thread
 
-from .setup import FRAMEWORK
+import flask
+
+logger = logging.getLogger(__name__)
 
 
 class ThreadHasReturn(Thread):
@@ -32,13 +37,6 @@ class ThreadHasReturn(Thread):
         }
 
 
-def celery_is_active() -> bool:
-    try:
-        return True if FRAMEWORK.celery.control.inspect().stats() else False
-    except:
-        return False
-
-
 def dict_factory(cursor: sqlite3.Cursor, row: tuple) -> dict:
         d = {}
         for idx, col in enumerate(cursor.description):
@@ -62,3 +60,82 @@ def get_rotating_file_logger(path: str,
         handler.setLevel(level)
         logger.addHandler(handler)
     return logger
+
+
+def get_readable_time(_time: float) -> str:
+    return datetime.datetime.fromtimestamp(_time, datetime.timezone.utc).strftime('%b %d %H:%M')
+
+
+def parse_mappings(text: str) -> dict[str, str]:
+    mappings = {}
+    if text:
+        settings = text.splitlines()
+        for setting in settings:
+            source, target = setting.rsplit(':', 1)
+            mappings[source.strip()] = target.strip()
+    return mappings
+
+
+def update_path(target: str, mappings: dict) -> str:
+    # 윈도우 경로 변경시
+    if '\\' in target:
+        target = target.replace('\\', '/')
+    for k, v in mappings.items():
+        target = target.replace(k, v)
+    return target
+
+
+def get_dir(target_path: str) -> list[dict[str, str]]:
+    target_path = pathlib.Path(target_path)
+    with os.scandir(target_path) as scandirs:
+        target_list = []
+        for entry in scandirs:
+            try:
+                target_list.append(pack_dir(entry))
+            except Exception as e:
+                logger.warning(e)
+        target_list = sorted(target_list, key=lambda entry: (entry.get('is_file'), entry.get('name')))
+        parent_pack = pack_dir(target_path.parent)
+        parent_pack['name'] = '..'
+        target_list.insert(0, parent_pack)
+        return target_list
+
+
+def pack_dir(entry: os.DirEntry | pathlib.Path) -> dict:
+    stats: os.stat_result = entry.stat(follow_symlinks=True)
+    return {
+        'name': entry.name,
+        'path': entry.path if isinstance(entry, os.DirEntry) else str(entry),
+        'is_file': entry.is_file(),
+        'size': format_file_size(stats.st_size),
+        'ctime': get_readable_time(stats.st_ctime),
+        'mtime': get_readable_time(stats.st_mtime),
+    }
+
+
+def format_file_size(size: int, decimals: int = 1, binary_system: bool = True) -> str:
+    units = ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']
+    largest_unit = 'Y'
+    if binary_system:
+        step = 1024
+    else:
+        step = 1000
+    for unit in units:
+        if size < step:
+            return f'{size:.{decimals}f}{unit}'
+        size /= step
+    return f'{size:.{decimals}f}{largest_unit}'
+
+
+def get_client_ip(request: flask.Request) -> str:
+    try:
+        if 'X-Real-Ip' in request.headers:
+            remote_addr = request.headers.getlist("X-Real-IP")[0].rpartition(' ')[-1]
+        if 'X-Forwarded-For' in request.headers:
+            remote_addr = request.headers.getlist("X-Forwarded-For")[0].rpartition(' ')[-1]
+        else:
+            remote_addr = request.remote_addr or 'unknown'
+    except:
+        logger.error(traceback.format_exc())
+        remote_addr = 'unknown'
+    return remote_addr

@@ -10,17 +10,17 @@ import flask
 
 from .setup import PluginBase, PluginModuleBase, ModelBase, FrameworkJob
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
-from .models import Job
-from .aiders import JobAider, BrowserAider, SettingAider, PlexmateAider, GDSToolAider, RcloneAider
+from .models import ScheduleModel
+from .aiders import JobAider, SettingAider, PlexmateAider, RcloneAider
 from .migrations import migrate_schedule, migrate_setting
-from .api import BaseModule, BasePage
-from .util import ThreadHasReturn, get_rotating_file_logger
+from .api import ModuleBase, PageBase
+from .util import ThreadHasReturn, get_rotating_file_logger, get_dir
 from .constants import (TASK_KEYS, TASKS, TOOL_TRASH_KEYS, TOOL_TRASHES, STATUS_KEYS, STATUSES,
     FF_SCHEDULE_KEYS, FF_SCHEDULES, SCAN_MODE_KEYS, SCAN_MODES, SECTION_TYPE_KEYS, SECTION_TYPES,
     SEARCH_KEYS, SEARCHES)
 
 
-class Setting(BaseModule):
+class Setting(ModuleBase):
 
     __DB_VERSIONS = ['1', '2']
 
@@ -33,7 +33,7 @@ class Setting(BaseModule):
             f'{self.name}_rclone_remote_vfses': '',
             f'{self.name}_rclone_remote_user': '',
             f'{self.name}_rclone_remote_pass': '',
-            f'{self.name}_rclone_remote_mapping': '/mnt/gds:\n/home/cloud/sjva/VOD:/VOD',
+            f'{self.name}_rclone_remote_mapping': '/mnt/gds:\n/home/cloud/gds/GDRIVE/VIDEO:/GDRIVE/VIDEO',
             f'{self.name}_plexmate_max_scan_time': '60',
             f'{self.name}_plexmate_timeover_range': '0~0',
             f'{self.name}_plexmate_plex_mapping': '',
@@ -41,19 +41,12 @@ class Setting(BaseModule):
             f'{self.name}_startup_commands': 'apt-get update',
             f'{self.name}_startup_timeout': '300',
             f'{self.name}_startup_dependencies': SettingAider.depends(),
-            f'{self.name}_gds_tool_request_span': '30',
-            f'{self.name}_gds_tool_request_auto': 'false',
-            f'{self.name}_gds_tool_fp_span': '30',
-            f'{self.name}_gds_tool_fp_auto': 'false',
             f'{self.name}_logging_login': 'false',
             f'{self.name}_logging_access': 'false',
             f'{self.name}_logging_access_file': '/data/log/access.log',
             f'{self.name}_logging_access_format': '{remote} {method} "{path}" {status}',
             f'{self.name}_rclone_path_test': 'true',
         }
-        self.commands.update({'command_test_connection': self.command_test_conn})
-        self.commands['clear_db'] = self.command_clear_db
-        self.commands['check_timeover'] = self.command_check_timeover
 
     def prerender(self, sub: str, req: flask.Request) -> None:
         '''override'''
@@ -67,14 +60,6 @@ class Setting(BaseModule):
         for conf in self.db_default.keys():
             args[conf] = CONFIG.get(conf)
         args[f'{self.name}_logging_login_file'] = f"{FRAMEWORK.config['path_data']}/log/system.log"
-        try:
-            gdsaider = GDSToolAider()
-            args[f'{self.name}_gds_tool_request_total'] = gdsaider.get_total_records('request')
-            args[f'{self.name}_gds_tool_fp_total'] = gdsaider.get_total_records('fp')
-        except:
-            LOGGER.error(traceback.format_exc())
-            args[f'{self.name}_gds_tool_request_total'] = -1
-            args[f'{self.name}_gds_tool_fp_total'] = -1
         return args
 
     def migration(self) -> None:
@@ -97,13 +82,6 @@ class Setting(BaseModule):
             data['ret'] = 'warning'
             data['msg'] = '접속에 실패했습니다.'
         return data
-
-    def command_clear_db(self, request: flask.Request) -> dict:
-        command, query, ids = self.pre_command(request)
-        mod = query.get('mod', ['no_mod'])[0]
-        span = int(query.get('span', ['-1'])[0])
-        GDSToolAider().delete(mod, span)
-        return self.returns('success', 'DB 정리를 실행합니다.')
 
     def command_check_timeover(self, request: flask.Request) -> dict:
         command, query, ids = self.pre_command(request)
@@ -129,15 +107,11 @@ class Setting(BaseModule):
         if not CONFIG.get(f'{self.name}_rclone_remote_vfses') and CONFIG.get(f'{self.name}_rclone_remote_vfs'):
             vfses = RcloneAider().vfs_list()
             CONFIG.set(f'{self.name}_rclone_remote_vfses', '|'.join(vfses))
-        if CONFIG.get(f'{self.name}_gds_tool_request_auto').lower() == 'true':
-            GDSToolAider().delete('request', CONFIG.get_int(f'{self.name}_gds_tool_request_span'))
-        if CONFIG.get(f'{self.name}_gds_tool_fp_auto').lower() == 'true':
-            GDSToolAider().delete('fp', CONFIG.get_int(f'{self.name}_gds_tool_fp_span'))
         if CONFIG.get(f'{self.name}_logging_login').lower() == 'true':
             SettingAider.set_login_log()
 
 
-class Schedule(BaseModule):
+class Schedule(ModuleBase):
 
     __DB_VERSIONS = ['1', '2', '3', '4', '5', '6']
 
@@ -148,17 +122,7 @@ class Schedule(BaseModule):
             f'{self.name}_working_directory': '/',
             f'{self.name}_last_list_option': ''
         }
-        self.web_list_model = Job
-        self.commands.update(
-            {
-                'list': self.command_list,
-                'save': self.command_save,
-                'delete': self.command_delete,
-                'execute': self.command_execute,
-                'schedule': self.command_schedule,
-                'get_job': self.command_get_job,
-            }
-        )
+        self.web_list_model = ScheduleModel
 
     def migration(self) -> None:
         '''override'''
@@ -202,7 +166,7 @@ class Schedule(BaseModule):
 
     def add_schedule(self, id: int, job: ModelBase = None) -> bool:
         try:
-            job = job or Job.get_by_id(id)
+            job = job or ScheduleModel.get_by_id(id)
             schedule_id = self.create_schedule_id(job.id)
             if not FRAMEWORK.scheduler.is_include(schedule_id):
                 sch = FrameworkJob(__package__, schedule_id, job.schedule_interval, self.run_async, job.desc, args=(self.start_job, (job,)))
@@ -215,7 +179,7 @@ class Schedule(BaseModule):
     def set_schedule(self, job_id: int | str, active: bool = False) -> tuple[bool, str]:
         schedule_id = self.create_schedule_id(job_id)
         is_include = FRAMEWORK.scheduler.is_include(schedule_id)
-        job = Job.get_by_id(job_id)
+        job = ScheduleModel.get_by_id(job_id)
         schedule_mode = job.schedule_mode if job else FF_SCHEDULE_KEYS[0]
         match active, is_include:
             case True, True:
@@ -231,11 +195,11 @@ class Schedule(BaseModule):
                 result, msg = False, '등록할 수 없는 일정 방식입니다.'
         return result, msg
 
-    def reload_schedule(self, job: Job, old_job: Job) -> None:
+    def reload_schedule(self, job: ScheduleModel, old_job: ScheduleModel) -> None:
         th = ThreadHasReturn(target=self._reload_schedule, args=(job, old_job), daemon=True, callback=self.callback_sio)
         th.start()
 
-    def _reload_schedule(self, job: Job, old_job: Job) -> Job:
+    def _reload_schedule(self, job: ScheduleModel, old_job: ScheduleModel) -> ScheduleModel:
         msg = ''
         schedule_id = self.create_schedule_id(job.id)
         if FRAMEWORK.scheduler.is_include(schedule_id) and \
@@ -264,7 +228,7 @@ class Schedule(BaseModule):
     def plugin_load(self) -> None:
         '''override'''
         super().plugin_load()
-        for job in Job.get_list():
+        for job in ScheduleModel.get_list():
             if job.schedule_mode == FF_SCHEDULE_KEYS[1]:
                 self.run_async(start_job, (job,))
             elif job.schedule_mode == FF_SCHEDULE_KEYS[2] and job.schedule_auto_start:
@@ -276,14 +240,14 @@ class Schedule(BaseModule):
     def plugin_unload(self) -> None:
         '''override'''
         super().plugin_unload()
-        for job in Job.get_list():
+        for job in ScheduleModel.get_list():
             if not job.status == STATUS_KEYS[0]:
                 LOGGER.warning(f'강제로 종료되는 작업: {job.id} {job.desc}')
                 job.set_status(STATUS_KEYS[0])
 
-    def update_job(self, job_id: int, query: dict[str, list]) -> Job:
-        old_job = Job.get_job(job_id)
-        job = Job.update_formdata(job_id, query)
+    def update_job(self, job_id: int, query: dict[str, list]) -> ScheduleModel:
+        old_job = ScheduleModel.get_job(job_id)
+        job = ScheduleModel.update_formdata(job_id, query)
         if old_job.id > 0:
             self.reload_schedule(job, old_job)
         return job
@@ -309,7 +273,7 @@ class Schedule(BaseModule):
                 'periodic_id': int(query.get('periodic_id', ['-1'])[0]),
                 'vfs': query.get('vfs', ['remote:'])[0],
             }
-            self.run_async(self.start_job, (Job.get_job(info=job),))
+            self.run_async(self.start_job, (ScheduleModel.get_job(info=job),))
             result, msg = True, '작업을 실행했습니다.'
         else:
             result, msg = False, '경로 정보가 없습니다.'
@@ -318,7 +282,7 @@ class Schedule(BaseModule):
     def command_list(self, request: flask.Request) -> dict:
         command, query, ids = self.pre_command(request)
         path = query.get('target', ['/'])[0]
-        dir_list = json.dumps(BrowserAider.get_dir(path))
+        dir_list = json.dumps(get_dir(path))
         CONFIG.set(f'{self.name}_working_directory', path)
         if dir_list:
             return self.returns('success', data=dir_list)
@@ -349,7 +313,7 @@ class Schedule(BaseModule):
             not_deleted = []
             LOGGER.info(f'to be deleted: {ids}')
             for _id in ids:
-                if Job.delete_by_id(_id):
+                if ScheduleModel.delete_by_id(_id):
                     self.set_schedule(_id, False)
                 else:
                     not_deleted.append(_id)
@@ -359,7 +323,7 @@ class Schedule(BaseModule):
             else:
                 return self.returns('success', f'모두 삭제 했습니다.')
         else:
-            if Job.delete_by_id(ids[0]):
+            if ScheduleModel.delete_by_id(ids[0]):
                 self.set_schedule(ids[0], False)
                 return self.returns('success', f'삭제 했습니다: ID {ids[0]}')
             else:
@@ -367,7 +331,7 @@ class Schedule(BaseModule):
 
     def command_execute(self, request: flask.Request) -> dict:
         command, query, ids = self.pre_command(request)
-        self.run_async(start_job, (Job.get_job(ids[0]),))
+        self.run_async(start_job, (ScheduleModel.get_job(ids[0]),))
         return self.returns('success', '일정을 실행했습니다.')
 
     def command_schedule(self, request: flask.Request) -> dict:
@@ -378,14 +342,14 @@ class Schedule(BaseModule):
 
     def command_get_job(self, request: flask.Request) -> dict:
         command, query, ids = self.pre_command(request)
-        job = Job.get_by_id(ids[0])
+        job = ScheduleModel.get_by_id(ids[0])
         if job:
             return self.returns('success', data=job.as_dict())
         else:
             return self.returns('warning', f'일정을 찾을 수 없습니다: ID {ids[0]}')
 
 
-class Manual(BaseModule):
+class Manual(ModuleBase):
 
     readme_file = pathlib.Path(__file__).parent / 'README.md'
 
@@ -401,7 +365,7 @@ class Manual(BaseModule):
         return args
 
 
-class Tool(BaseModule):
+class Tool(ModuleBase):
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name='tool', first_menu='trash')
@@ -414,7 +378,7 @@ class Tool(BaseModule):
             page.setting_save_after(changes)
 
 
-class ToolTrash(BasePage):
+class ToolTrash(PageBase):
 
     def __init__(self, plugin: PluginBase, parent: PluginModuleBase) -> None:
         super().__init__(plugin, parent, name='trash')
@@ -422,14 +386,6 @@ class ToolTrash(BasePage):
             'tool_trash_task_status': STATUS_KEYS[0],
             'tool_trash_last_list_option': ''
         }
-        self.commands.update(
-            {
-                'status': self.command_status,
-                'list': self.command_list,
-                'stop': self.command_stop,
-                'delete': self.command_delete,
-            }
-        )
 
     def check_status(func: callable) -> callable:
         @functools.wraps(func)
@@ -474,7 +430,7 @@ class ToolTrash(BasePage):
         '''override'''
         command, query, ids = self.pre_command(request)
         if command in TOOL_TRASH_KEYS:
-            job = Job.get_job()
+            job = ScheduleModel.get_job()
             job.task = command
             job.section_id = int(query.get('section_id', ['-1'])[0])
             job.vfs = query.get('vfs', ['remote:'])[0]

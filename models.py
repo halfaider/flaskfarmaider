@@ -6,11 +6,11 @@ from flask_sqlalchemy.query import Query
 from sqlalchemy import desc
 
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
-from .api import BaseModel
+from .api import Model
 from .constants import TASK_KEYS, STATUS_KEYS, FF_SCHEDULE_KEYS, SCAN_MODE_KEYS, SEARCH_KEYS
 
 
-class Job(BaseModel):
+class ScheduleModel(Model):
 
     __tablename__ = f'{PLUGIN.package_name}_jobs'
 
@@ -52,30 +52,12 @@ class Job(BaseModel):
         'sch-target-section': (section_id, section_id.type.python_type, -1),
     }
 
-    def __init__(self, task: str = '', schedule_mode: str = FF_SCHEDULE_KEYS[0], schedule_auto_start: bool = False,
-                 desc: str = '', target: str = '', recursive: bool = False, section_id: int = -1,
-                 vfs: str = '', scan_mode: str = SCAN_MODE_KEYS[0], periodic_id: int = -1,
-                 clear_type: str = '', clear_level: str = '', clear_section: int = -1, schedule_interval = '60') -> None:
+    def __init__(self) -> None:
         self.ctime = datetime.datetime.now()
         self.ftime = datetime.datetime(1970, 1, 1)
         self.status = STATUS_KEYS[0]
 
-        self.task = task
-        self.schedule_mode = schedule_mode
-        self.schedule_auto_start = schedule_auto_start
-        self.schedule_interval = schedule_interval
-        self.desc = desc
-        self.target = target
-        self.recursive = recursive
-        self.vfs = vfs
-        self.scan_mode = scan_mode
-        self.periodic_id = periodic_id
-        self.clear_type = clear_type
-        self.clear_level = clear_level
-        self.clear_section = clear_section
-        self.section_id = section_id
-
-    def update(self, data: dict[str, str | int | bool]) -> 'Job':
+    def update(self, data: dict[str, str | int | bool]) -> 'ScheduleModel':
         for k, v in data.items():
             try:
                 setattr(self, k, v)
@@ -84,11 +66,11 @@ class Job(BaseModel):
         return self
 
     @classmethod
-    def update_formdata(cls, job_id: int, formdata: dict[str, list]) -> 'Job':
+    def update_formdata(cls, job_id: int, formdata: dict[str, list]) -> 'ScheduleModel':
         if job_id > 0:
             model = cls.get_by_id(job_id)
         else:
-            model = Job()
+            model = ScheduleModel()
 
         if formdata.get('sch-task', [-1])[0] == TASK_KEYS[5]:
             formdata.update({'sch-schedule-interval': ['매 시작']})
@@ -113,13 +95,13 @@ class Job(BaseModel):
         return model
 
     @classmethod
-    def get_job(cls, id: int = -1, info: dict = None) -> 'Job':
+    def get_job(cls, id: int = -1, info: dict = None) -> 'ScheduleModel':
         if id > 0:
             job = cls.get_by_id(id)
         elif info:
-            job = Job().update(info)
+            job = ScheduleModel().update(info)
         else:
-            job = Job()
+            job = ScheduleModel()
             job.id = id
         return job
 
@@ -136,7 +118,7 @@ class Job(BaseModel):
                 query = query.order_by(desc(getattr(cls, order)))
             return query
 
-    def set_status(self, status: str, save: bool = True) -> 'Job':
+    def set_status(self, status: str, save: bool = True) -> 'ScheduleModel':
         if status in STATUS_KEYS:
             self.status = status
             if status == STATUS_KEYS[2]:

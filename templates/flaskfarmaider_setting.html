@@ -14,7 +14,6 @@
 {{ macros.m_tab_head_start() }}
 {{ macros.m_tab_head('rcloneremote', 'Rclone Remote', true) }}
 {{ macros.m_tab_head('plexmate', 'Plexmate', false) }}
-{{ macros.m_tab_head('gds_tool', '구드공 툴', false) }}
 {{ macros.m_tab_head('startup', '시작 스크립트', false) }}
 {{ macros.m_tab_head('logging', '기타 로그', false) }}
 {{ macros.m_tab_head_end() }}
@@ -166,40 +165,6 @@
         row='20'
     ) }}
 {{ macros.m_tab_content_end() }}
-{{ macros.m_tab_content_start('gds_tool', false) }}
-    {% set sources = ({'request': {'title': '복사 요청 목록'}, 'fp': {'title': 'GDS 변경사항 목록'}}) %}
-    {{ macros.m_row_start('5') }}
-    {{ macros.m_row_end() }}
-    <h3 class="text-warning">이제 gds_tool 플러그인에서 직접 설정할 수 있습니다.</h3>
-    <h3 class="text-warning">이 설정은 조만간 삭제 됩니다.</h3>
-        <div class="row">
-        {% for k, v in sources.items() %}
-            <div class="col">
-                <h3>{{ v.title }}</h3>
-                <h4>총 레코드: <span class="badge badge-info" id="setting_gds_tool_{{ k }}_total">0</span></h4>
-                <br />
-                <br />
-                <div class="form-row">
-                    <label for="setting_gds_tool_{{ k }}_span" class="col-sm-4 col-form-label text-right font-weight-bold">잔여 기간</label>
-                    <input type="text" class="col-sm-4 form-control col" id="setting_gds_tool_{{ k }}_span" name="setting_gds_tool_{{ k }}_span" placeholder="days" />
-                    <div class="">
-                        <button class="btn btn-warning" type="button" id="setting_gds_tool_{{ k }}_del">삭제</button>
-                    </div>
-                </div>
-                <div class="form-row mb-3">
-                    <div class="col-sm-4"></div><div class=""><em>오늘부터 잔여 기간(일) 까지만 남기고 삭제<br />전체 삭제는 0 입력</em></div>
-                </div>
-                <div class="form-row">
-                    <label for="setting_gds_tool_{{ k }}_auto" class="col-sm-4 col-form-label text-right font-weight-bold">자동 삭제</label>
-                    <input id="setting_gds_tool_{{ k }}_auto" name="setting_gds_tool_{{ k }}_auto" type="checkbox" class="form-control" data-toggle="toggle" />
-                </div>
-                <div class="form-row">
-                    <div class="col-sm-4"></div><div class=""><em>자동으로 기간 적용 삭제</em></div>
-                </div>
-            </div>
-        {% endfor %}
-        </div>
-{{ macros.m_tab_content_end() }}
 {{ macros.m_tab_content_start('logging', false) }}
     {{ macros.setting_checkbox(
         module_name + '_logging_login',
@@ -246,12 +211,6 @@
 <script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
     const VFS = "{{ args.setting_rclone_remote_vfs }}";
-    const SETTING_GDS_TOOL_REQUEST_SPAN = JSON.parse('{{ args.setting_gds_tool_request_span|int }}');
-    const SETTING_GDS_TOOL_REQUEST_AUTO = JSON.parse('{{ args.setting_gds_tool_request_auto|lower }}');
-    const SETTING_GDS_TOOL_REQUEST_TOTAL = JSON.parse('{{ args.setting_gds_tool_request_total|int }}');
-    const SETTING_GDS_TOOL_FP_SPAN = JSON.parse('{{ args.setting_gds_tool_fp_span|int }}');
-    const SETTING_GDS_TOOL_FP_AUTO = JSON.parse('{{ args.setting_gds_tool_fp_auto|lower }}');
-    const SETTING_GDS_TOOL_FP_TOTAL = JSON.parse('{{ args.setting_gds_tool_fp_total|int }}');
     const SETTING_LOGGING_LOGIN = JSON.parse('{{ args.setting_logging_login|lower }}');
     const SETTING_LOGGING_ACCESS = JSON.parse('{{ args.setting_logging_access|lower }}');
 

@@ -1,8 +1,7 @@
 import traceback
 import urllib.parse
 import sqlite3
-import time
-import datetime
+import functools
 from threading import Thread
 
 import flask
@@ -11,18 +10,22 @@ from flask_sqlalchemy.query import Query
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from .constants import *
-from .util import ThreadHasReturn, celery_is_active
+from .util import ThreadHasReturn
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
 from .setup import PluginBase, PluginModuleBase, PluginPageBase, default_route_socketio_module, default_route_socketio_page, ModelBase
+
+
+def celery_is_active() -> bool:
+    try:
+        return True if FRAMEWORK.celery.control.inspect().stats() else False
+    except:
+        return False
 
 
 class Base:
 
     def __init__(self, *args, **kwds) -> None:
         super().__init__(*args, **kwds)
-        self.commands = {
-            'default': self.command_default,
-        }
 
     def set_recent_menu(self, req: flask.Request) -> None:
         current_menu = '|'.join(req.path[1:].split('/')[1:])
@@ -32,8 +35,8 @@ class Base:
     def get_template_args(self) -> dict:
         args = {
             'package_name': PLUGIN.package_name,
-            'module_name': self.name if isinstance(self, BaseModule) else self.parent.name,
-            'page_name': self.name if isinstance(self, BasePage) else None,
+            'module_name': self.name if isinstance(self, ModuleBase) else self.parent.name,
+            'page_name': self.name if isinstance(self, PageBase) else None,
         }
         return args
 
@@ -60,7 +63,7 @@ class Base:
 
     def process_command(self, command: str, arg1: str, arg2: str, arg3: str, request: flask.Request) -> flask.Response:
         try:
-            data = self.commands.get(command, self.commands.get('default'))(request)
+            data = getattr(self, f'command_{command}', self.command_default)(request)
         except Exception as e:
             LOGGER.error(traceback.format_exc())
             data = self.returns('warning', str(e))
@@ -83,10 +86,8 @@ class Base:
         LOGGER.debug(f'{table} 현재 DB 버전: {version}')
         with FRAMEWORK.app.app_context():
             db_file = FRAMEWORK.app.config['SQLALCHEMY_BINDS'][PLUGIN.package_name].replace('sqlite:///', '').split('?')[0]
-            conn = sqlite3.connect(db_file)
             try:
-
-                with conn:
+                with sqlite3.connect(db_file) as conn:
                     conn.row_factory = sqlite3.Row
                     cs = conn.cursor()
                     # DB 볼륨 정리
@@ -97,12 +98,11 @@ class Base:
                     FRAMEWORK.db.session.flush()
             except:
                 LOGGER.exception('마이그레이션 실패')
-            conn.close()
         LOGGER.debug(f'{table} 최종 DB 버전: {version}')
         return version
 
 
-class BaseModule(Base, PluginModuleBase):
+class ModuleBase(Base, PluginModuleBase):
 
     def __init__(self, plugin: PluginBase, first_menu: str = None, name: str = None, scheduler_desc: str = None) -> None:
         super().__init__(plugin, first_menu, name, scheduler_desc)
@@ -248,7 +248,7 @@ class BaseModule(Base, PluginModuleBase):
         return ret
 
 
-class BasePage(Base, PluginPageBase):
+class PageBase(Base, PluginPageBase):
 
     def __init__(self, plugin: PluginBase, parent: PluginModuleBase, name: str = None, scheduler_desc: str = None) -> None:
         super().__init__(plugin, parent, name, scheduler_desc)
@@ -346,7 +346,7 @@ class BasePage(Base, PluginPageBase):
         return self.parent.start_celery(func, *args, on_message, page=self)
 
 
-class BaseModel(ModelBase):
+class Model(ModelBase):
 
     __abstract__ = True
     __bind_key__ = PLUGIN.package_name
@@ -411,35 +411,15 @@ class Aider:
     def __init__(self, name: str = None) -> None:
         self.name = name
 
-    @staticmethod
-    def get_readable_time(_time: float) -> str:
-        return datetime.datetime.fromtimestamp(_time, datetime.timezone.utc).strftime('%b %d %H:%M')
-
-    @staticmethod
-    def parse_mappings(text: str) -> dict[str, str]:
-        mappings = {}
-        if text:
-            settings = text.splitlines()
-            for setting in settings:
-                source, target = setting.split(':')
-                mappings[source.strip()] = target.strip()
-        return mappings
-
-    @staticmethod
-    def update_path(target: str, mappings: dict) -> str:
-        for k, v in mappings.items():
-            target = target.replace(k, v)
-        return target
-
-    @staticmethod
-    def request(method: str = 'POST', url: str = None, data: dict = None, timeout: int | tuple = None, **kwds: dict) -> requests.Response:
+    def request(self, method: str, url: str, *args: tuple, **kwds: dict) -> requests.Response:
         _timeout = CONFIG.get_int('setting_startup_timeout')
-        timeout = _timeout if _timeout > 0 else timeout
+        kwds['timeout'] = _timeout if _timeout > 0 else kwds.get('timeout')
         try:
             if method.upper() == 'JSON':
-                return requests.request('POST', url, json=data or {}, timeout=timeout, **kwds)
+                data = kwds.pop('data', None)
+                return requests.request('POST', url, *args, json=data, **kwds)
             else:
-                return requests.request(method, url, data=data, timeout=timeout, **kwds)
+                return requests.request(method, url, *args, **kwds)
         except:
             tb = traceback.format_exc()
             LOGGER.error(tb)
@@ -449,3 +429,24 @@ class Aider:
             return response
 
 
+class PluginAider(Aider):
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+
+    @property
+    def plugin(self) -> PluginModuleBase | None:
+        return FRAMEWORK.PluginManager.get_plugin_instance(self.name)
+
+    def check_plugin(func: callable) -> callable:
+        @functools.wraps(func)
+        def wrap(self, *args, **kwds):
+            if self.plugin:
+                return func(self, *args, **kwds)
+            else:
+                raise Exception(f'플러그인을 찾을 수 없습니다: {self.name}')
+        return wrap
+
+    @check_plugin
+    def get_module(self, module: str) -> PluginModuleBase:
+        return self.plugin.logic.get_module(module)

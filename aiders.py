@@ -1,27 +1,24 @@
-import os
 import pathlib
 import datetime
 import traceback
 import shutil
 import sqlite3
-import functools
 import subprocess
 import shlex
+import locale
 import platform
 import time
-import locale
-import logging
 
 import yaml
 import requests
 import flask
 import flask_login
 
-from .setup import PluginModuleBase, ModelBase, system_plugin
+from .setup import ModelBase, system_plugin
 from .setup import FRAMEWORK, LOGGER, CONFIG
-from .api import Aider
+from .api import Aider, PluginAider
 from .constants import TASK_KEYS, TOOL_TRASH_KEYS, STATUS_KEYS, SCAN_MODE_KEYS, SECTION_TYPE_KEYS
-from .util import dict_factory
+from .util import dict_factory, get_readable_time, parse_mappings, update_path, get_client_ip
 
 
 class JobAider(Aider):
@@ -168,20 +165,6 @@ class SettingAider(Aider):
                 with cls.depend_source_yaml.open(encoding='utf-8', newline='\n') as file:
                     return file.read()
 
-    @staticmethod
-    def get_client_ip(request: flask.Request) -> str:
-        try:
-            if 'X-Real-Ip' in request.headers:
-                remote_addr = request.headers.getlist("X-Real-IP")[0].rpartition(' ')[-1]
-            if 'X-Forwarded-For' in request.headers:
-                remote_addr = request.headers.getlist("X-Forwarded-For")[0].rpartition(' ')[-1]
-            else:
-                remote_addr = request.remote_addr or 'unknown'
-        except:
-            LOGGER.error(traceback.format_exc())
-            remote_addr = 'unknown'
-        return remote_addr
-
     @classmethod
     def set_login_log(cls, enable: bool = True) -> None:
         if enable:
@@ -196,7 +179,7 @@ class SettingAider(Aider):
             username = arg1
             password = arg2
             remember = (arg3 == 'true')
-            client_info = f"user={username} ip={SettingAider.get_client_ip(request)}"
+            client_info = f"user={username} ip={get_client_ip(request)}"
             failed_msg = f'로그인 실패: {client_info}'
             if username not in FRAMEWORK.users:
                 system_plugin.logger.warning(failed_msg)
@@ -209,77 +192,6 @@ class SettingAider(Aider):
                 FRAMEWORK.users[username].authenticated = True
                 flask_login.login_user(FRAMEWORK.users[username], remember=remember)
                 return flask.jsonify('redirect')
-
-
-class BrowserAider(Aider):
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    @staticmethod
-    def get_dir(target_path: str) -> list[dict[str, str]]:
-        target_path = pathlib.Path(target_path)
-        with os.scandir(target_path) as scandirs:
-            target_list = []
-            for entry in scandirs:
-                try:
-                    target_list.append(BrowserAider.pack_dir(entry))
-                except Exception as e:
-                    LOGGER.warning(e)
-            target_list = sorted(target_list, key=lambda entry: (entry.get('is_file'), entry.get('name')))
-            parent_pack = BrowserAider.pack_dir(target_path.parent)
-            parent_pack['name'] = '..'
-            target_list.insert(0, parent_pack)
-            return target_list
-
-    @staticmethod
-    def pack_dir(entry: os.DirEntry | pathlib.Path) -> dict:
-        stats: os.stat_result = entry.stat(follow_symlinks=True)
-        return {
-            'name': entry.name,
-            'path': entry.path if isinstance(entry, os.DirEntry) else str(entry),
-            'is_file': entry.is_file(),
-            'size': BrowserAider.format_file_size(stats.st_size),
-            'ctime': BrowserAider.get_readable_time(stats.st_ctime),
-            'mtime': BrowserAider.get_readable_time(stats.st_mtime),
-        }
-
-    @staticmethod
-    def format_file_size(size: int, decimals: int = 1, binary_system: bool = True) -> str:
-        units = ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']
-        largest_unit = 'Y'
-        if binary_system:
-            step = 1024
-        else:
-            step = 1000
-        for unit in units:
-            if size < step:
-                return f'{size:.{decimals}f}{unit}'
-            size /= step
-        return f'{size:.{decimals}f}{largest_unit}'
-
-
-class PluginAider(Aider):
-
-    def __init__(self, name: str) -> None:
-        super().__init__(name)
-
-    @property
-    def plugin(self) -> PluginModuleBase | None:
-        return FRAMEWORK.PluginManager.get_plugin_instance(self.name)
-
-    def check_plugin(func: callable) -> callable:
-        @functools.wraps(func)
-        def wrap(self, *args, **kwds):
-            if self.plugin:
-                return func(self, *args, **kwds)
-            else:
-                raise Exception(f'플러그인을 찾을 수 없습니다: {self.name}')
-        return wrap
-
-    @check_plugin
-    def get_module(self, module: str) -> PluginModuleBase:
-        return self.plugin.logic.get_module(module)
 
 
 class PlexmateAider(PluginAider):
@@ -342,7 +254,7 @@ class PlexmateAider(PluginAider):
         rows = self.get_trashes(section_id, page_no, limit)
         if len(rows) > 0:
             for row in rows:
-                row['deleted_at'] = self.get_readable_time(row['deleted_at'])
+                row['deleted_at'] = get_readable_time(row['deleted_at'])
             result['data'] = rows
         return result
 
@@ -406,8 +318,8 @@ class PlexmateAider(PluginAider):
                     over.set_status('READY', save=True)
 
     def get_targets(self, target: str, section_id: int = -1) -> dict[str, int]:
-        mappings = self.parse_mappings(CONFIG.get('setting_plexmate_plex_mapping'))
-        target = pathlib.Path(self.update_path(target, mappings))
+        mappings = parse_mappings(CONFIG.get('setting_plexmate_plex_mapping'))
+        target = pathlib.Path(update_path(target, mappings))
         # section_id DB 패치가 안 됐을 경우 대비
         if section_id and int(section_id) > 0:
             locations = self.db.select(f'SELECT library_section_id, root_path FROM section_locations WHERE library_section_id = {section_id}')
@@ -583,28 +495,6 @@ class PlexmateAider(PluginAider):
         return False
 
 
-class GDSToolAider(PluginAider):
-
-    def __init__(self) -> None:
-        super().__init__('gds_tool')
-
-    def get_model(self, name: str) -> ModelBase:
-        return self.get_module(name).web_list_model
-
-    def get_total_records(self, name: str) -> int:
-        with FRAMEWORK.app.app_context():
-            return FRAMEWORK.db.session.query(self.get_model(name)).count()
-
-    def delete(self, name: str, span: int) -> None:
-        self.get_model(name).delete_all(span)
-        with FRAMEWORK.app.app_context():
-            db_file = FRAMEWORK.app.config['SQLALCHEMY_BINDS']['gds_tool'].replace('sqlite:///', '').split('?')[0]
-            with sqlite3.connect(db_file) as conn:
-                conn.row_factory = sqlite3.Row
-                cs = conn.cursor()
-                cs.execute(f'VACUUM;').fetchall()
-
-
 class RcloneAider(Aider):
 
     def __init__(self) -> None:
@@ -664,8 +554,8 @@ class RcloneAider(Aider):
 
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> requests.Response:
         if not CONFIG.get('setting_rclone_path_test').lower() == 'true':
-            mappings = self.parse_mappings(CONFIG.get('setting_rclone_mapping'))
-            response = self._vfs_refresh(self.update_path(local_path, mappings), recursive, fs)
+            mappings = parse_mappings(CONFIG.get('setting_rclone_mapping'))
+            response = self._vfs_refresh(update_path(local_path, mappings), recursive, fs)
             result, reason = self.is_successful(response)
             if not result:
                 LOGGER.error(f'새로고침 실패: {reason}: {local_path}')
@@ -685,15 +575,15 @@ class RcloneAider(Aider):
         while not test_dirs[-1].exists():
             test_dirs.append(test_dirs[-1].parent) # [children ... parents ... until path exists]
         LOGGER.debug(f"경로 검사: {str(test_dirs)}")
-        mappings = self.parse_mappings(CONFIG.get('setting_rclone_mapping'))
+        mappings = parse_mappings(CONFIG.get('setting_rclone_mapping'))
         while test_dirs:
             # vfs/refresh 후
-            response = self._vfs_refresh(self.update_path(str(test_dirs[-1]), mappings), recursive, fs)
+            response = self._vfs_refresh(update_path(str(test_dirs[-1]), mappings), recursive, fs)
             # 타겟이 존재하는지 점검
             if local_path.exists():
                 # 타겟이 존재하지 않았던 '폴더'면 vfs/refresh
                 if not local_path.is_file() and not already_exists:
-                    self._vfs_refresh(self.update_path(str(local_path), mappings), recursive, fs)
+                    self._vfs_refresh(update_path(str(local_path), mappings), recursive, fs)
                 # 타겟 폴더가 존재하므로 종료
                 break
             # 타겟이 여전히 존재하지 않으면 결과 점검
@@ -711,8 +601,8 @@ class RcloneAider(Aider):
         return response
 
     def vfs_forget(self, local_path: str, fs: str = None) -> requests.Response:
-        mappings = self.parse_mappings(CONFIG.get('setting_rclone_mapping'))
-        response = self._vfs_refresh(self.update_path(local_path, mappings), fs=fs, forget=True)
+        mappings = parse_mappings(CONFIG.get('setting_rclone_mapping'))
+        response = self._vfs_refresh(update_path(local_path, mappings), fs=fs, forget=True)
         result, reason = self.is_successful(response)
         if not result:
             LOGGER.error(f'캐시삭제 실패: {reason}: {local_path}')
@@ -766,7 +656,7 @@ class StartupAider(Aider):
 
     def startup(self) -> None:
         plugins_installed = [plugin_name for plugin_name in FRAMEWORK.PluginManager.all_package_list.keys()]
-        depends = yaml.safe_load(SettingAider().depends()).get('dependencies')
+        depends = yaml.safe_load(SettingAider.depends()).get('dependencies')
 
         require_plugins, require_packages, require_commands = self.get_require_plugins(plugins_installed, depends)
 
