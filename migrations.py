@@ -154,7 +154,7 @@ def migrate_schedule_v7(cs: sqlite3.Cursor, table: str) -> None:
     try:
         row = cs.execute(f'SELECT name FROM sqlite_master WHERE type="table" AND name="flaskfarmaider_jobs"').fetchone()
         if row:
-            cs.execute(f'ALTER TABLE "flaskfarmaider_jobs" RENAME TO "flaskfarmaider_schedules"')
+            cs.execute(f'INSERT INTO "flaskfarmaider_schedules" SELECT * FROM "flaskfarmaider_jobs"')
     except Exception as e:
         LOGGER.error(e)
 
@@ -193,7 +193,7 @@ def migrate_setting_v3(cs: sqlite3.Cursor, table: str) -> None:
         try:
             row = cs.execute(f'SELECT id FROM "{table}" WHERE key="{key}"').fetchone()
             if row:
-                cs.execute(f'DELETE FROM "{table} WHERE KEY="{key}"')
+                cs.execute(f'DELETE FROM "{table}" WHERE key="{key}"')
         except Exception as e:
             LOGGER.error(e)
 
