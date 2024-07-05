@@ -161,16 +161,23 @@ def migrate_schedule_v7(cs: sqlite3.Cursor, table: str) -> None:
             if 'periodic_id' in cols:
                 cs.execute(f'ALTER TABLE "flaskfarmaider_jobs" DROP COLUMN "periodic_id"')
             if 'rclone_remote' not in cols:
-                cs.execute(f'ALTER TABLE "flaskfarmaider_jobs" ADD COLUMN "rclone_remote" VARCHAR')
-            if 'vfs' in cols:
-                cs.execute(f'ALTER TABLE "flaskfarmaider_jobs" DROP COLUMN "vfs"')
-            cs.execute(f'INSERT INTO "{table}" SELECT * FROM "flaskfarmaider_jobs"')
+                cs.execute(f'ALTER TABLE "flaskfarmaider_jobs" RENAME COLUMN "vfs" TO "rclone_remote"')
+            cs.execute(f'''
+                INSERT INTO "{table}" (id, ctime, ftime, desc, target, task, recursive, rclone_remote, schedule_mode, schedule_interval,
+                    schedule_auto_start, status, scan_mode, clear_type, clear_level, clear_section, section_id)
+                SELECT id, ctime, ftime, desc, target, task, recursive, rclone_remote, schedule_mode, schedule_interval,
+                    schedule_auto_start, status, scan_mode, clear_type, clear_level, clear_section, section_id
+                FROM "flaskfarmaider_jobs"
+                ''')
             cs.execute(f'DROP TABLE "flaskfarmaider_jobs"')
         rows = cs.execute(f'SELECT * FROM {table}').fetchall()
         remotes = CONFIG.get_json('setting_rclone_remotes')
         for row in rows:
-            if row['task'] in ['refresh_scan', 'refresh', 'pm_ready_refresh']:
-                cs.execute(f'UPDATE "{table}" SET rclone_remote="{remotes[0]}" WHERE id={row["id"]}')
+            cs.execute(f'UPDATE "{table}" SET rclone_remote="" WHERE id={row["id"]}')
+            for remote in remotes:
+                if row['rclone_remote'] == f'{urllib.parse.urlparse(remote).fragment}:':
+                    cs.execute(f'UPDATE "{table}" SET rclone_remote="{remote}" WHERE id={row["id"]}')
+                    break
             match row['scan_mode']:
                 case 'periodic':
                     cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
@@ -223,7 +230,7 @@ def migrate_setting_v3(cs: sqlite3.Cursor, table: str) -> None:
                 cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
             case key if key in [
                     'setting_gds_tool_request_span', 'setting_gds_tool_request_auto', 'setting_gds_tool_fp_span', 'setting_gds_tool_fp_auto',
-                    'setting_rclone_remote_vfses', 'setting_rclone_path_test', 'setting_logging_rotation', 'setting_logging_files', 'settings_logging_size',
+                    'setting_rclone_path_test', 'setting_logging_rotation', 'setting_logging_files', 'settings_logging_size',
                     'tool_file_watcher_enable', 'tool_file_watcher_map', 'watcher_last_list_option',
                 ]:
                 cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
@@ -235,15 +242,21 @@ def migrate_setting_v3(cs: sqlite3.Cursor, table: str) -> None:
                 mappings = row['value'].splitlines()
                 cs.execute(f'UPDATE "{table}" SET value=\'{json.dumps(mappings)}\' WHERE key="setting_plex_mappings"')
                 cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
+            case 'setting_rclone_remote_vfses':
+                rclone_remote['vfses'] = [vfs[:-1] for vfs in row['value'].split('|')]
+                cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
 
     if rclone_remote.get('setting_rclone_remote_addr'):
         user = rclone_remote.get('setting_rclone_remote_user')
         pass_ = rclone_remote.get('setting_rclone_remote_pass')
-        url = urllib.parse.urlparse(f"{rclone_remote['setting_rclone_remote_addr']}#{rclone_remote['setting_rclone_remote_vfs'][:-1]}")
-        if user and pass_:
-            remotes = [f"{url.scheme}://{user}:{pass_}@{url.netloc}#{url.fragment}"]
-        else:
-            remotes = [urllib.parse.urlunparse(url)]
+        url = urllib.parse.urlparse(f"{rclone_remote['setting_rclone_remote_addr']}")
+        remotes = []
+        for vfs in rclone_remote['vfses']:
+            if user and pass_:
+                remote = f"{url.scheme}://{user}:{pass_}@{url.netloc}#{vfs}"
+            else:
+                remote = f"{url.scheme}://{url.netloc}#{vfs}"
+            remotes.append(remote)
         cs.execute(f'UPDATE "{table}" SET value=\'{json.dumps(remotes)}\' WHERE key="setting_rclone_remotes"')
 
 
