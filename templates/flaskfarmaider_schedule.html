@@ -1,22 +1,160 @@
 {% extends 'flaskfarmaider.html' %}
 {% block content %}
-{{ macros.m_modal_start('sch-add-modal', '일정 추가', 'modal-lg') }}
-<form id='sch-setting'></form>
+{{ macros.m_modal_start('add-modal', '일정 추가', 'modal-xl') }}
+<form id='setting'>
+    <div class="form-group row mx-2">
+        <div class="col pl-0">
+            <label for="sch-task"><strong>작업</strong></label>
+            <div class="input-group">
+                <select id="sch-task" name="sch-task" class="form-control form-control-sm">
+                    {% for task in args.tasks.values() %}
+                    {% if task.key == 'forget' %}
+                    {% continue %}
+                    {% endif %}
+                    <option value="{{ task.key }}">{{ task.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <small class="form-text text-muted">일정으로 등록할 작업</small>
+        </div>
+        <div class="col pr-0">
+            <label for="sch-description" class=""><strong>설명</strong></label>
+            <div class="input-group">
+                <input id="sch-description" name="sch-description" type="text" class="form-control form-control-sm">
+            </div>
+            <small class="form-text text-muted">일정 목록에 표시될 제목</small>
+        </div>
+    </div>
+
+    <div class="form-group row mx-2">
+        <div class="col pl-0">
+            <label for=""><strong>일정 방식</strong></label>
+            <div class="input-group">
+                <div class="custom-control custom-radio custom-control-inline">
+                    <input id="sch-schedule-mode0" type="radio" class="custom-control-input" name="sch-schedule-mode" value="none">
+                    <label class="custom-control-label" for="sch-schedule-mode0">없음</label>
+                </div>
+                <div class="custom-control custom-radio custom-control-inline">
+                    <input id="sch-schedule-mode1" type="radio" class="custom-control-input" name="sch-schedule-mode" value="startup">
+                    <label class="custom-control-label" for="sch-schedule-mode1">시작시 실행</label>
+                </div>
+                <div class="custom-control custom-radio custom-control-inline">
+                    <input id="sch-schedule-mode2" type="radio" class="custom-control-input" name="sch-schedule-mode" value="schedule">
+                    <label class="custom-control-label" for="sch-schedule-mode2">시간 간격</label>
+                </div>
+            </div>
+            <div class="input-group mt-3">
+                <div class="custom-control custom-switch custom-control-inline">
+                    <input id="sch-schedule-auto-start" name="sch-schedule-auto-start" type="checkbox" class="custom-control-input">
+                    <label for="sch-schedule-auto-start" class="custom-control-label"><strong>시작시 일정 등록</strong></label>
+                    <input id="sch-schedule-auto-start-helper" type="checkbox" class="mx-1" hidden name="sch-checkbox-helper" title="Off로 저장시 체크">
+                </div>
+            </div>
+        </div>
+        <div class="col pr-0">
+            <label for="sch-schedule-interval" class=""><strong>시간 간격</strong></label>
+            <div class="input-group">
+                <input id="sch-schedule-interval" name="sch-schedule-interval" type="text" class="form-control form-control-sm" value="">
+            </div>
+            <small class="form-text text-muted">Interval(단위: 분) 혹은 5자리 Cron 표현식<br>예시 1: 60<br>예시 2: */10 * * * *</small>
+        </div>
+    </div>
+    <hr class="">
+    <div class="form-group row mx-2">
+        <div class="col pl-0">
+            <label for="sch-target-path" class=""><strong>로컬 경로</strong></label>
+            <div class="input-group">
+                <input id="sch-target-path" name="sch-target-path" type="text" class="form-control form-control-sm">
+                <button id="sch-target-path-btn" class="btn btn-sm btn-outline-primary">경로 탐색</button>
+            </div>
+            <small class="form-text text-muted">Flaskfarm이 접근 가능한 로컬 경로</small>
+
+            <label for="sch-target-section" class="mt-3"><strong>라이브러리 섹션</strong></label>
+            <div class="input-group">
+                <select id="sch-target-section" name="sch-target-section" class="form-control form-control-sm"></select>
+            </div>
+            <small class="form-text text-muted">plex_mate 플러그인에 등록된 플렉스 서버의 라이브러리 섹션</small>
+            <span class="mt-3 text-warning">새로고침/스캔 대상은 "로컬 경로", "라이브러리 섹션"의 경로를 비교하여 상세 경로(하위 경로)가 선택 됩니다.</span>
+        </div>
+        <div class="col pr-0">
+            <label for="sch-rclone-remote" class=""><strong>Rclone 리모트 콘트롤 서버</strong></label>
+            <div class="input-group">
+                <select id="sch-rclone-remote" name="sch-rclone-remote" class="form-control form-control-sm">
+                    {% for remote in args.setting_rclone_remotes %}
+                    <option value="{{ remote }}">{{ remote }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <small class="form-text text-muted">vfs/refresh를 수행할 RC 서버</small>
+            <div class="input-group mt-3">
+                <div class="custom-control custom-switch custom-control-inline">
+                    <input id="sch-recursive" name="sch-recursive" type="checkbox" class="custom-control-input">
+                    <label for="sch-recursive" class="custom-control-label"><strong>Recursive</strong></label>
+                    <input id="sch-recursive-helper" type="checkbox" class="mx-1" hidden name="sch-checkbox-helper" title="Off로 저장시 체크">
+                </div>
+            </div>
+            <small class="form-text text-muted">rclone vfs/refresh의 --recursive 옵션 적용 여부</small>
+            <label for="" class="mt-3"><strong>스캔 방식</strong></label>
+            <div class="input-group">
+                <div class="custom-control custom-radio custom-control-inline">
+                    <input id="sch-scan-mode0" type="radio" class="custom-control-input" name="sch-scan-mode" value="web">
+                    <label class="custom-control-label" for="sch-scan-mode0">Plex Web API</label>
+                </div>
+                <div class="custom-control custom-radio custom-control-inline">
+                    <input id="sch-scan-mode1" type="radio" class="custom-control-input" name="sch-scan-mode" value="plexmate">
+                    <label class="custom-control-label" for="sch-scan-mode1">plex_mate 스캔</label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <hr class="">
+    <div class="form-group row mx-2">
+        <div class="col pl-0">
+            <label for="" class=""><strong>파일 정리 유형</strong></label>
+            <div class="input-group">
+                <div class="custom-control custom-radio custom-control-inline">
+                    <input id="sch-clear-type0" type="radio" class="custom-control-input" name="sch-clear-type" value="movie">
+                    <label class="custom-control-label" for="sch-clear-type0">영화</label>
+                </div>
+                <div class="custom-control custom-radio custom-control-inline">
+                    <input id="sch-clear-type1" type="radio" class="custom-control-input" name="sch-clear-type" value="show">
+                    <label class="custom-control-label" for="sch-clear-type1">TV</label>
+                </div>
+                <div class="custom-control custom-radio custom-control-inline">
+                    <input id="sch-clear-type2" type="radio" class="custom-control-input" name="sch-clear-type" value="artist">
+                    <label class="custom-control-label" for="sch-clear-type2">음악</label>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <label for="sch-clear-level" class=""><strong>파일 정리 단계</strong></label>
+            <div class="input-group">
+                <select id="sch-clear-level" name="sch-clear-level" class="form-control form-control-sm"></select>
+            </div>
+        </div>
+        <div class="col pr-0">
+            <label for="sch-clear-section" class=""><strong>파일 정리 섹션</strong></label>
+            <div class="input-group">
+                <select id="sch-clear-section" name="sch-clear-section" class="form-control form-control-sm"></select>
+            </div>
+        </div>
+    </div>
+</form>
 {{ macros.m_modal_end_with_button(
   [
-    ['sch-save-btn', '일정 저장'],
+    ['save-btn', '일정 저장'],
   ]
 ) }}
 <form id="form_search">
-    <div class="input-group">
-        <div class="input-group-prepend">
+    <div class="input-group input-group-sm">
+        <div class="input-group-prepend input-group-sm">
             <select id="length" name="length" class="form-control w-50">
                 <option value="10">10</option>
                 <option value="20">20</option>
                 <option value="50">50</option>
                 <option value="100">100</option>
             </select>
-        <div class="input-group-prepend"></div>
+        <div class="input-group-prepend input-group-sm"></div>
             <select id="order" name="order" class="form-control">
                 <option value="desc">최근 순</option>
                 <option value="asc">오래된 순</option>
@@ -32,10 +170,10 @@
             </select>
         </div>
         <input id="keyword" name="keyword" class="form-control" type="text" placeholder="검색..." aria-label="Search">
-        <div class="input-group-append">
+        <div class="input-group-append input-group-sm">
             <div class="btn-group" role="group">
-                <button type="button" id="globalSearchSearchBtn" class="btn btn-primary px-4">검색</button>
-                <button type="button" id="SearchResetBtn" class="btn btn-outline-primary">리셋</button>
+                <button type="button" id="globalSearchSearchBtn" class="btn btn-primary btn-sm px-4">검색</button>
+                <button type="button" id="SearchResetBtn" class="btn btn-outline-primary btn-sm">리셋</button>
             </div>
         </div>
     </div>
@@ -43,8 +181,8 @@
 
 <hr class="border border-secondary">
 
-<div class="input-group-append">
-    <button type="button" id="sch-add-btn" class="btn btn-block btn-primary">일정 추가</button>
+<div class="input-group-append input-group-sm">
+    <button type="button" id="add-btn" class="btn btn-block btn-primary">일정 추가</button>
     <button type="button" id="multiple-edit" class="btn btn-outline-success mx-2">선택 수정</button>
     <button type="button" id="multiple-del" class="btn btn-outline-warning">선택 삭제</button>
 </div>
@@ -99,7 +237,6 @@
 <br />
 <br />
 
-<script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
     // assign variables
     const TASKS = JSON.parse('{{ args.tasks|tojson }}');
@@ -109,23 +246,19 @@
     const FF_SCHEDULE_KEYS = JSON.parse('{{ args.ff_schedule_keys|tojson }}');
     const FF_SCHEDULES = JSON.parse('{{ args.ff_schedules|tojson }}');
     const LAST_LIST_OPTIONS = "{{ args[module_name ~ '_last_list_option'] }}".split('|');
-    const VFS = "{{ args.setting_rclone_remote_vfs }}";
     const SCAN_MODES = JSON.parse('{{ args.scan_modes|tojson }}');
     const SCAN_MODE_KEYS = JSON.parse('{{ args.scan_mode_keys|tojson }}');
-    const PERIODICS = JSON.parse('{{ args.periodics|tojson }}');
     const SECTIONS = JSON.parse('{{ args.sections|tojson }}');
     const SECTION_TYPES = JSON.parse('{{ args.section_types|tojson }}');
     const SECTION_TYPE_KEYS = JSON.parse('{{ args.section_type_keys|tojson }}');
     const SEARCH_KEYS = JSON.parse('{{ args.search_keys|tojson }}');
     const SEARCHES = JSON.parse('{{ args.searches|tojson }}');
-    const VFSES = [];
-    const _VFSES = JSON.parse('{{ args.setting_rclone_remote_vfses.split('|')|tojson }}');
-    for (let idx in _VFSES) {
-        VFSES.push({value: _VFSES[idx], name: _VFSES[idx]});
-    }
+
+    const SETTING_RCLONE_REMOTES = JSON.parse('{{ args.setting_rclone_remotes|tojson }}');
+    const SETTING_RCLONE_MAPPINGS = JSON.parse('{{ args.setting_rclone_mappings|tojson }}');
 
     $(function() {
-        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider.js') }}")
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_schedule.js') }}")
     });
 </script>

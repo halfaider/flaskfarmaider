@@ -8,50 +8,33 @@ import shlex
 import locale
 import platform
 import time
+import urllib.parse
+import functools
+from typing import Any
 
 import yaml
-import requests
-import flask
-import flask_login
 
-from .setup import ModelBase, system_plugin
 from .setup import FRAMEWORK, LOGGER, CONFIG
 from .api import Aider, PluginAider
+from .models import ScheduleModel
 from .constants import TASK_KEYS, TOOL_TRASH_KEYS, STATUS_KEYS, SCAN_MODE_KEYS, SECTION_TYPE_KEYS
-from .util import dict_factory, get_readable_time, parse_mappings, update_path, get_client_ip
+from .util import dict_factory, get_readable_time, parse_mappings, update_path, parse_json_response
 
 
-class JobAider(Aider):
+class ScheduleAider(Aider):
 
-    def __init__(self) -> None:
-        super().__init__()
-        self.starts = {
-            TASK_KEYS[0]: self.start_refresh_scan,
-            TASK_KEYS[1]: self.start_refresh,
-            TASK_KEYS[2]: self.start_scan,
-            TASK_KEYS[3]: self.start_pm_ready_refresh,
-            TASK_KEYS[4]: self.start_clear,
-            TASK_KEYS[5]: self.start_startup,
-            TASK_KEYS[6]: self.start_forget,
-            TOOL_TRASH_KEYS[0]: self.start_trash,
-            TOOL_TRASH_KEYS[1]: self.start_trash,
-            TOOL_TRASH_KEYS[2]: self.start_trash,
-            TOOL_TRASH_KEYS[3]: self.start_trash,
-            TOOL_TRASH_KEYS[4]: self.start_trash,
-        }
-
-    def start_trash(self, job: ModelBase) -> None:
+    def start_trash(self, schedule: ScheduleModel) -> None:
         refresh = scan = empty = False
-        if job.task in [TOOL_TRASH_KEYS[0], TOOL_TRASH_KEYS[3], TOOL_TRASH_KEYS[4]]:
+        if schedule.task in [TOOL_TRASH_KEYS[0], TOOL_TRASH_KEYS[3], TOOL_TRASH_KEYS[4]]:
             refresh = True
-        if job.task in [TOOL_TRASH_KEYS[1], TOOL_TRASH_KEYS[3], TOOL_TRASH_KEYS[4]]:
+        if schedule.task in [TOOL_TRASH_KEYS[1], TOOL_TRASH_KEYS[3], TOOL_TRASH_KEYS[4]]:
             scan = True
-        if job.task in [TOOL_TRASH_KEYS[2], TOOL_TRASH_KEYS[4]]:
+        if schedule.task in [TOOL_TRASH_KEYS[2], TOOL_TRASH_KEYS[4]]:
             empty = True
         plex_aider = PlexmateAider()
-        if not job.task == TOOL_TRASH_KEYS[2]:
-            rclone_aider = RcloneAider()
-            trashes: dict = plex_aider.get_trashes(job.section_id, 1, -1)
+        if not schedule.task == TOOL_TRASH_KEYS[2]:
+            rclone_aider = RcloneAider(schedule.rclone_remote)
+            trashes: dict = plex_aider.get_trashes(schedule.section_id, 1, -1)
             if trashes:
                 paths = {pathlib.Path(row['file']).parent for row in trashes}
                 for path in paths:
@@ -59,20 +42,35 @@ class JobAider(Aider):
                         LOGGER.info(f'작업을 중지합니다.')
                         break
                     if refresh:
-                        rclone_aider.vfs_refresh(path, job.recursive, job.vfs)
+                        rclone_aider.vfs_refresh(str(path), schedule.recursive)
                     if scan:
-                        plex_aider.scan(SCAN_MODE_KEYS[2], str(path), -1, job.section_id)
+                        plex_aider.scan(SCAN_MODE_KEYS[0], str(path), schedule.section_id)
             else:
                 LOGGER.info('이용 불가 파일이 없습니다.')
                 empty = False
         if empty and CONFIG.get('tool_trash_task_status') == STATUS_KEYS[1]:
-            plex_aider.empty_trash(job.section_id)
+            plex_aider.empty_trash(schedule.section_id)
 
-    def start_forget(self, job: ModelBase) -> None:
+    def start_trash_refresh(self, schedule: ScheduleModel) -> None:
+        self.start_trash(schedule)
+
+    def start_trash_scan(self, schedule: ScheduleModel) -> None:
+        self.start_trash(schedule)
+
+    def start_trash_empty(self, schedule: ScheduleModel) -> None:
+        self.start_trash(schedule)
+
+    def start_trash_refresh_scan(self, schedule: ScheduleModel) -> None:
+        self.start_trash(schedule)
+
+    def start_trash_refresh_scan_empty(self, schedule: ScheduleModel) -> None:
+        self.start_trash(schedule)
+
+    def start_forget(self, schedule: ScheduleModel) -> None:
         '''forget'''
-        RcloneAider().vfs_forget(job.target, job.vfs)
+        RcloneAider(schedule.rclone_remote).vfs_forget(schedule.target)
 
-    def start_startup(self, job: ModelBase) -> None:
+    def start_startup(self, schedule: ScheduleModel) -> None:
         '''startup'''
         platform_name = platform.system().lower()
         LOGGER.debug(f'플랫폼: {platform_name}')
@@ -83,11 +81,11 @@ class JobAider(Aider):
         else:
             LOGGER.warning(f'실행할 수 없는 OS 환경입니다: {platform_name}')
 
-    def start_clear(self, job: ModelBase) -> None:
+    def start_clear(self, schedule: ScheduleModel) -> None:
         '''clear'''
-        PlexmateAider().clear_section(job.clear_section, job.clear_type, job.clear_level)
+        PlexmateAider().clear_section(schedule.clear_section, schedule.clear_type, schedule.clear_level)
 
-    def start_pm_ready_refresh(self, job: ModelBase) -> None:
+    def start_pm_ready_refresh(self, schedule: ScheduleModel) -> None:
         '''pm_ready_refresh'''
         plex_aider = PlexmateAider()
         # plexmate
@@ -97,53 +95,39 @@ class JobAider(Aider):
         targets = {s.target for s in plex_aider.get_scan_items('READY')}
         if targets:
             for target in targets:
-                RcloneAider().vfs_refresh(target, job.recursive, job.vfs)
+                RcloneAider(schedule.rclone_remote).vfs_refresh(target, schedule.recursive)
         else:
             LOGGER.info(f'plex_mate: 새로고침 대상이 없습니다.')
 
-    def start_scan(self, job: ModelBase) -> None:
+    def start_scan(self, schedule: ScheduleModel) -> None:
         '''scan'''
-        PlexmateAider().scan(job.scan_mode, job.target, job.periodic_id, job.section_id)
+        PlexmateAider().scan(schedule.scan_mode, schedule.target, schedule.section_id)
 
-    def start_refresh(self, job: ModelBase) -> None:
+    def start_refresh(self, schedule: ScheduleModel) -> None:
         '''refresh'''
-        rclone_aider = RcloneAider()
-        # section_id DB 패치가 안 됐을 경우 대비
-        if job.section_id and int(job.section_id) > 0:
-            targets = PlexmateAider().get_targets(job.target, job.section_id)
+        rclone_aider = RcloneAider(schedule.rclone_remote)
+        if schedule.section_id and int(schedule.section_id) > 0:
+            targets = PlexmateAider().get_targets(schedule.target, schedule.section_id)
             for location, _ in targets.items():
-                rclone_aider.vfs_refresh(location, job.recursive, job.vfs)
+                rclone_aider.vfs_refresh(location, schedule.recursive)
         else:
-            rclone_aider.vfs_refresh(job.target, job.recursive, job.vfs)
+            rclone_aider.vfs_refresh(schedule.target, schedule.recursive)
 
-    def start_refresh_scan(self, job: ModelBase) -> None:
+    def start_refresh_scan(self, schedule: ScheduleModel) -> None:
         '''refresh_scan'''
         # refresh
         plex_aider = PlexmateAider()
-        rclone_aider = RcloneAider()
-        if job.scan_mode == SCAN_MODE_KEYS[1] and job.periodic_id > 0:
-            # 주기적 스캔 작업 새로고침
-            targets = plex_aider.get_periodic_locations(job.periodic_id)
-            for target in targets:
-                rclone_aider.vfs_refresh(target, job.recursive, job.vfs)
-            plex_aider.scan(job.scan_mode, periodic_id=job.periodic_id)
-        else:
-            targets = plex_aider.get_targets(job.target, job.section_id)
-            for location, section_id in targets.items():
-                rclone_aider.vfs_refresh(location, job.recursive, job.vfs)
-                plex_aider.scan(job.scan_mode, location, section_id=section_id)
+        rclone_aider = RcloneAider(schedule.rclone_remote)
+        targets = plex_aider.get_targets(schedule.target, schedule.section_id)
+        for location, section_id in targets.items():
+            rclone_aider.vfs_refresh(location, schedule.recursive)
+            plex_aider.scan(schedule.scan_mode, location, section_id=section_id)
 
 
 class SettingAider(Aider):
 
-    # system 플러그인은 플러그인 매니저에 등록되지 않으므로 직접 임포트
-    system_route = system_plugin.logic.get_module('route')
-    system_route_process_command = system_route.process_command
     depend_source_yaml = pathlib.Path(__file__).parent / 'files' / f'{__package__}.yaml'
     depend_user_yaml = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml')
-
-    def __init__(self) -> None:
-        super().__init__()
 
     @classmethod
     def depends(cls, text: str = None) -> str:
@@ -165,34 +149,6 @@ class SettingAider(Aider):
                 with cls.depend_source_yaml.open(encoding='utf-8', newline='\n') as file:
                     return file.read()
 
-    @classmethod
-    def set_login_log(cls, enable: bool = True) -> None:
-        if enable:
-            cls.system_route.process_command = cls.process_command_route_system
-        else:
-            cls.system_route.process_command = cls.system_route_process_command
-
-    @staticmethod
-    def process_command_route_system(command: str, arg1: str | None, arg2: str | None, arg3: str | None, request: flask.Request) -> flask.Response:
-        '''alternative of system.route.process_command()'''
-        if command == 'login':
-            username = arg1
-            password = arg2
-            remember = (arg3 == 'true')
-            client_info = f"user={username} ip={get_client_ip(request)}"
-            failed_msg = f'로그인 실패: {client_info}'
-            if username not in FRAMEWORK.users:
-                system_plugin.logger.warning(failed_msg)
-                return flask.jsonify('no_id')
-            elif not FRAMEWORK.users[username].can_login(password):
-                system_plugin.logger.warning(failed_msg)
-                return flask.jsonify('wrong_password')
-            else:
-                system_plugin.logger.info(f'로그인 성공: {client_info}')
-                FRAMEWORK.users[username].authenticated = True
-                flask_login.login_user(FRAMEWORK.users[username], remember=remember)
-                return flask.jsonify('redirect')
-
 
 class PlexmateAider(PluginAider):
 
@@ -200,10 +156,10 @@ class PlexmateAider(PluginAider):
         super().__init__('plex_mate')
         self.db = self.plugin.PlexDBHandle
 
-    def get_scan_model(self) -> ModelBase:
+    def get_scan_model(self) -> ScheduleModel:
         return self.get_module('scan').web_list_model
 
-    def get_scan_items(self, status: str) -> list[ModelBase]:
+    def get_scan_items(self, status: str) -> list[ScheduleModel]:
         return self.get_scan_model().get_list_by_status(status)
 
     def get_sections(self) -> dict:
@@ -317,10 +273,9 @@ class PlexmateAider(PluginAider):
                     over.created_time = datetime.datetime.now()
                     over.set_status('READY', save=True)
 
-    def get_targets(self, target: str, section_id: int = -1) -> dict[str, int]:
-        mappings = parse_mappings(CONFIG.get('setting_plexmate_plex_mapping'))
+    def get_targets(self, target: str, section_id: int = None) -> dict[str, int]:
+        mappings = parse_mappings(CONFIG.get_json('setting_plex_mappings'))
         target = pathlib.Path(update_path(target, mappings))
-        # section_id DB 패치가 안 됐을 경우 대비
         if section_id and int(section_id) > 0:
             locations = self.db.select(f'SELECT library_section_id, root_path FROM section_locations WHERE library_section_id = {section_id}')
         else:
@@ -348,8 +303,8 @@ class PlexmateAider(PluginAider):
         else:
             LOGGER.error(f'스캔 전송 실패: {response.text}')
 
-    def scan(self, scan_mode: str, target: str = None, periodic_id: int = -1, section_id: int = -1) -> None:
-        if scan_mode == SCAN_MODE_KEYS[2]:
+    def scan(self, scan_mode: str, target: str = None, section_id: int = -1) -> None:
+        if scan_mode == SCAN_MODE_KEYS[0]:
             '''
             웹 스캔의 완료를 추적하는 방식이 정확하지 않음.
                 - 스캔이 밀려 있을 경우 activity는 현재 스캔만 보여줌
@@ -369,12 +324,6 @@ class PlexmateAider(PluginAider):
                     #    time.sleep(1)
             else:
                 LOGGER.error(f'섹션 ID를 찾을 수 없습니다: {target}')
-        elif scan_mode == SCAN_MODE_KEYS[1]:
-            module = self.get_module('periodic')
-            scan_job = self.get_periodic_job(periodic_id)
-            if scan_job:
-                LOGGER.debug(f'주기적 스캔 작업 실행: {scan_job}')
-                module.one_execute(periodic_id - 1)
         else:
             scan_item = self.get_scan_model()(target)
             scan_item.save()
@@ -484,149 +433,149 @@ class PlexmateAider(PluginAider):
                     if updating_section_id == section_id:
                         LOGGER.debug(f"status=scanning section_id={updating_section_id} title='{act.get('title')}' progress={act.get('progress')}")
                         return True
-
-        perodics = self.get_module('periodic').web_list_model
-        with FRAMEWORK.app.app_context():
-            query = FRAMEWORK.db.session.query(perodics).filter(perodics.status == 'working')
-            workings = query.all()
-            if workings:
-                LOGGER.debug(f'status=working section_id={workings[0].section_id} pid={workings[0].process_pid}')
-                return True
         return False
 
 
 class RcloneAider(Aider):
 
-    def __init__(self) -> None:
+    def __init__(self, rc_url: str = None) -> None:
         super().__init__()
+        url = urllib.parse.urlparse(rc_url)
+        self._vfs = url.fragment
+        self._rc_user = url.username
+        self._rc_pass = url.password
+        self._rc_url = urllib.parse.urlunparse([url.scheme, f'{url.hostname}:{url.port}', '', '', '', ''])
+        self._mappings = parse_mappings(CONFIG.get_json('setting_rclone_mappings'))
 
-    def get_metadata_cache(self, fs: str) -> tuple[int, int]:
+    @property
+    def rc_url(self) -> str:
+        return self._rc_url
+
+    @property
+    def rc_user(self) -> str:
+        return self._rc_user
+
+    @property
+    def rc_pass(self) -> str:
+        return self._rc_pass
+
+    @property
+    def vfs(self) -> str:
+        return self._vfs
+
+    @property
+    def mappings(self) -> str:
+        return self._mappings
+
+    def command(method: callable) -> callable:
+        @functools.wraps(method)
+        def wrapper(self, *args: tuple, **kwds: dict) -> dict[str, Any]:
+            data = method(self, *args, **kwds)
+            vfs = data.pop('fs', None)
+            if vfs:
+                data['fs'] = f'{vfs}:'
+            command = '/'.join(method.__name__.split('__'))
+            interface = data.pop('interface', 'API')
+            # CLI or API
+            if interface == 'CLI':
+                command_method = self.command_cli
+            else:
+                command_method = self.command_api
+            result = command_method(command, data)
+            if 'error' in result:
+                raise Exception(result.get('error'))
+            return result
+        return wrapper
+
+    def check_metadata_cache(method: callable) -> callable:
+        @functools.wraps(method)
+        def wrapper(self, *args: tuple, **kwds: dict) -> dict[str, Any]:
+            start_dirs, start_files = self.get_metadata_cache()
+            start = time.time()
+            result = method(self, *args, **kwds)
+            elapsed = time.time() - start
+            dirs, files = self.get_metadata_cache()
+            LOGGER.info(f'dirs={dirs - start_dirs} files={files - start_files} elapsed={elapsed:.1f}s result="{result!r}"')
+            return result
+        return wrapper
+
+    def command_api(self, command: str, data: dict = None) -> dict[str, Any]:
+        LOGGER.debug(f'{command}: {data}')
+        return parse_json_response(self.request('JSON', f'{self.rc_url}/{command}', data=data, auth=(self.rc_user, self.rc_pass)))
+
+    def command_cli(self, command: str, data: dict = None):
+        pass
+
+    @command
+    def vfs__list(self, interface: str = None) -> dict[str, Any]:
+        return {'interface': interface}
+
+    @command
+    def vfs__stats(self, fs: str = None, interface: str = None) -> dict[str, Any]:
+        return {
+            'interface': interface,
+            'fs': fs or self.vfs,
+        }
+
+    @command
+    def vfs__refresh(self, remote_path: str, recursive: bool = False, fs: str = None, interface: str = None) -> dict[str, Any]:
+        return {
+            'dir': remote_path,
+            'recursive': str(recursive).lower(),
+            'interface': interface,
+            'fs': fs or self.vfs,
+        }
+
+    @command
+    def vfs__forget(self, remote_path: str, fs: str = None, interface: str = None) -> dict[str, Any]:
+        return {
+            'interface': interface,
+            'dir': remote_path,
+            'fs': fs or self.vfs,
+        }
+
+    @check_metadata_cache
+    def _vfs_refresh(self, remote_path: str, recursive: bool = False, fs: str = None) -> dict[str, Any]:
+        result: dict = self.vfs__refresh(remote_path, recursive, fs)
+        return result
+
+    def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> None:
+        remote_path = pathlib.Path(update_path(local_path, self.mappings)) if self.mappings else pathlib.Path(local_path)
+        parents: list[pathlib.Path] = list(remote_path.parents)
+        to_be_tested = str(remote_path)
+        not_exists_paths = []
+        result = self._vfs_refresh(to_be_tested, recursive)
+        while result['result'].get(to_be_tested) == 'file does not exist':
+            not_exists_paths.insert(0, to_be_tested)
+            if parents:
+                to_be_tested = str(parents.pop(0))
+                result = self._vfs_refresh(to_be_tested, recursive)
+            else:
+                LOGGER.warning(f'Hit the top-level path.')
+                break
+        for path in not_exists_paths:
+            result = self._vfs_refresh(path, recursive)
+            if not result.get(path) == 'OK':
+                LOGGER.error(f'Could not refresh: "{str(remote_path)}" result="{result}"')
+                break
+
+    @check_metadata_cache
+    def _vfs_forget(self, remote_path: str, fs: str = None) -> dict[str, Any]:
+        result: dict = self.vfs__forget(remote_path, fs)
+        return result
+
+    def vfs_forget(self, local_path: str, fs: str = None) -> None:
+        remote_path = pathlib.Path(update_path(local_path, self.mappings)) if self.mappings else pathlib.Path(local_path)
+        self._vfs_forget(str(remote_path), fs)
+
+    def get_metadata_cache(self, fs: str = None) -> tuple[int, int]:
         try:
-            response = self.vfs_stats(fs)
-            result = response.json().get('metadataCache')
+            result = self.vfs__stats(fs)
+            result = result.get('metadataCache')
             return result.get('dirs', 0), result.get('files', 0)
         except Exception as e:
             LOGGER.warning(repr(e))
             return 0, 0
-
-    def vfs_stats(self, fs: str) -> requests.Response:
-        return self.command("vfs/stats", data={"fs": fs})
-
-    def command(self, command: str, data: dict = None) -> requests.Response:
-        LOGGER.debug(f'{command}: {data}')
-        return self.request(
-            "JSON",
-            f'{CONFIG.get("setting_rclone_remote_addr")}/{command}',
-            data=data,
-            auth=(CONFIG.get('setting_rclone_remote_user'), CONFIG.get('setting_rclone_remote_pass'))
-        )
-
-    def _vfs_list(self) -> requests.Response:
-        return self.command('vfs/list')
-
-    def vfs_list(self) -> list:
-        response = self._vfs_list()
-        vfses = [CONFIG.get('setting_rclone_remote_vfs')]
-        if int(str(response.status_code)[0]) == 2:
-            vfses = response.json().get('vfses', vfses)
-        return sorted(vfses)
-
-    def _vfs_refresh(self, remote_path: str, recursive: bool = False, fs: str = None, forget: bool = False) -> requests.Response:
-        data = {
-            'fs': fs or CONFIG.get('setting_rclone_remote_vfs'),
-            'dir': remote_path
-        }
-        if forget:
-            cmd, title = 'vfs/forget', '캐시삭제 결과'
-        else:
-            cmd, title = 'vfs/refresh', '새로고침 결과'
-            data['recursive'] = str(recursive).lower()
-        start_dirs, start_files = self.get_metadata_cache(data["fs"])
-        start = time.time()
-        response = self.command(cmd, data=data)
-        dirs, files = self.get_metadata_cache(data["fs"])
-        try:
-            content = response.json()
-        except requests.exceptions.JSONDecodeError:
-            content = response.text
-        LOGGER.info(f'{title}: dirs={dirs - start_dirs} files={files - start_files} elapsed={(time.time() - start):.1f}s content={content}')
-        return response
-
-    def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> requests.Response:
-        if not CONFIG.get('setting_rclone_path_test').lower() == 'true':
-            mappings = parse_mappings(CONFIG.get('setting_rclone_mapping'))
-            response = self._vfs_refresh(update_path(local_path, mappings), recursive, fs)
-            result, reason = self.is_successful(response)
-            if not result:
-                LOGGER.error(f'새로고침 실패: {reason}: {local_path}')
-            return response
-        # 이미 존재하는 파일이면 패스, 존재하지 않은 파일/폴더, 존재하는 폴더이면 진행
-        local_path = pathlib.Path(local_path)
-        if local_path.is_file():
-            response = requests.Response()
-            response.status_code = 0
-            reason = '이미 존재하는 파일입니다'
-            response._content = bytes(reason, 'utf-8')
-            LOGGER.debug(f'{reason}: {local_path}')
-            return response
-        # vfs/refresh 용 존재하는 경로 찾기
-        test_dirs = [local_path] # file: 존재하지 않음, foler: 존재함, 존재하지 않음
-        already_exists = test_dirs[0].exists()
-        while not test_dirs[-1].exists():
-            test_dirs.append(test_dirs[-1].parent) # [children ... parents ... until path exists]
-        LOGGER.debug(f"경로 검사: {str(test_dirs)}")
-        mappings = parse_mappings(CONFIG.get('setting_rclone_mapping'))
-        while test_dirs:
-            # vfs/refresh 후
-            response = self._vfs_refresh(update_path(str(test_dirs[-1]), mappings), recursive, fs)
-            # 타겟이 존재하는지 점검
-            if local_path.exists():
-                # 타겟이 존재하지 않았던 '폴더'면 vfs/refresh
-                if not local_path.is_file() and not already_exists:
-                    self._vfs_refresh(update_path(str(local_path), mappings), recursive, fs)
-                # 타겟 폴더가 존재하므로 종료
-                break
-            # 타겟이 여전히 존재하지 않으면 결과 점검
-            result, reason = self.is_successful(response)
-            if not result:
-                LOGGER.error(f'새로고침 실패: {reason}: {test_dirs[-1]}')
-                # 새로고침에 실패했으면 다음 자식 경로의 새로고침도 실패하므로 종료
-                break
-            # 다음 테스트 대상이 타겟이면 종료, 아니면 반복
-            if len(test_dirs) > 2:
-                test_dirs.pop()
-            else:
-                LOGGER.warning(f'새로고침 후에도 대상이 존재하지 않습니다: {str(local_path)}')
-                break
-        return response
-
-    def vfs_forget(self, local_path: str, fs: str = None) -> requests.Response:
-        mappings = parse_mappings(CONFIG.get('setting_rclone_mapping'))
-        response = self._vfs_refresh(update_path(local_path, mappings), fs=fs, forget=True)
-        result, reason = self.is_successful(response)
-        if not result:
-            LOGGER.error(f'캐시삭제 실패: {reason}: {local_path}')
-        return response
-
-    def is_successful(self, response: requests.Response) -> tuple[bool, str]:
-        if not str(response.status_code).startswith('2'):
-            return False, f'status code: {response.status_code}, content: {response.text}'
-        try:
-            # {'error': '', ...}
-            # {'result': {'/path/to': 'Invalid...'}}
-            # {'result': {'/path/to': 'OK'}}
-            # {'forgotten': ['/path/to']}
-            _json = response.json()
-            if _json.get('result'):
-                result = list(_json.get('result').values())[0]
-                return (True, result) if result == 'OK' else (False, result)
-            elif _json.get('forgotten'):
-                return True, _json.get('forgotten')
-            else:
-                return False, _json.get('error')
-        except:
-            LOGGER.error(traceback.format_exc())
-            return False, response.text
 
 
 class StartupAider(Aider):
@@ -661,7 +610,7 @@ class StartupAider(Aider):
         require_plugins, require_packages, require_commands = self.get_require_plugins(plugins_installed, depends)
 
         # 1. Commands from the setting
-        executable_commands = CONFIG.get('setting_startup_commands').splitlines()
+        executable_commands = CONFIG.get_json('setting_startup_commands')
         # 2. Commands of installing required packages
         executable_commands.extend(self.get_commands_from_packages(require_packages))
         # 3. Commands from plugin dependencies

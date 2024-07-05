@@ -4,9 +4,12 @@ import pathlib
 import datetime
 import os
 import traceback
+from typing import Any
 from threading import Thread
 
 import flask
+import requests
+
 
 logger = logging.getLogger(__name__)
 
@@ -66,13 +69,17 @@ def get_readable_time(_time: float) -> str:
     return datetime.datetime.fromtimestamp(_time, datetime.timezone.utc).strftime('%b %d %H:%M')
 
 
-def parse_mappings(text: str) -> dict[str, str]:
+def parse_mappings(settings: str | list) -> dict[str, str]:
+    if type(settings) is str:
+        settings = settings.splitlines()
+    return _parse_mappings(settings)
+
+
+def _parse_mappings(settings: list) -> dict[str, str]:
     mappings = {}
-    if text:
-        settings = text.splitlines()
-        for setting in settings:
-            source, target = setting.rsplit(':', 1)
-            mappings[source.strip()] = target.strip()
+    for setting in settings:
+        source, target = setting.rsplit(':', 1)
+        mappings[source.strip()] = target.strip()
     return mappings
 
 
@@ -82,6 +89,8 @@ def update_path(target: str, mappings: dict) -> str:
         target = target.replace('\\', '/')
     for k, v in mappings.items():
         target = target.replace(k, v)
+    if not target:
+        target = '/'
     return target
 
 
@@ -139,3 +148,19 @@ def get_client_ip(request: flask.Request) -> str:
         logger.error(traceback.format_exc())
         remote_addr = 'unknown'
     return remote_addr
+
+
+def parse_json_response(response: requests.Response) -> dict[str, Any]:
+        try:
+            # {'error': '', ...}
+            # {'result': {'/path/to': 'Invalid...'}}
+            # {'result': {'/path/to': 'OK'}}
+            # {'forgotten': ['/path/to']}
+            result = response.json()
+        except Exception as e:
+            result = {
+                'status_code': response.status_code,
+                'content': response.text.strip(),
+                'error': f'{repr(e)}',
+            }
+        return result

@@ -1,221 +1,160 @@
 {% extends 'flaskfarmaider.html' %}
 {% block content %}
 
-{% set vfses = [] %}
-{% for vfs in args[module_name + '_rclone_remote_vfses'].split('|') %}
-    {{ vfses.append([vfs, vfs]) or '' }}
-{% endfor %}
-
-{{ macros.m_button_group([['globalSettingSaveBtn', '설정 저장']])}}
-{{ macros.m_row_start('5') }}
-{{ macros.m_row_end() }}
-
+<div class="input-group mb-3">
+    <button id="btn-save-settings" type="button" class="btn btn-block btn-primary">설정 저장</button>
+</div>
 <nav>
-{{ macros.m_tab_head_start() }}
-{{ macros.m_tab_head('rcloneremote', 'Rclone Remote', true) }}
-{{ macros.m_tab_head('plexmate', 'Plexmate', false) }}
-{{ macros.m_tab_head('startup', '시작 스크립트', false) }}
-{{ macros.m_tab_head('logging', '기타 로그', false) }}
-{{ macros.m_tab_head_end() }}
+    <div class="nav nav-tabs" id="nav-tab" role="tablist">
+        <a class="nav-item nav-link active" id="nav-general-tab" data-toggle="tab" data-target="#nav-general" href="#" role="tab" aria-controls="nav-general" aria-selected="true">일반</a>
+        <a class="nav-item nav-link" id="nav-rclone-tab" data-toggle="tab" data-target="#nav-rclone" href="#" role="tab" aria-controls="nav-rclone" aria-selected="false">Rclone</a>
+        <a class="nav-item nav-link" id="nav-plex_mate-tab" data-toggle="tab" data-target="#nav-plex_mate" href="#" role="tab" aria-controls="nav-plex_mate" aria-selected="false">plex_mate</a>
+        <a class="nav-item nav-link" id="nav-startup-tab" data-toggle="tab" data-target="#nav-startup" href="#" role="tab" aria-controls="nav-startup" aria-selected="false">스타트업</a>
+        <a class="nav-item nav-link" id="nav-logging-tab" data-toggle="tab" data-target="#nav-logging" href="#" role="tab" aria-controls="nav-logging" aria-selected="false">기타 로그</a>
+    </div>
 </nav>
 <form id="setting">
 <div class="tab-content" id="nav-tabContent">
-{{ macros.m_tab_content_start('rcloneremote', true) }}
-    {{ macros.setting_input_text_and_buttons(
-        module_name + '_rclone_remote_addr',
-        'Rclone Remote 주소 (필수)',
-        [['btn_test_connection_rclone', '접속 확인']],
-        value=args[module_name + '_rclone_remote_addr'],
-        desc=['rclone remote의 주소', 'ex. http://172.17.0.1:5572'],
-        col='8'
-    ) }}
-    {{ macros.setting_select(
-        module_name + '_rclone_remote_vfs',
-        'vfs 리모트',
-        vfses,
-        col='3',
-        desc=['"접속 확인" 성공시 목록이 갱신됩니다.'],
-        value=args[module_name + '_rclone_remote_vfs']
-    ) }}
-    {{ macros.m_hr() }}
-    {{ macros.setting_input_text(
-        module_name + '_rclone_remote_user',
-        'User (선택)',
-        value=args[module_name + '_rclone_remote_user'],
-        col='3',
-        desc=['Remote 접속에 필요한 사용자 이름','--rc-user=username', '사용하지 않을 경우 공백으로 남겨두세요.']
-    ) }}
-    {{ macros.setting_input_text(
-        module_name + '_rclone_remote_pass',
-        'Pass (선택)',
-        value=args[module_name + '_rclone_remote_pass'],
-        col='3',
-        desc=['Remote 접속에 필요한 비밀번호', '--rc-pass=password', '사용하지 않을 경우 공백으로 남겨두세요.'],
-        type='password'
-    ) }}
-    {{ macros.m_hr() }}
-    {{ macros.setting_input_textarea(
-        module_name + '_rclone_remote_mapping',
-        '경로 변경 규칙 (필수)',
-        value=args[module_name + '_rclone_remote_mapping'],
-        desc=[
-            '로컬 경로를 리모트 경로로 변경할 때 적용할 규칙들',
-            '줄바꿈으로 각 규칙 구분',
-            '',
-            '/변경할/로컬/경로:/변경될/리모트/경로',
-            '',
-            'ex.',
-            '로컬 경로: /mnt/gds/VOD/1.방송중/드라마',
-            '리모트 경로: VOD/1.방송중/드라마',
-            '로컬 경로에서 /mnt/gds 부분을 삭제해야 하므로',
-            '/mnt/gds:'
-        ],
-        col='8',
-        row='5'
-    ) }}
-    {{ macros.setting_checkbox(
-        module_name + '_rclone_path_test',
-        '로컬 경로 검사',
-        args[module_name + '_rclone_path_test'],
-        desc=['vfs/refresh 요청 전 로컬 경로 검사 여부', 'Off시 로컬 경로를 검사하지 않습니다.', '로컬 경로를 검사하지 않으면 plex_mate의 ready 항목을 새로고침할 때 실패할 수 있습니다.']
-    ) }}
-{{ macros.m_tab_content_end() }}
-{{ macros.m_tab_content_start('plexmate', false) }}
-    {{ macros.setting_input_text(
-        module_name + '_plexmate_max_scan_time',
-        '최대 스캔 시간',
-        value=args[module_name + '_plexmate_max_scan_time'],
-        col='3',
-        desc=['분 단위', 'Plexmate의 SCANNING 상태가 이 시간을 초과하여 지속될 경우 스캔 실패로 간주합니다.']
-    ) }}
-    {{ macros.m_hr() }}
-    {{ macros.setting_input_text_and_buttons(
-        module_name + '_plexmate_timeover_range',
-        '타임오버 항목 점검',
-        [[module_name + '_plexmate_timeover_btn', '지금 실행']],
-        value=args[module_name + '_plexmate_timeover_range'],
-        col='5',
-        desc=[
-            'Plexmate의 TIMEOVER된 항목들 중 이 ID 범위내 항목들을 다시 READY로 변경합니다.',
-            '~로 범위 표시: e.g. 100~110',
-            '100, 101, 102 ... 107, 108, 109, 110'
-            ''
-        ]
-    ) }}
-    {{ macros.m_hr() }}
-    {{ macros.setting_input_textarea(
-        module_name + '_plexmate_plex_mapping',
-        'PLEX 경로 변경 규칙',
-        value=args[module_name + '_plexmate_plex_mapping'],
-        desc=[
-            'FF의 경로와 플렉스 경로가 다를 경우 적용할 규칙들',
-            '줄바꿈으로 각 규칙 구분',
-            '',
-            '/변경할/로컬/경로:/변경될/플렉스/경로',
-            '',
-            'ex.',
-            '로컬 경로: /mnt/gds/VOD/1.방송중/드라마',
-            '플렉스 경로: /gdrive/VOD/1.방송중/드라마',
-            '로컬 경로에서 /mnt/gds 부분을 /gdrive 로 변경해야 하므로',
-            '/mnt/gds:/gdrive'
-        ],
-        col='8',
-        row='5'
-    ) }}
-{{ macros.m_tab_content_end() }}
-{{ macros.m_tab_content_start('startup', false) }}
-    {{ macros.setting_checkbox(
-        module_name + '_startup_executable',
-        '실행 허용',
-        args[module_name + '_startup_executable'],
-        desc=['명령어 실행 허용 여부', '로그에서 실행될 명령어 목록을 보고 실행 여부를 결정하세요.']
-    ) }}
-    {{ macros.m_hr() }}
-    {{ macros.setting_input_textarea(
-        module_name + '_startup_commands',
-        '실행할 명령어',
-        value=args[module_name + '_startup_commands'],
-        desc=['간단한 쉘 커맨드를 한 줄씩 입력하세요.', 'ex.', 'apt-get update', 'cmd.exe /c calc'],
-        col='12',
-        row='5'
-    ) }}
-    {{ macros.m_hr() }}
-    {{ macros.setting_input_text(
-        module_name + '_startup_timeout',
-        '명령어 최대 대기 시간',
-        value=args[module_name + '_startup_timeout'],
-        col='3',
-        desc=['초 단위', '각 명령어의 최대 대기시간입니다.']
-    ) }}
-    {{ macros.m_hr() }}
-    {{ macros.setting_input_textarea(
-        module_name + '_startup_dependencies',
-        '플러그인 의존성 목록',
-        value=args[module_name + '_startup_dependencies'],
-        desc=[
-        '../data/db/flaskfarmaider.yaml 파일을 수정하거나 여기에 yaml 문법으로 작성해 주세요.',
-        'ex.',
-        '플러그인:',
-        'repo: 플러그인 저장소',
-        'plugins: [필요한 플러그인1, 필요한 플러그인2, ...]',
-        'packages: [필요한 패키지1, 필요한 패키지2, ...]',
-        'commands: [필요한 명령어1, 필요한 명령어2, ...]'
-        ],
-        col='12',
-        row='20'
-    ) }}
-{{ macros.m_tab_content_end() }}
-{{ macros.m_tab_content_start('logging', false) }}
-    {{ macros.setting_checkbox(
-        module_name + '_logging_login',
-        '로그인 로그',
-        args[module_name + '_logging_login'],
-        desc=[args[module_name + '_logging_login_file']]
-    ) }}
-    {{ macros.m_hr() }}
-    {{ macros.setting_checkbox(
-        module_name + '_logging_access',
-        '접속 로그',
-        args[module_name + '_logging_access'],
-        desc=['Flaskfarm의 접속 로그']
-    ) }}
-    {{ macros.setting_input_text(
-        module_name + '_logging_access_file',
-        '접속 로그 경로',
-        value=args[module_name + '_logging_access_file'],
-        col='8',
-        desc=['접속 로그 파일의 경로']
-    ) }}
-    {{ macros.setting_input_text(
-            module_name + '_logging_access_format',
-            '접속 로그 형식',
-            value=args[module_name + '_logging_access_format'],
-            col='8',
-            desc=[
-                '{remote}: 클라이언트 IP',
-                '{method}: HTTP 메소드 (GET, POST, ...)',
-                '{path}: 요청 경로',
-                '{status}: HTTP 응답 상태 코드(200, 404, ...)',
-                '{length}: 응답 크기',
-                '{agent}: User-Agent',
-                '{form}: form 데이터',
-                '{headers}: HTTP 헤더',
-                '{hostname}: 호스트명',
-            ]
-        )
-    }}
-{{ macros.m_tab_content_end() }}
+    <div class="tab-pane fade show active" id="nav-general" role="tabpanel" aria-labelledby="nav-general-tab">
+        <div class="form-group row mx-2">
+            <div class="col pl-0">
+                <label for="setting_general_timeout"><strong>최대 대기 시간</strong></label>
+                <input id="setting_general_timeout" name="setting_general_timeout" class="form-control form-control-sm" type="number" value="{{ args.setting_general_timeout }}" required>
+                <small class="form-text text-muted">
+                    기본 최대 대기 시간<br>단위: 초
+                </small>
+            </div>
+            <div class="col pr-0"></div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="nav-rclone" role="tabpanel" aria-labelledby="nav-rclone-tab">
+        <div class="form-group row mx-2">
+            <div class="col pl-0">
+                <label for="rclone-remote-group"><strong>Remote Control 주소</strong></label>
+                <div id="rclone-remote-group"></div>
+                <small class="form-text text-muted">
+                    형식: scheme://user:pass@address#remote<br>예시 1: http://admin:12345@localhost:5275#gds<br>예시 2: https://user:pass@mydomain.com#my_remote<br>예시 3: http://172.17.0.1:5572
+                </small>
+            </div>
+            <div class="col pr-0">
+                <label for="rclone-mapping-group"><strong>Rclone 경로 변경 규칙</strong></label>
+                <div id="rclone-mapping-group"></div>
+                <small class="form-text text-muted">
+                    형식: /변경할/로컬/경로:/변경될/리모트/경로<br>예시 1: /mnt/gds/GDRIVE:/GDRIVE<br>예시 2: /mnt/gds:<br>예시 3: Y:/GDRIVE:/GDRIVE
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="nav-plex_mate" role="tabpanel" aria-labelledby="nav-plex_mate-tab">
+        <div class="form-group row mx-2">
+            <div class="col pl-0">
+                <label for="setting_plexmate_max_scan_time"><strong>최대 스캔 시간</strong></label>
+                <div class="input-group">
+                    <input id="setting_plexmate_max_scan_time" name="setting_plexmate_max_scan_time" class="form-control form-control-sm" type="number" value="{{ args.setting_plexmate_max_scan_time }}" required>
+                </div>
+                <small class="form-text text-muted">
+                    이 시간을 초과한 plex_mate 플러그인의 스캔 항목을 FINISH_TIMEOVER 처리<br>단위: 분
+                </small>
+                <label for="setting_plexmate_timeover_range" class="mt-3"><strong>타임오버 항목 재시도</strong></label>
+                <div class="input-group">
+                    <input id="setting_plexmate_timeover_range" name="setting_plexmate_timeover_range" class="form-control form-control-sm" type="text" value="{{ args.setting_plexmate_timeover_range }}" required>
+                    <button type="button" id="setting_plexmate_timeover_btn" class="btn btn-outline-primary btn-sm">지금 실행</button>
+                </div>
+                <small class="form-text text-muted">
+                    이 ID 범위의 항목 중 FINISH_TIMEOVER 처리된 항목을 다시 READY로 변경<br>형식: 시작ID~끝ID<br>예시 : 100~110 (100, 101, 102 ... 107, 108, 109, 110)
+                </small>
+            </div>
+            <div class="col pr-0">
+                <label for="plex-mapping-group"><strong>Plex 경로 변경 규칙</strong></label>
+                <div id="plex-mapping-group"></div>
+                <small class="form-text text-muted">
+                    형식: /변경할/로컬/경로:/변경될/플렉스/경로<br>예시 1: /mnt/gds/GDRIVE:/host/mnt/gds/GDRIVE<br>예시 2: /mnt/gds:<br>예시 3: Y:/GDRIVE:/GDRIVE
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="nav-startup" role="tabpanel" aria-labelledby="nav-startup-tab">
+        <div class="form-group row mx-2">
+            <div class="col pl-0">
+                <div class="custom-control custom-switch custom-control-inline">
+                    <input id="setting_startup_executable" name="setting_startup_executable" type="checkbox" class="custom-control-input">
+                    <label for="setting_startup_executable" class="custom-control-label"><strong>실행 허용</strong></label>
+                </div>
+                <small class="form-text text-muted">
+                    명령어 실행 허용 여부<br>로그에서 실행될 명령어를 확인하고 결정
+                </small>
+                <label for="setting_startup_timeout" class="mt-3"><strong>명령어 최대 대기 시간</strong></label>
+                <input id="setting_startup_timeout" name="setting_startup_timeout" type="number" class="form-control form-control-sm" value="300">
+                <small class="form-text text-muted">
+                    각 명령어의 최대 대기 시간<br>단위: 초
+                </small>
+                <label for="startup-command-group" class="mt-3"><strong>Plex 경로 변경 규칙</strong></label>
+                <div id="startup-command-group"></div>
+                <small class="form-text text-muted">
+                    실행할 커맨드<br>예시 1: apt-get update<br>예시 2: cmd.exe /c calc
+                </small>
+            </div>
+            <div class="col pr-0">
+                <label for="setting_startup_dependencies"><strong>플러그인 의존성 목록</strong></label>
+                <textarea id="setting_startup_dependencies" name="setting_startup_dependencies" class="form-control form-control-sm" rows="10">{{ args.setting_startup_dependencies }}</textarea>
+                <small class="form-text text-muted">
+                    /data/db/flaskfarmaider.yaml 파일을 수정하거나 여기에 yaml 문법으로 작성<br>플러그인이름:<br>repo: 플러그인 저장소<br>plugins: [필요한 플러그인1, 필요한 플러그인2, ...]<br>packages: [필요한 패키지1, 필요한 패키지2, ...]<br>commands: [필요한 명령어1, 필요한 명령어2, ...]
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="nav-logging" role="tabpanel" aria-labelledby="nav-logging-tab">
+        <div class="form-group row mx-2">
+            <div class="col pl-0">
+
+                <div class="custom-control custom-switch custom-control-inline">
+                    <input id="setting_logging_login" name="setting_logging_login"class="custom-control-input" type="checkbox">
+                    <label for="setting_logging_login" class="custom-control-label"><strong>로그인 로그</strong></label>
+                </div>
+                <small class="form-text text-muted">
+                    /data/log/system.log
+                </small>
+
+                <div class="custom-control custom-switch custom-control-inline mt-3">
+                    <input id="setting_logging_access" name="setting_logging_access"class="custom-control-input" type="checkbox">
+                    <label for="setting_logging_access" class="custom-control-label"><strong>접속 로그</strong></label>
+                </div>
+                <small class="form-text text-muted">
+                    Flaskfarm의 접속 로그
+                </small>
+
+                <label for="setting_logging_access_file" class="mt-3"><strong>접속 로그 파일 경로</strong></label>
+                <input id="setting_logging_access_file" name="setting_logging_access_file" type="text" class="form-control form-control-sm" placeholder="/data/log/access.log" value="{{ args.setting_logging_access_file }}">
+                <small class="form-text text-muted">
+                    접속 로그 파일의 경로
+                </small>
+            </div>
+            <div class="col pr-0">
+                <label for="setting_logging_access_format" class=""><strong>접속 로그 형식</strong></label>
+                <input id="setting_logging_access_format" name="setting_logging_access_format" type="text" class="form-control form-control-sm" placeholder="/data/log/access.log" value="{{ args.setting_logging_access_format }}">
+                <small class="form-text text-muted">
+                    {remote}: 클라이언트 IP<br>{method}: HTTP 메소드 (GET, POST, ...)<br>{path}: 요청 경로<br>{status}: HTTP 응답 상태 코드(200, 404, ...)<br>{length}: 응답 크기<br>{agent}: User-Agent<br>{form}: form 데이터<br>{headers}: HTTP 헤더<br>{hostname}: 호스트명
+                </small>
+
+            </div>
+        </div>
+    </div>
 </div>
 </form>
 
-<script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
     const VFS = "{{ args.setting_rclone_remote_vfs }}";
     const SETTING_LOGGING_LOGIN = JSON.parse('{{ args.setting_logging_login|lower }}');
     const SETTING_LOGGING_ACCESS = JSON.parse('{{ args.setting_logging_access|lower }}');
+    const SETTING_STARTUP_EXECUTABLE = JSON.parse('{{ args.setting_startup_executable|lower }}');
+
+    const SETTING_RCLONE_REMOTES = JSON.parse('{{ args.setting_rclone_remotes|tojson }}');
+    const SETTING_RCLONE_MAPPINGS = JSON.parse('{{ args.setting_rclone_mappings|tojson }}');
+    const SETTING_PLEX_MAPPINGS = JSON.parse('{{ args.setting_plex_mappings|tojson }}');
+    const SETTING_STARTUP_COMMANDS = JSON.parse('{{ args.setting_startup_commands|tojson }}');
 
     $(function() {
-        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider.js') }}")
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_setting.js') }}")
     });
 </script>

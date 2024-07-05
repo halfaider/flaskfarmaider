@@ -13,7 +13,7 @@
 }
 
 #brw-list-table.table thead,
-#brw-list-table.table tbody tr{
+#brw-list-table.table tbody tr {
     display: table;
     width:100%;
     table-layout: fixed;
@@ -36,8 +36,14 @@ textarea {
 */
 
 #markdown table td,
-#markdown table th{
+#markdown table th {
     padding-left: 10px;
     padding-right: 10px;
     border: 1px solid #ddd;
 }
+
+#main_container {
+    width: 100%;
+    max-width:100%;
+}
+

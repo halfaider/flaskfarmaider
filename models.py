@@ -21,17 +21,16 @@ class ScheduleModel(Model):
     target = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     task = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     recursive = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
-    vfs = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     schedule_mode = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     schedule_interval = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     schedule_auto_start = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
     status = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     scan_mode = FRAMEWORK.db.Column(FRAMEWORK.db.String)
-    periodic_id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
     clear_type = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     clear_section = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
     clear_level = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     section_id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
+    rclone_remote = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     # Column, type, default value
     formdata_mapping = {
         'sch-task': (task, task.type.python_type, TASK_KEYS[0]),
@@ -39,17 +38,14 @@ class ScheduleModel(Model):
         'sch-schedule-mode': (schedule_mode, schedule_mode.type.python_type, FF_SCHEDULE_KEYS[0]),
         'sch-schedule-interval': (schedule_interval, schedule_interval.type.python_type, '60'),
         'sch-target-path': (target, target.type.python_type, ''),
-        'sch-vfs': (vfs, vfs.type.python_type, ''),
         'sch-recursive': (recursive, recursive.type.python_type, False),
-        'sch-recursive-select': (recursive, recursive.type.python_type, False),
         'sch-schedule-auto-start': (schedule_auto_start, schedule_auto_start.type.python_type, False),
-        'sch-schedule-auto-start-select': (schedule_auto_start, schedule_auto_start.type.python_type, False),
         'sch-scan-mode': (scan_mode, scan_mode.type.python_type, SCAN_MODE_KEYS[0]),
-        'sch-scan-mode-periodic-id': (periodic_id, periodic_id.type.python_type, -1),
         'sch-clear-type': (clear_type, clear_type.type.python_type, ''),
         'sch-clear-level': (clear_level, clear_level.type.python_type, ''),
         'sch-clear-section': (clear_section, clear_section.type.python_type, -1),
         'sch-target-section': (section_id, section_id.type.python_type, -1),
+        'sch-rclone-remote': (rclone_remote, rclone_remote.type.python_type, ''),
     }
 
     def __init__(self) -> None:
@@ -66,20 +62,19 @@ class ScheduleModel(Model):
         return self
 
     @classmethod
-    def update_formdata(cls, job_id: int, formdata: dict[str, list]) -> 'ScheduleModel':
-        if job_id > 0:
-            model = cls.get_by_id(job_id)
+    def update_formdata(cls, id_: int, formdata: dict[str, list]) -> 'ScheduleModel':
+        if id_ > 0:
+            model = cls.get_by_id(id_)
         else:
             model = ScheduleModel()
-
+        formdata.pop('sch-checkbox-helper', None)
         if formdata.get('sch-task', [-1])[0] == TASK_KEYS[5]:
             formdata.update({'sch-schedule-interval': ['매 시작']})
-
-        for key in ['sch-recursive', 'sch-recursive-select', 'sch-schedule-auto-start', 'sch-schedule-auto-start-select']:
+        for key in ['sch-recursive', 'sch-schedule-auto-start']:
             val = formdata.get(key)
-            if val:
-                formdata[key] = [val[0].lower() == 'true']
-
+            if val and type(val[0]) is str:
+                formdata[key] = [val[0].lower() == 'on']
+        LOGGER.debug(f'Form data: {formdata}')
         data = {}
         for k, v in formdata.items():
             try:
@@ -89,21 +84,20 @@ class ScheduleModel(Model):
                 LOGGER.error(f'formdata key: {k}')
                 LOGGER.error(traceback.format_exc())
                 continue
-
         model.update(data)
         model.save()
         return model
 
     @classmethod
-    def get_job(cls, id: int = -1, info: dict = None) -> 'ScheduleModel':
+    def get(cls, id: int = -1, info: dict = None) -> 'ScheduleModel':
         if id > 0:
-            job = cls.get_by_id(id)
+            model = cls.get_by_id(id)
         elif info:
-            job = ScheduleModel().update(info)
+            model = ScheduleModel().update(info)
         else:
-            job = ScheduleModel()
-            job.id = id
-        return job
+            model = ScheduleModel()
+            model.id = id
+        return model
 
     @classmethod
     def make_query(cls, request: Request, order: str = 'desc', keyword: str = '', option1: str = SEARCH_KEYS[0], option2: str = 'all') -> Query:

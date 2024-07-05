@@ -17,7 +17,6 @@
     }
 </style>
 
-<script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
     $(function() {
         const CONVERTER = new showdown.Converter();
@@ -28,7 +27,7 @@
         html = CONVERTER.makeHtml(text);
         $('#markdown').html(html);
 
-        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider.js') }}")
     });
   </script>
 {% endblock %}

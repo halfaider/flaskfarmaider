@@ -125,7 +125,6 @@ dependencies:
     repo: 'https://github.com/halfaider/flaskfarmaider'
     plugins:
       - plex_mate
-      - gds_tool
   alive:
     repo: 'https://github.com/by275/alive'
     commands:

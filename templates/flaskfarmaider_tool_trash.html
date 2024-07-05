@@ -20,13 +20,9 @@
             <option value="{{ args.tool_trash_keys.3 }}">{{ args.tool_trashes[args.tool_trash_keys.3].name }}</option>
             <option value="{{ args.tool_trash_keys.4 }}">{{ args.tool_trashes[args.tool_trash_keys.4].name }}</option>
         </select>
-        <select class="custom-select col-1" id="trash-vfs">
-        {%- for vfs in args.setting_rclone_remote_vfses.split('|') %}
-        {%- if vfs == args.setting_rclone_remote_vfs %}
-            <option value="{{ vfs }}" selected>{{ vfs }}</option>
-        {% else %}
-            <option value="{{ vfs }}">{{ vfs }}</option>
-        {% endif %}
+        <select class="custom-select" id="trash-rclone-remotes">
+        {%- for remote in args.setting_rclone_remotes %}
+            <option value="{{ remote }}">{{ remote }}</option>
         {% endfor %}
         </select>
         <div class="input-group-append">
@@ -71,7 +67,6 @@
     </ul>
 </nav>
 
-<script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
     const SECTION_TYPES = JSON.parse('{{ args.section_types|tojson }}');
     const SECTION_TYPE_KEYS = JSON.parse('{{ args.section_type_keys|tojson }}');
@@ -87,7 +82,7 @@
     const LAST_LIST_OPTIONS = '{{ args.tool_trash_last_list_option }}'.split('|')
 
     $(function() {
-        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider.js') }}")
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_tool_trash.js') }}")
     });
 </script>

@@ -3,6 +3,7 @@ import urllib.parse
 import sqlite3
 import functools
 from threading import Thread
+from typing import Any
 
 import flask
 import requests
@@ -12,14 +13,10 @@ from sqlalchemy.orm.attributes import InstrumentedAttribute
 from .constants import *
 from .util import ThreadHasReturn
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
-from .setup import PluginBase, PluginModuleBase, PluginPageBase, default_route_socketio_module, default_route_socketio_page, ModelBase
-
-
-def celery_is_active() -> bool:
-    try:
-        return True if FRAMEWORK.celery.control.inspect().stats() else False
-    except:
-        return False
+from .setup import (
+    PluginBase, PluginModuleBase, PluginPageBase, ModelBase,
+    default_route_socketio_module, default_route_socketio_page, celery_is_active
+)
 
 
 class Base:
@@ -70,14 +67,19 @@ class Base:
         finally:
             return flask.jsonify(data)
 
-    def pre_command(self, request: flask.Request) -> tuple[str, dict, list]:
-        command = request.form.get('command')
+    def parse_command(self, request: flask.Request) -> dict[str, Any]:
         query = urllib.parse.parse_qs(request.form.get('arg1'))
-        ids =list(map(int, query.pop('id', [-1])))
-        return command, query, ids
+        ids = list(map(int, query.pop('id', [-1])))
+        return {
+            'command': request.form.get('command'),
+            'query': query,
+            'ids': ids,
+        }
 
     def command_default(self, request: flask.Request) -> tuple[bool, str]:
-        return False, '아직 구현되지 않았습니다.'
+        data = self.returns('danger', title='Flaskfarmaider')
+        data['msg'] = '아직 구현되지 않았습니다.'
+        return data
 
     def returns(self, success: str, msg: str = None, title: str = None, modal: str = None, json: dict = None, reload: bool = False, data: dict = None) -> dict:
         return {'ret': success, 'msg': msg, 'title': title, 'modal': modal, 'json': json, 'reload': reload, 'data': data}
@@ -412,8 +414,8 @@ class Aider:
         self.name = name
 
     def request(self, method: str, url: str, *args: tuple, **kwds: dict) -> requests.Response:
-        _timeout = CONFIG.get_int('setting_startup_timeout')
-        kwds['timeout'] = _timeout if _timeout > 0 else kwds.get('timeout')
+        timeout_ = CONFIG.get_int('setting_general_timeout')
+        kwds['timeout'] = timeout_ if timeout_ > 0 else kwds.get('timeout')
         try:
             if method.upper() == 'JSON':
                 data = kwds.pop('data', None)

@@ -1,27 +1,42 @@
-const SOCKET = io.connect(window.location.href);
+// FF의 confirm 모달은 플러그인의 콘텐츠보다 늦게 출력되기 때문에 documnet ready 후에 셀렉터 사용
+const E_CONFIRM_TITLE = $('#confirm_title');
+const E_CONFIRM_BODY = $('#confirm_body');
+const E_CONFIRM_BTN = $('#confirm_button');
+const E_CONFIRM_MODAL = $("#confirm_modal");
 const E_SELECT_ALL = $('#select-all');
+const E_MULTIPLE_DEL = $('#multiple-del');
+const E_MULTIPLE_EDIT = $('#multiple-edit');
+const SOCKET = io.connect(window.location.href);
 
-E_SELECT_ALL.on('click', function(e) {
-    if (this.checked) {
-        $('input[class="selectable"]').each(function() {
-            this.checked = true;
-        });
-    } else {
-        $('input[class="selectable"]').each(function() {
-            this.checked = false;
-        });
-    }
-});
+function confirmModal(title, content, func) {
+    E_CONFIRM_TITLE.html(title);
+    E_CONFIRM_BODY.html(content);
+    E_CONFIRM_BTN.off('click');
+    E_CONFIRM_BTN.on('click', func);
+    E_CONFIRM_MODAL.modal({backdrop: 'static', keyboard: true}, 'show');
+}
 
-SOCKET.on('result', function(result) {
-    if (result) {
-        if (result.data.msg) {
-            notify(result.data.msg, 'info');
+function deleteModel(model_id) {
+    confirmModal('다음 ID의 데이터를 삭제할까요?',
+        'ID: ' + model_id,
+        function() {
+        globalSendCommand('delete', 'id=' + model_id, null, null, function(result) {
+            if (result.ret == 'success') {
+                globalRequestSearch(1);
+            }
+        });
+    });
+}
+
+function openModalById(from, model_id) {
+    globalSendCommand("get", 'id=' + model_id, null, null, function(result) {
+        if (result.ret == 'success') {
+            openModal(from, result.data);
         }
-    }
-});
+    });
+}
 
-function set_plex_sections(type, target, sections) {
+function setPlexSections(type, target, sections) {
     target.empty();
     if (sections[type]) {
         sections[type].forEach(function(item) {
@@ -38,17 +53,17 @@ function set_plex_sections(type, target, sections) {
     target.prop('value', '');
 }
 
-function pagination(target, page, total, limit, list_func) {
+function pagination(target, page, total, limit, listFunc) {
     target.empty();
-    limit_page = 10;
-    final_page = Math.ceil(total / limit);
+    let limit_page = 10;
+    let final_page = Math.ceil(total / limit);
     if (final_page > 1) {
-        first_page = Math.floor(page / limit_page) * limit_page;
+        let first_page = Math.floor(page / limit_page) * limit_page;
         if (page < limit_page) {
             first_page++;
         }
-        last_page = Math.min(first_page + limit_page, final_page);
-        elements = '<ul class="pagination justify-content-center">';
+        let last_page = Math.min(first_page + limit_page, final_page);
+        let elements = '<ul class="pagination justify-content-center">';
         if (first_page >= limit_page) {
             elements += '<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>';
         }
@@ -71,11 +86,11 @@ function pagination(target, page, total, limit, list_func) {
     }
     target.append(elements);
     $('.page-link').on('click', function(e) {
-        list_func($(this).data('page'));
+        listFunc($(this).data('page'));
     });
 }
 
-function copy_to_clipboard(text) {
+function copyToClipboard(text) {
     if ( ! window.navigator.clipboard ) {
         notify('클립보드 접근 권한이 없습니다.', 'warning');
     } else {
@@ -87,79 +102,139 @@ function copy_to_clipboard(text) {
     }
 }
 
-function build_form_header(title, col) {
-    let element = '<div class="row" style="padding-top: 10px; padding-bottom:10px; align-items: center;"><div class="col-sm-3 set-left">';
-    element += '<strong>' + title + '</strong></div>';
-    element += '<div class="col-sm-9">';
-    element += '<div class="input-group col-sm-' + col + '">';
-    return element;
+function joinBy(itemList, delimiter = '\r\n') {
+    let list_ = JSON.parse(itemList);
+    if (list_ !== null) {
+        return list_.join(delimiter);
+    } else {
+        return '';
+    }
 }
 
-function build_form_footer(desc) {
-    let element = '</div><div class="col-sm-9"><em>' + desc + '</em>';
-    element += '</div></div></div>';
-    return element;
-}
+function renderAddableInputGroup(itemList, groupId, formName, placeHolder) {
+    const ADDABLE_GROUP = $('#' + groupId);
+    let defaultInputGroup = '<div class="input-group">';
+    defaultInputGroup += '<input name="' + formName + '" class="form-control form-control-sm" type="text" placeholder="' + placeHolder + '">'
+    defaultInputGroup += '<button type="button" class="btn btn-outline-warning btn-sm btn-remove-element">삭제</button>';
+    defaultInputGroup += '</div>';
+    if (itemList.length < 1) {
+        let inputGroup = $(defaultInputGroup);
+        inputGroup.children('.btn-remove-element').remove();
+        inputGroup.append('<button type="button" class="btn btn-outline-primary btn-sm btn-add-element">추가</button>');
+        inputGroup.children('input').prop('value', '');
 
-function build_form_select(id, title, options, col, desc) {
-    let element = build_form_header(title, col);
-    element += '<select id="' + id + '" name="' + id + '" class="form-control form-control-sm">';
-    if (options.length > 0) {
-        for (let idx in options) {
-            element += '<option value="' + options[idx].value + '">' + options[idx].name + '</option>';
+        inputGroup.on('click', '.btn-add-element', function() {
+            let addingInputGroup = $(defaultInputGroup);
+            addingInputGroup.on('click', '.btn-remove-element', function() {
+                $(this).parent().remove();
+            });
+            ADDABLE_GROUP.append(addingInputGroup);
+        });
+        ADDABLE_GROUP.append(inputGroup);
+
+    } else {
+        for (let idx in itemList) {
+            let inputGroup = $(defaultInputGroup);
+            if (idx < 1) {
+                inputGroup.children('.btn-remove-element').remove();
+                inputGroup.append('<button type="button" class="btn btn-outline-primary btn-sm btn-add-element">추가</button>');
+                inputGroup.on('click', '.btn-add-element', function() {
+                    let addingInputGroup = $(defaultInputGroup);
+                    addingInputGroup.on('click', '.btn-remove-element', function() {
+                        $(this).parent().remove();
+                    });
+                    ADDABLE_GROUP.append(addingInputGroup);
+                });
+            }
+            inputGroup.children('input').prop('value', itemList[idx]);
+            inputGroup.on('click', '.btn-remove-element', function() {
+                $(this).parent().remove();
+            });
+            ADDABLE_GROUP.append(inputGroup);
         }
     }
-    element += '</select>';
-    element += build_form_footer(desc);
-    return element;
 }
 
-function build_form_text(id, title, value, col, desc) {
-    let element = build_form_header(title, col);
-    element += '<input id="' + id + '" name="' + id + '" type="text" class="form-control form-control-sm" value="' + value + '" />';
-    element += build_form_footer(desc);
-    return element;
-}
+// 추가 버튼
+$('#add-btn').on('click', function(e) {
+    e.preventDefault();
+    openModal('new', '');
+});
 
-function build_form_text_btn(id, title, value, btn_id, btn_text, col, desc) {
-    let element = build_form_header(title, col);
-    element += '<input id="' + id + '" name="' + id + '" type="text" class="form-control form-control-sm" value="' + value + '" />';
-    element += '<div class="btn-group btn-group-sm flex-wrap mr-2" role="group" style="padding-left:5px; padding-top:0px">';
-    element += '<button id="' + btn_id + '" class="btn btn-sm btn-outline-primary">' + btn_text + '</button></div>';
-    element += build_form_footer(desc);
-    return element;
-}
-
-function build_form_checkbox(id, title, options, col, desc) {
-    let element = build_form_header(title, col);
-    element += '<input id="' + id + '" name="' + id + '" type="checkbox" class="form-control form-control-sm" data-toggle="toggle" />';
-    element += '<select id="' + id + '-select" name="' + id + '-select" class="form-control form-control-sm col-sm-2">';
-    if (options.length > 0) {
-        for (let idx in options) {
-            element += '<option value="' + options[idx].value + '">' + options[idx].name + '</option>';
+// 저장 버튼
+$('#save-btn').on('click', function() {
+    let ids = $(this).data('id');
+    let formdata = new FormData(document.getElementById('setting'));
+    let checkboxes = ['sch-recursive', 'sch-schedule-auto-start']
+    for (idx in checkboxes) {
+        if ($('#' + checkboxes[idx] + '-helper').prop('checked')) {
+            if (!$('#' + checkboxes[idx]).prop('checked')) {
+                formdata.append(checkboxes[idx], 'off');
+            }
         }
     }
-    element += '</select>';
-    element += build_form_footer(desc);
-    return element;
-}
-
-function build_form_radio(id, title, options, col, desc) {
-    let element = build_form_header(title, col);
-    for (let idx in options) {
-        element += '<div class="custom-control custom-radio custom-control-inline">';
-        element += '<input id="'+ id + idx + '" type="radio" class="custom-control-input" name="' + id + '" value="' + options[idx].value +'">';
-        element += '<label class="custom-control-label" for="' + id + idx + '">' + options[idx].name + '</label></div>';
+    for (let i in ids) {
+        formdata.append('id', ids[i]);
     }
-    element += build_form_footer(desc);
-    return element;
-}
+    let query = new URLSearchParams(formdata).toString();
+    console.log(query);
+    globalSendCommand('save', query, null, null, function(result) {
+        if (result.ret == 'success') {
+            $('#add-modal').modal('hide');
+            globalRequestSearch(1);
+        }
+    });
+});
 
-function build_form_group(id, elements) {
-    let element = '<div id="' + id + '">';
-    for (let idx in elements) {
-        element += elements[idx];
+E_SELECT_ALL.on('click', function(e) {
+    if (this.checked) {
+        $('input[class="selectable"]').each(function() {
+            this.checked = true;
+        });
+    } else {
+        $('input[class="selectable"]').each(function() {
+            this.checked = false;
+        });
     }
-    element += '</div';
-    return element
-}
+});
+
+SOCKET.on('result', function(result) {
+    if (result) {
+        if (result.data.msg) {
+            notify(result.data.msg, 'info');
+        }
+    }
+});
+
+E_MULTIPLE_DEL.on('click', function(e) {
+    let selected = $('input[class="selectable"]:checked').map((i, el) => el.value).get();
+    if (selected.length > 0) {
+        confirmModal(
+            '선택한 항목을 삭제할까요?',
+            selected.length + ' 개의 항목이 모두 삭제됩니다.',
+            function() {
+                let query = '';
+                for (let i in selected) {
+                    query += 'id=' + selected[i] + '&';
+                }
+                globalSendCommand('delete', query, null, null, function(result) {
+                    if (result.ret == 'success') {
+                        globalRequestSearch(1);
+                    }
+                    E_SELECT_ALL.prop('checked', false);
+                });
+            }
+        );
+    } else {
+        notify('선택된 항목이 없습니다.', 'warning');
+    }
+});
+
+E_MULTIPLE_EDIT.on('click', function(e) {
+    let selected = $('input[class="selectable"]:checked').map((i, el) => el.value).get();
+    if (selected.length > 0) {
+        openModal('multiple-edit', selected);
+    } else {
+        notify('선택된 항목이 없습니다.', 'warning');
+    }
+});
