@@ -598,7 +598,6 @@ class RcloneAider(Aider):
             result = self._vfs_refresh(path, recursive)
             if not result['result'].get(path) == 'OK':
                 # file 일 경우 'invalid argument'
-                LOGGER.warning(f'{result}')
                 break
 
     @check_metadata_cache
