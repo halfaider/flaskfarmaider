@@ -548,7 +548,6 @@ class RcloneAider(Aider):
         to_be_tested = str(remote_path)
         not_exists_paths = []
         result = self._vfs_refresh(to_be_tested, recursive)
-        LOGGER.info(result)
         while not result['result'].get(to_be_tested) == 'OK':
             if result['result'].get(to_be_tested) == 'file does not exist':
                 not_exists_paths.insert(0, to_be_tested)
@@ -559,9 +558,7 @@ class RcloneAider(Aider):
                 LOGGER.warning(f'Hit the top-level path.')
                 break
         for path in not_exists_paths:
-            LOGGER.info(path)
             result = self._vfs_refresh(path, recursive)
-            LOGGER.info(result)
             if not result['result'].get(path) == 'OK':
                 # file 일 경우 'invalid argument'
                 LOGGER.warning(f'{result}')
