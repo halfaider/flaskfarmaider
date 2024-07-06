@@ -474,6 +474,9 @@ class RcloneAider(Aider):
             vfs = data.pop('fs', None)
             if vfs:
                 data['fs'] = f'{vfs}:'
+            dir = data.get('dir')
+            if not dir or dir == '/':
+                data.pop('dir', None)
             command = '/'.join(method.__name__.split('__'))
             interface = data.pop('interface', 'API')
             # CLI or API
@@ -545,8 +548,9 @@ class RcloneAider(Aider):
         to_be_tested = str(remote_path)
         not_exists_paths = []
         result = self._vfs_refresh(to_be_tested, recursive)
-        while not result['result'].get(to_be_tested).lower() == 'ok':
-            if result['result'].get(to_be_tested).lower() == 'file does not exist':
+        LOGGER.info(result)
+        while not result['result'].get(to_be_tested) == 'OK':
+            if result['result'].get(to_be_tested) == 'file does not exist':
                 not_exists_paths.insert(0, to_be_tested)
             if parents:
                 to_be_tested = str(parents.pop(0))
@@ -555,9 +559,12 @@ class RcloneAider(Aider):
                 LOGGER.warning(f'Hit the top-level path.')
                 break
         for path in not_exists_paths:
+            LOGGER.info(path)
             result = self._vfs_refresh(path, recursive)
-            if not result.get(path).lower() == 'ok':
-                LOGGER.error(f'Could not refresh: "{str(remote_path)}" result="{result}"')
+            LOGGER.info(result)
+            if not result['result'].get(path) == 'OK':
+                # file 일 경우 'invalid argument'
+                LOGGER.warning(f'{result}')
                 break
 
     @check_metadata_cache

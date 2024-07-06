@@ -76,9 +76,9 @@
     <div class="tab-pane fade" id="nav-startup" role="tabpanel" aria-labelledby="nav-startup-tab">
         <div class="form-group row mx-2">
             <div class="col pl-0">
-                <div class="custom-control custom-switch custom-control-inline">
-                    <input id="setting_startup_executable" name="setting_startup_executable" type="checkbox" class="custom-control-input">
-                    <label for="setting_startup_executable" class="custom-control-label"><strong>실행 허용</strong></label>
+                <div class="form-check form-check-inline">
+                    <label for="setting_startup_executable" class="form-check-label mr-1"><strong>실행 허용</strong></label>
+                    <input id="setting_startup_executable" name="setting_startup_executable" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
                 </div>
                 <small class="form-text text-muted">
                     명령어 실행 허용 여부<br>로그에서 실행될 명령어를 확인하고 결정
@@ -106,18 +106,17 @@
     <div class="tab-pane fade" id="nav-logging" role="tabpanel" aria-labelledby="nav-logging-tab">
         <div class="form-group row mx-2">
             <div class="col pl-0">
-
-                <div class="custom-control custom-switch custom-control-inline">
-                    <input id="setting_logging_login" name="setting_logging_login"class="custom-control-input" type="checkbox">
-                    <label for="setting_logging_login" class="custom-control-label"><strong>로그인 로그</strong></label>
+                <div class="form-check form-check-inline">
+                    <label for="setting_logging_login" class="form-check-label mr-1"><strong>로그인 로그</strong></label>
+                    <input id="setting_logging_login" name="setting_logging_login" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
                 </div>
                 <small class="form-text text-muted">
                     /data/log/system.log
                 </small>
 
-                <div class="custom-control custom-switch custom-control-inline mt-3">
-                    <input id="setting_logging_access" name="setting_logging_access"class="custom-control-input" type="checkbox">
-                    <label for="setting_logging_access" class="custom-control-label"><strong>접속 로그</strong></label>
+                <div class="form-check form-check-inline mt-3">
+                    <label for="setting_logging_access" class="form-check-label mr-1"><strong>접속 로그</strong></label>
+                    <input id="setting_logging_access" name="setting_logging_access" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
                 </div>
                 <small class="form-text text-muted">
                     Flaskfarm의 접속 로그

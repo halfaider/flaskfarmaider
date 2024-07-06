@@ -100,6 +100,6 @@ E_PLEXMATE_TIMEOVER_BTN.on('click', function (e) {
     globalSendCommand('check_timeover', 'range=' + range, null, null, null);
 });
 
-$('#setting_startup_executable').prop('checked', (SETTING_STARTUP_EXECUTABLE ? true : false));
-$('#setting_logging_login').prop('checked', (SETTING_LOGGING_LOGIN ? true : false));
-$('#setting_logging_access').prop('checked', (SETTING_LOGGING_ACCESS ? true : false));
+$('#setting_startup_executable').bootstrapToggle((SETTING_STARTUP_EXECUTABLE ? 'on' : 'off'));
+$('#setting_logging_login').bootstrapToggle((SETTING_LOGGING_LOGIN ? 'on' : 'off'));
+$('#setting_logging_access').bootstrapToggle((SETTING_LOGGING_ACCESS ? 'on' : 'off'));

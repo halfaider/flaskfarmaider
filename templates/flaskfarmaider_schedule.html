@@ -43,12 +43,11 @@
                     <label class="custom-control-label" for="sch-schedule-mode2">시간 간격</label>
                 </div>
             </div>
-            <div class="input-group mt-3">
-                <div class="custom-control custom-switch custom-control-inline">
-                    <input id="sch-schedule-auto-start" name="sch-schedule-auto-start" type="checkbox" class="custom-control-input">
-                    <label for="sch-schedule-auto-start" class="custom-control-label"><strong>시작시 일정 등록</strong></label>
-                    <input id="sch-schedule-auto-start-helper" type="checkbox" class="mx-1" hidden name="sch-checkbox-helper" title="Off로 저장시 체크">
-                </div>
+
+            <div class="form-check form-check-inline mt-3">
+                <label for="sch-schedule-auto-start" class="form-check-label mr-1"><strong>시작시 일정 등록</strong></label>
+                <input id="sch-schedule-auto-start" name="sch-schedule-auto-start" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
+                <input id="sch-schedule-auto-start-helper" type="checkbox" class="mx-1" hidden name="sch-checkbox-helper" title="Off로 저장시 체크">
             </div>
         </div>
         <div class="col pr-0">
@@ -86,13 +85,13 @@
                 </select>
             </div>
             <small class="form-text text-muted">vfs/refresh를 수행할 RC 서버</small>
-            <div class="input-group mt-3">
-                <div class="custom-control custom-switch custom-control-inline">
-                    <input id="sch-recursive" name="sch-recursive" type="checkbox" class="custom-control-input">
-                    <label for="sch-recursive" class="custom-control-label"><strong>Recursive</strong></label>
-                    <input id="sch-recursive-helper" type="checkbox" class="mx-1" hidden name="sch-checkbox-helper" title="Off로 저장시 체크">
-                </div>
+
+            <div class="form-check form-check-inline mt-3">
+                <label for="sch-recursive" class="form-check-label mr-1"><strong>Recursive</strong></label>
+                <input id="sch-recursive" name="sch-recursive" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
+                <input id="sch-recursive-helper" type="checkbox" class="mx-1" hidden name="sch-checkbox-helper" title="Off로 저장시 체크">
             </div>
+
             <small class="form-text text-muted">rclone vfs/refresh의 --recursive 옵션 적용 여부</small>
             <label for="" class="mt-3"><strong>스캔 방식</strong></label>
             <div class="input-group">
