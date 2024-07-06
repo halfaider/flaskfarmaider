@@ -153,37 +153,33 @@ def migrate_schedule_v6(cs: sqlite3.Cursor, table: str) -> None:
 
 def migrate_schedule_v7(cs: sqlite3.Cursor, table: str) -> None:
     LOGGER.debug('DB 버전 7 로 마이그레이션')
-    try:
-        row = cs.execute(f'SELECT name FROM sqlite_master WHERE type="table" AND name="flaskfarmaider_jobs"').fetchone()
-        if row:
-            rows = cs.execute(f'SELECT name FROM pragma_table_info("flaskfarmaider_jobs")').fetchall()
-            cols = [row['name'] for row in rows]
-            if 'periodic_id' in cols:
-                cs.execute(f'ALTER TABLE "flaskfarmaider_jobs" DROP COLUMN "periodic_id"')
-            if 'rclone_remote' not in cols:
-                cs.execute(f'ALTER TABLE "flaskfarmaider_jobs" RENAME COLUMN "vfs" TO "rclone_remote"')
-            cs.execute(f'''
-                INSERT INTO "{table}" (id, ctime, ftime, desc, target, task, recursive, rclone_remote, schedule_mode, schedule_interval,
-                    schedule_auto_start, status, scan_mode, clear_type, clear_level, clear_section, section_id)
-                SELECT id, ctime, ftime, desc, target, task, recursive, rclone_remote, schedule_mode, schedule_interval,
-                    schedule_auto_start, status, scan_mode, clear_type, clear_level, clear_section, section_id
-                FROM "flaskfarmaider_jobs"
-                ''')
-            cs.execute(f'DROP TABLE "flaskfarmaider_jobs"')
-        rows = cs.execute(f'SELECT * FROM {table}').fetchall()
-        remotes = CONFIG.get_json('setting_rclone_remotes')
-        for row in rows:
-            if not row['rclone_remote'].startswith('http'):
-                cs.execute(f'UPDATE "{table}" SET rclone_remote="" WHERE id={row["id"]}')
-            for remote in remotes:
-                if row['rclone_remote'] == f'{urllib.parse.urlparse(remote).fragment}:':
-                    cs.execute(f'UPDATE "{table}" SET rclone_remote="{remote}" WHERE id={row["id"]}')
-                    break
-            match row['scan_mode']:
-                case 'periodic':
-                    cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
-    except Exception as e:
-        LOGGER.error(e)
+    row = cs.execute(f'SELECT name FROM sqlite_master WHERE type=? AND name=?', ('table', 'flaskfarmaider_jobs')).fetchone()
+    if row:
+        rows = cs.execute(f'SELECT name FROM pragma_table_info(?)', ('flaskfarmaider_jobs',)).fetchall()
+        cols = [row['name'] for row in rows]
+        if 'periodic_id' in cols:
+            cs.execute(f'ALTER TABLE flaskfarmaider_jobs DROP COLUMN periodic_id')
+        if 'rclone_remote' not in cols:
+            cs.execute(f'ALTER TABLE flaskfarmaider_jobs RENAME COLUMN vfs TO rclone_remote')
+        cs.execute(f"""
+            INSERT INTO {table} (id, ctime, ftime, desc, target, task, recursive, rclone_remote, schedule_mode, schedule_interval,
+                schedule_auto_start, status, scan_mode, clear_type, clear_level, clear_section, section_id)
+            SELECT id, ctime, ftime, desc, target, task, recursive, rclone_remote, schedule_mode, schedule_interval,
+                schedule_auto_start, status, scan_mode, clear_type, clear_level, clear_section, section_id
+            FROM flaskfarmaider_jobs
+            """)
+        cs.execute(f'DROP TABLE flaskfarmaider_jobs')
+    rows = cs.execute(f'SELECT * FROM {table}').fetchall()
+    remotes = CONFIG.get_json('setting_rclone_remotes')
+    for row in rows:
+        if row['rclone_remote'] and not row['rclone_remote'].startswith('http'):
+            cs.execute(f'UPDATE {table} SET rclone_remote=? WHERE id=?', ('', row['id'],))
+        for remote in remotes:
+            if row['rclone_remote'] == f'{urllib.parse.urlparse(remote).fragment}:':
+                cs.execute(f'UPDATE {table} SET rclone_remote=? WHERE id=?', (remote, row['id']))
+                break
+        if row['scan_mode'] == 'periodic':
+            cs.execute(f'DELETE FROM {table} WHERE id=?', (row['id'],))
 
 
 def migrate_schedule_v8(cs: sqlite3.Cursor, table: str) -> None:
@@ -205,19 +201,16 @@ def migrate_setting_v2(cs: sqlite3.Cursor, table: str) -> None:
         'tool_login_log_enable': 'setting_logging_login',
     }
     for old, new in mapping.items():
-        try:
-            row = cs.execute(f'SELECT value FROM "{table}" WHERE key="{old}"').fetchone()
-            if row:
-                cs.execute(f'UPDATE "{table}" SET value="{row[-1]}" WHERE key="{new}"')
-                cs.execute(f'DELETE FROM "{table}" WHERE key="{old}"')
-        except Exception as e:
-            LOGGER.error(e)
+        row = cs.execute(f'SELECT value FROM "{table}" WHERE key="{old}"').fetchone()
+        if row:
+            cs.execute(f'UPDATE "{table}" SET value="{row[-1]}" WHERE key="{new}"')
+            cs.execute(f'DELETE FROM "{table}" WHERE key="{old}"')
 
 
 def migrate_setting_v3(cs: sqlite3.Cursor, table: str) -> None:
     LOGGER.debug('DB 버전 3 으로 마이그레이션')
     rclone_remote = {}
-    rows = cs.execute(f'SELECT * FROM "{table}"').fetchall()
+    rows = cs.execute(f'SELECT * FROM {table}').fetchall()
     for row in rows:
         match row['key']:
             case 'setting_startup_commands':
@@ -225,28 +218,27 @@ def migrate_setting_v3(cs: sqlite3.Cursor, table: str) -> None:
                     json.loads(row['value'])
                 except:
                     commands = json.dumps(row['value'].splitlines())
-                    cs.execute(f'UPDATE "{table}" SET value=\'{commands}\' WHERE id={row["id"]}')
+                    cs.execute(f'UPDATE {table} SET value=? WHERE id=?', (commands, row['id']))
             case key if key in ['setting_rclone_remote_addr', 'setting_rclone_remote_vfs', 'setting_rclone_remote_user', 'setting_rclone_remote_pass']:
                 rclone_remote[key] = row['value']
-                cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
+                cs.execute(f'DELETE FROM {table} WHERE id=?', (row['id'],))
             case key if key in [
                     'setting_gds_tool_request_span', 'setting_gds_tool_request_auto', 'setting_gds_tool_fp_span', 'setting_gds_tool_fp_auto',
                     'setting_rclone_path_test', 'setting_logging_rotation', 'setting_logging_files', 'settings_logging_size',
                     'tool_file_watcher_enable', 'tool_file_watcher_map', 'watcher_last_list_option',
                 ]:
-                cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
+                cs.execute(f'DELETE FROM {table} WHERE id=?', (row['id'],))
             case 'setting_rclone_remote_mapping':
-                mappings = row['value'].splitlines()
-                cs.execute(f'UPDATE "{table}" SET value=\'{json.dumps(mappings)}\' WHERE key="setting_rclone_mappings"')
-                cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
+                mappings = json.dumps(row['value'].splitlines())
+                cs.execute(f'UPDATE {table} SET value=? WHERE key=?', (mappings, 'setting_rclone_mappings'))
+                cs.execute(f'DELETE FROM {table} WHERE id=?', (row['id'],))
             case 'setting_plexmate_plex_mapping':
-                mappings = row['value'].splitlines()
-                cs.execute(f'UPDATE "{table}" SET value=\'{json.dumps(mappings)}\' WHERE key="setting_plex_mappings"')
-                cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
+                mappings = json.dumps(row['value'].splitlines())
+                cs.execute(f'UPDATE {table} SET value=? WHERE key=?', (mappings, 'setting_plex_mappings'))
+                cs.execute(f'DELETE FROM {table} WHERE id=?', (row['id'],))
             case 'setting_rclone_remote_vfses':
                 rclone_remote['vfses'] = [vfs[:-1] for vfs in row['value'].split('|')]
-                cs.execute(f'DELETE FROM "{table}" WHERE id={row["id"]}')
-
+                cs.execute(f'DELETE FROM {table} WHERE id=?', (row['id'],))
     if rclone_remote.get('setting_rclone_remote_addr'):
         user = rclone_remote.get('setting_rclone_remote_user')
         pass_ = rclone_remote.get('setting_rclone_remote_pass')
@@ -258,10 +250,9 @@ def migrate_setting_v3(cs: sqlite3.Cursor, table: str) -> None:
             else:
                 remote = f"{url.scheme}://{url.netloc}#{vfs}"
             remotes.append(remote)
-        cs.execute(f'UPDATE "{table}" SET value=\'{json.dumps(remotes)}\' WHERE key="setting_rclone_remotes"')
+        cs.execute(f'UPDATE {table} SET value=? WHERE key=?', (json.dumps(remotes), 'setting_rclone_remotes'))
 
 
 def migrate_setting_v4(cs: sqlite3.Cursor, table: str) -> None:
     # Reseved for future use
     pass
-
