@@ -116,6 +116,18 @@ class Setting(ModuleBase):
         plexmate.check_timeover(num_range)
         return self.returns('success', 'TIMEOUT 항목을 READY로 변경합니다.')
 
+    def command_update_dependencies(self, request: flask.Request) -> dict:
+        aider = SettingAider()
+        result = self.returns('success', '업데이트를 완료했습니다.')
+        try:
+            response = aider.request('GET', 'https://raw.githubusercontent.com/halfaider/flaskfarmaider/main/files/flaskfarmaider.yaml')
+            aider.depends(response.text)
+        except:
+            LOGGER.error(traceback.format_exc())
+            result['ret'] = 'warning'
+            result['msg'] = '업데이트를 실패했습니다.'
+        return result
+
     def setting_save_after(self, changes: list) -> None:
         '''override'''
         super().setting_save_after(changes)

@@ -134,7 +134,7 @@ class SettingAider(Aider):
         try:
             if not cls.depend_user_yaml.exists():
                 shutil.copyfile(cls.depend_source_yaml, cls.depend_user_yaml)
-            if text:
+            if text or text == '':
                 with cls.depend_user_yaml.open(mode='w', encoding='utf-8', newline='\n') as file:
                     file.write(text)
                     depends = text

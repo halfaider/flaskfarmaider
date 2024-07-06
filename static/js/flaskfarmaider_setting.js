@@ -103,3 +103,14 @@ E_PLEXMATE_TIMEOVER_BTN.on('click', function (e) {
 $('#setting_startup_executable').bootstrapToggle((SETTING_STARTUP_EXECUTABLE ? 'on' : 'off'));
 $('#setting_logging_login').bootstrapToggle((SETTING_LOGGING_LOGIN ? 'on' : 'off'));
 $('#setting_logging_access').bootstrapToggle((SETTING_LOGGING_ACCESS ? 'on' : 'off'));
+
+$('#setting_startup_dependencies_update_Btn').on('click', function() {
+    $(this);
+    confirmModal(
+        '최신 내용으로 덮어쓸까요?',
+        '<a href="https://raw.githubusercontent.com/halfaider/flaskfarmaider/main/files/flaskfarmaider.yaml" target=_blank>https://raw.githubusercontent.com/halfaider/flaskfarmaider/main/files/flaskfarmaider.yaml</a>',
+        function() {
+            globalSendCommand('update_dependencies', null, null, null, null);
+        }
+    );
+});

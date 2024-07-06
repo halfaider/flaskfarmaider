@@ -47,3 +47,6 @@ textarea {
     max-width:100%;
 }
 
+#confirm_body {
+    word-break: break-word;
+}
