@@ -545,8 +545,9 @@ class RcloneAider(Aider):
         to_be_tested = str(remote_path)
         not_exists_paths = []
         result = self._vfs_refresh(to_be_tested, recursive)
-        while result['result'].get(to_be_tested) == 'file does not exist':
-            not_exists_paths.insert(0, to_be_tested)
+        while not result['result'].get(to_be_tested).lower() == 'ok':
+            if result['result'].get(to_be_tested).lower() == 'file does not exist':
+                not_exists_paths.insert(0, to_be_tested)
             if parents:
                 to_be_tested = str(parents.pop(0))
                 result = self._vfs_refresh(to_be_tested, recursive)
@@ -555,7 +556,7 @@ class RcloneAider(Aider):
                 break
         for path in not_exists_paths:
             result = self._vfs_refresh(path, recursive)
-            if not result.get(path) == 'OK':
+            if not result.get(path).lower() == 'ok':
                 LOGGER.error(f'Could not refresh: "{str(remote_path)}" result="{result}"')
                 break
 

@@ -173,7 +173,8 @@ def migrate_schedule_v7(cs: sqlite3.Cursor, table: str) -> None:
         rows = cs.execute(f'SELECT * FROM {table}').fetchall()
         remotes = CONFIG.get_json('setting_rclone_remotes')
         for row in rows:
-            cs.execute(f'UPDATE "{table}" SET rclone_remote="" WHERE id={row["id"]}')
+            if not row['rclone_remote'].startswith('http'):
+                cs.execute(f'UPDATE "{table}" SET rclone_remote="" WHERE id={row["id"]}')
             for remote in remotes:
                 if row['rclone_remote'] == f'{urllib.parse.urlparse(remote).fragment}:':
                     cs.execute(f'UPDATE "{table}" SET rclone_remote="{remote}" WHERE id={row["id"]}')
