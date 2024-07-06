@@ -492,7 +492,8 @@ class RcloneAider(Aider):
             else:
                 command_method = self.command_api
             result = command_method(command, data)
-            if 'error' in result:
+            if result.get('error'):
+                LOGGER.error(result)
                 raise Exception(result.get('error'))
             return result
         return wrapper
@@ -543,6 +544,35 @@ class RcloneAider(Aider):
             'dir': remote_path,
             'fs': fs or self.vfs,
         }
+
+    @command
+    def job__list(self, interface: str = None) -> dict[str, Any]:
+        return {'interface': interface}
+
+    @command
+    def job__status(self, jobid: int, interface: str = None) -> dict[str, Any]:
+        return {
+            'interface': interface,
+            'jobid': jobid,
+        }
+
+    @command
+    def job__stop(self, jobid: int, interface: str = None) -> dict[str, Any]:
+        return {
+            'interface': interface,
+            'jobid': jobid,
+        }
+
+    @command
+    def job__stopgroup(self, group: str, interface: str = None) -> dict[str, Any]:
+        return {
+            'interface': interface,
+            'group': group,
+        }
+
+    @command
+    def core__stats(self, interface: str = None) -> dict[str, Any]:
+        return {'interface': interface}
 
     @check_metadata_cache
     def _vfs_refresh(self, remote_path: str, recursive: bool = False, fs: str = None) -> dict[str, Any]:

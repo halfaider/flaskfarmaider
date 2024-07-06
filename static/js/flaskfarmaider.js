@@ -198,14 +198,6 @@ E_SELECT_ALL.on('click', function(e) {
     }
 });
 
-SOCKET.on('result', function(result) {
-    if (result) {
-        if (result.data.msg) {
-            notify(result.data.msg, 'info');
-        }
-    }
-});
-
 E_MULTIPLE_DEL.on('click', function(e) {
     let selected = $('input[class="selectable"]:checked').map((i, el) => el.value).get();
     if (selected.length > 0) {

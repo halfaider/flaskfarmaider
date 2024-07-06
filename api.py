@@ -347,6 +347,12 @@ class PageBase(Base, PluginPageBase):
         '''override'''
         return self.parent.start_celery(func, *args, on_message, page=self)
 
+    def socketio_connect(self) -> None:
+        pass
+
+    def socketio_disconnect(self) -> None:
+        pass
+
 
 class Model(ModelBase):
 

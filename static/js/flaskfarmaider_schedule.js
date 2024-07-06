@@ -605,4 +605,3 @@ SOCKET.on('result', function(result) {
         toggleScheduleStatus(result.data.id, result.data.status);
     }
 });
-

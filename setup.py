@@ -3,6 +3,7 @@ import traceback
 
 import flask
 import flask_login
+from flask import request
 
 from framework.init_main import Framework
 from framework.scheduler import Job as FrameworkJob
@@ -10,8 +11,9 @@ from plugin.create_plugin import create_plugin_instance
 from plugin.create_plugin import PluginBase
 from plugin.logic_module_base import PluginModuleBase, PluginPageBase
 from plugin.model_base import ModelBase
-from plugin.route import default_route_socketio_module, default_route_socketio_page
+from plugin.route import default_route_socketio_module
 from system.setup import P as SYSTEM_PLUGIN
+from support import AlchemyEncoder
 
 from .constants import OPTS
 from .util import get_client_ip
@@ -19,7 +21,7 @@ from .util import get_client_ip
 PLUGIN = P = create_plugin_instance(OPTS)
 LOGGER = PLUGIN.logger
 CONFIG = PLUGIN.ModelSetting
-FRAMEWORK = Framework.get_instance()
+FRAMEWORK = F = Framework.get_instance()
 
 
 def celery_is_active() -> bool:
@@ -79,6 +81,33 @@ def setting_set_json(key: str, value: dict | list) -> bool:
         LOGGER.error(traceback.format_exc())
         LOGGER.eroror(f'Invalid JSON: {value}')
         return False
+
+
+def default_route_socketio_page(page):
+    module = page.parent
+    page.socketio_list = page.socketio_list or []
+
+    @F.socketio.on('connect', namespace=f'/{P.package_name}/{module.name}/{page.name}')
+    def connect():
+        P.logger.debug(f'socket_connect : {P.package_name}/{module.name}/{page.name}')
+        page.socketio_list.append(request.sid)
+        socketio_callback('start', '')
+        page.socketio_connect()
+
+    @F.socketio.on('disconnect', namespace=f'/{P.package_name}/{module.name}/{page.name}')
+    def disconnect():
+        P.logger.debug(f'socket_disconnect : {P.package_name}/{module.name}/{page.name}')
+        page.socketio_list.remove(request.sid)
+        page.socketio_disconnect()
+
+    def socketio_callback(cmd, data, encoding=True):
+        if page.socketio_list:
+            if encoding:
+                data = json.dumps(data, cls=AlchemyEncoder)
+                data = json.loads(data)
+            F.socketio.emit(cmd, data, namespace=f'/{P.package_name}/{module.name}/{page.name}')
+
+    page.socketio_callback = socketio_callback
 
 
 CONFIG.get_json = setting_get_json
