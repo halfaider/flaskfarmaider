@@ -440,11 +440,18 @@ class RcloneAider(Aider):
 
     def __init__(self, rc_url: str = None) -> None:
         super().__init__()
+        if not rc_url or not rc_url.startswith('http'):
+            raise Exception(f'Rclone RC 리모트 주소를 입력하세요: {rc_url}')
         url = urllib.parse.urlparse(rc_url)
         self._vfs = url.fragment
         self._rc_user = url.username
         self._rc_pass = url.password
-        self._rc_url = urllib.parse.urlunparse([url.scheme, f'{url.hostname}:{url.port}', '', '', '', ''])
+        try:
+            self._rc_url = urllib.parse.urlunparse([url.scheme, f'{url.hostname}:{url.port}', '', '', '', ''])
+        except Exception as e:
+            LOGGER.error(traceback.format_exc())
+            LOGGER.error(f'url: {url}')
+            raise e
         self._mappings = parse_mappings(CONFIG.get_json('setting_rclone_mappings'))
 
     @property
@@ -524,7 +531,7 @@ class RcloneAider(Aider):
     def vfs__refresh(self, remote_path: str, recursive: bool = False, fs: str = None, interface: str = None) -> dict[str, Any]:
         return {
             'dir': remote_path,
-            'recursive': str(recursive).lower(),
+            'recursive': f'{bool(recursive)}'.lower(),
             'interface': interface,
             'fs': fs or self.vfs,
         }
