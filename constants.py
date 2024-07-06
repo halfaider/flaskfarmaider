@@ -99,6 +99,7 @@ OPTS = {
                 'name': '도구',
                 'list': [
                     {'uri': 'trash', 'name': 'Plex 휴지통 스캔'},
+                    {'uri': 'rclone', 'name': 'Rclone Status'},
                 ]
             },
             {

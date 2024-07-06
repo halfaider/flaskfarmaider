@@ -165,14 +165,14 @@ $('#add-btn').on('click', function(e) {
 $('#save-btn').on('click', function() {
     let ids = $(this).data('id');
     let formdata = new FormData(document.getElementById('setting'));
-    let checkboxes = ['sch-recursive', 'sch-schedule-auto-start']
-    for (idx in checkboxes) {
-        if ($('#' + checkboxes[idx] + '-helper').prop('checked')) {
-            if (!$('#' + checkboxes[idx]).prop('checked')) {
-                formdata.append(checkboxes[idx], 'off');
-            }
+    $('input[id$="-helper"]:checkbox').each(function(index) {
+        let targetId = $(this).prop('id').replace('-helper', '');
+        let isTargetChecked = $('#' + targetId).prop('checked');
+        let isChecked = $(this).prop('checked');
+        if (isChecked && !isTargetChecked) {
+            formdata.append(targetId, 'off');
         }
-    }
+    });
     for (let i in ids) {
         formdata.append('id', ids[i]);
     }
@@ -236,5 +236,13 @@ E_MULTIPLE_EDIT.on('click', function(e) {
         openModal('multiple-edit', selected);
     } else {
         notify('선택된 항목이 없습니다.', 'warning');
+    }
+});
+
+$('input:checkbox').on('change', function() {
+    let helperId = $(this).prop('id') + '-helper';
+    let helper = $('#' + helperId);
+    if (helper) {
+        helper.prop('checked', true);
     }
 });

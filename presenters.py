@@ -397,13 +397,31 @@ class Tool(ModuleBase):
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name='tool', first_menu='trash')
-        self.set_page_list([ToolTrash])
+        self.set_page_list([ToolTrash, ToolRclone])
 
     def setting_save_after(self, changes: list) -> None:
         '''override'''
         super().setting_save_after(changes)
         for page in self.page_list:
             page.setting_save_after(changes)
+
+
+class ToolRclone(PageBase):
+
+    def __init__(self, plugin: PluginBase, parent: ModuleBase) -> None:
+        super().__init__(plugin, parent, name='rclone')
+        self.db_default = {}
+
+    def get_template_args(self) -> dict:
+        '''override'''
+        args = super().get_template_args()
+        args['setting_rclone_remotes'] = CONFIG.get_json('setting_rclone_remotes')
+        return args
+
+    def command_default(self, request: flask.Request) -> dict:
+        '''override'''
+        self.socketio_callback('result', {'test': 'Hi'})
+        return super().command_default(request)
 
 
 class ToolTrash(PageBase):

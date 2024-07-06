@@ -1,0 +1,28 @@
+{% extends 'flaskfarmaider.html' %}
+{% block content %}
+<div class="input-group input-group-sm">
+    <div class="input-group-prepend">
+        <span class="input-group-text">RC 서버</span>
+    </div>
+    <select class="custom-select" id="rclone-remotes">
+    {%- for remote in args.setting_rclone_remotes %}
+        <option value="{{ remote }}">{{ remote }}</option>
+    {% endfor %}
+    </select>
+    <div class="input-group-append">
+        <span class="input-group-text">새로고침 간격</span>
+    </div>
+    <input class="form-control" type="number">
+</div>
+<div class="status_container">
+    <div class="status_body">
+    </div>
+</div>
+
+<script type="text/javascript">
+    $(function() {
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider.js') }}")
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_tool_rclone.js') }}")
+    });
+</script>
+{% endblock %}
