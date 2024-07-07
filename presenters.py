@@ -50,6 +50,7 @@ class Setting(ModuleBase):
         args = super().get_template_args()
         for conf in self.db_default.keys():
             if conf in ['setting_rclone_remotes', 'setting_rclone_mappings', 'setting_plex_mappings', 'setting_startup_commands']:
+                #args[conf] = json.dumps(CONFIG.get_json(conf)).replace('\\"', '\\\\"')
                 args[conf] = CONFIG.get_json(conf)
             else:
                 args[conf] = CONFIG.get(conf)

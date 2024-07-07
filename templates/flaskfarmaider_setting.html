@@ -1,6 +1,5 @@
 {% extends 'flaskfarmaider.html' %}
 {% block content %}
-
 <div class="input-group mb-3">
     <button id="save-btn" type="button" class="btn btn-block btn-primary">설정 저장</button>
 </div>
@@ -22,7 +21,6 @@
                 <small class="form-text text-muted">
                     기본 최대 대기 시간<br>단위: 초
                 </small>
-
                 <div class="form-check form-check-inline">
                     <label for="setting_logging_login" class="form-check-label mr-1"><strong>로그인 로그</strong></label>
                     <input id="setting_logging_login" name="setting_logging_login" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
@@ -31,7 +29,6 @@
                 <small class="form-text text-muted">
                     /data/log/system.log
                 </small>
-
                 <div class="form-check form-check-inline mt-3">
                     <label for="setting_logging_access" class="form-check-label mr-1"><strong>접속 로그</strong></label>
                     <input id="setting_logging_access" name="setting_logging_access" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
@@ -40,19 +37,16 @@
                 <small class="form-text text-muted">
                     Flaskfarm의 접속 로그
                 </small>
-
                 <label for="setting_logging_access_file" class="mt-3"><strong>접속 로그 파일 경로</strong></label>
                 <input id="setting_logging_access_file" name="setting_logging_access_file" type="text" class="form-control form-control-sm" placeholder="/data/log/access.log" value="{{ args.setting_logging_access_file }}">
                 <small class="form-text text-muted">
                     접속 로그 파일의 경로
                 </small>
-
                 <label for="setting_logging_access_format" class=""><strong>접속 로그 형식</strong></label>
                 <input id="setting_logging_access_format" name="setting_logging_access_format" type="text" class="form-control form-control-sm" placeholder="/data/log/access.log" value="{{ args.setting_logging_access_format }}">
                 <small class="form-text text-muted">
                     {remote}: 클라이언트 IP<br>{method}: HTTP 메소드 (GET, POST, ...)<br>{path}: 요청 경로<br>{status}: HTTP 응답 상태 코드(200, 404, ...)<br>{length}: 응답 크기<br>{agent}: User-Agent<br>{form}: form 데이터<br>{headers}: HTTP 헤더<br>{hostname}: 호스트명
                 </small>
-
             </div>
             <div class="col pr-0">
                 <label for="setting_config_file"><strong>기타 설정 파일</strong></label>
@@ -147,15 +141,14 @@
 
 <script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
-    const VFS = "{{ args.setting_rclone_remote_vfs }}";
-    const SETTING_LOGGING_LOGIN = JSON.parse('{{ args.setting_logging_login|lower }}');
-    const SETTING_LOGGING_ACCESS = JSON.parse('{{ args.setting_logging_access|lower }}');
-    const SETTING_STARTUP_EXECUTABLE = JSON.parse('{{ args.setting_startup_executable|lower }}');
-
-    const SETTING_RCLONE_REMOTES = JSON.parse('{{ args.setting_rclone_remotes|tojson }}');
-    const SETTING_RCLONE_MAPPINGS = JSON.parse('{{ args.setting_rclone_mappings|tojson }}');
-    const SETTING_PLEX_MAPPINGS = JSON.parse('{{ args.setting_plex_mappings|tojson }}');
-    const SETTING_STARTUP_COMMANDS = JSON.parse('{{ args.setting_startup_commands|tojson }}');
+    const VFS = '{{ args.setting_rclone_remote_vfs }}';
+    const SETTING_LOGGING_LOGIN = {{ args.setting_logging_login|lower }};
+    const SETTING_LOGGING_ACCESS = {{ args.setting_logging_access|lower }};
+    const SETTING_STARTUP_EXECUTABLE = {{ args.setting_startup_executable|lower }};
+    const SETTING_RCLONE_REMOTES = {{ args.setting_rclone_remotes|tojson }};
+    const SETTING_RCLONE_MAPPINGS = {{ args.setting_rclone_mappings|tojson }};
+    const SETTING_PLEX_MAPPINGS = {{ args.setting_plex_mappings|tojson }};
+    const SETTING_STARTUP_COMMANDS = {{ args.setting_startup_commands|tojson }};
 
     $(function() {
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")

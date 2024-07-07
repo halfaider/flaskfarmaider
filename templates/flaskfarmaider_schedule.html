@@ -1,18 +1,18 @@
 {% extends 'flaskfarmaider.html' %}
 {% block content %}
-{{ macros.m_modal_start('add-modal', '일정 추가', 'modal-xl') }}
+{{- macros.m_modal_start('add-modal', '일정 추가', 'modal-xl') }}
 <form id='setting'>
     <div class="form-group row mx-2">
         <div class="col pl-0">
             <label for="sch-task"><strong>작업</strong></label>
             <div class="input-group">
                 <select id="sch-task" name="sch-task" class="form-control form-control-sm">
-                    {% for task in args.tasks.values() %}
-                    {% if task.key == 'forget' %}
-                    {% continue %}
-                    {% endif %}
+                    {%- for task in args.tasks.values() %}
+                    {%- if task.key == 'forget' %}
+                    {%- continue %}
+                    {%- endif %}
                     <option value="{{ task.key }}">{{ task.name }}</option>
-                    {% endfor %}
+                    {%- endfor %}
                 </select>
             </div>
             <small class="form-text text-muted">일정으로 등록할 작업</small>
@@ -25,7 +25,6 @@
             <small class="form-text text-muted">일정 목록에 표시될 제목</small>
         </div>
     </div>
-
     <div class="form-group row mx-2">
         <div class="col pl-0">
             <label for=""><strong>일정 방식</strong></label>
@@ -43,7 +42,6 @@
                     <label class="custom-control-label" for="sch-schedule-mode2">시간 간격</label>
                 </div>
             </div>
-
             <div class="form-check form-check-inline mt-3">
                 <label for="sch-schedule-auto-start" class="form-check-label mr-1"><strong>시작시 일정 등록</strong></label>
                 <input id="sch-schedule-auto-start" name="sch-schedule-auto-start" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
@@ -67,7 +65,6 @@
                 <button id="sch-target-path-btn" class="btn btn-sm btn-outline-primary">경로 탐색</button>
             </div>
             <small class="form-text text-muted">Flaskfarm이 접근 가능한 로컬 경로</small>
-
             <label for="sch-target-section" class="mt-3"><strong>라이브러리 섹션</strong></label>
             <div class="input-group">
                 <select id="sch-target-section" name="sch-target-section" class="form-control form-control-sm"></select>
@@ -79,19 +76,17 @@
             <label for="sch-rclone-remote" class=""><strong>Rclone 리모트 콘트롤 서버</strong></label>
             <div class="input-group">
                 <select id="sch-rclone-remote" name="sch-rclone-remote" class="form-control form-control-sm">
-                    {% for remote in args.setting_rclone_remotes %}
+                    {%- for remote in args.setting_rclone_remotes %}
                     <option value="{{ remote }}">{{ remote }}</option>
-                    {% endfor %}
+                    {%- endfor %}
                 </select>
             </div>
             <small class="form-text text-muted">vfs/refresh를 수행할 RC 서버</small>
-
             <div class="form-check form-check-inline mt-3">
                 <label for="sch-recursive" class="form-check-label mr-1"><strong>Recursive</strong></label>
                 <input id="sch-recursive" name="sch-recursive" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
                 <input id="sch-recursive-helper" type="hidden" class="mx-1" hidden name="checkbox-helper" title="Off로 저장시 체크">
             </div>
-
             <small class="form-text text-muted">rclone vfs/refresh의 --recursive 옵션 적용 여부</small>
             <label for="" class="mt-3"><strong>스캔 방식</strong></label>
             <div class="input-group">
@@ -139,11 +134,7 @@
         </div>
     </div>
 </form>
-{{ macros.m_modal_end_with_button(
-  [
-    ['save-btn', '일정 저장'],
-  ]
-) }}
+{{- macros.m_modal_end_with_button([['save-btn', '일정 저장']]) -}}
 <form id="form_search">
     <div class="input-group input-group-sm">
         <div class="input-group-prepend input-group-sm">
@@ -160,9 +151,9 @@
                 <option value="ftime">최근 완료 순</option>
             </select>
             <select id="option1" name="option1" class="form-control">
-                {% for key, value in args.searches.items() %}
+                {%- for key, value in args.searches.items() %}
                 <option value="{{ key }}">{{ value.name }}</option>
-                {% endfor %}
+                {%- endfor %}
             </select>
             <select id="option2" name="option2" class="form-control">
                 <option value="all">전체</option>
@@ -239,23 +230,24 @@
 <script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
     // assign variables
-    const TASKS = JSON.parse('{{ args.tasks|tojson }}');
-    const TASK_KEYS = JSON.parse('{{ args.task_keys|tojson }}');
-    const STATUSES = JSON.parse('{{ args.statuses|tojson }}');
-    const STATUS_KEYS = JSON.parse('{{ args.status_keys|tojson }}');
-    const FF_SCHEDULE_KEYS = JSON.parse('{{ args.ff_schedule_keys|tojson }}');
-    const FF_SCHEDULES = JSON.parse('{{ args.ff_schedules|tojson }}');
-    const LAST_LIST_OPTIONS = "{{ args[module_name ~ '_last_list_option'] }}".split('|');
-    const SCAN_MODES = JSON.parse('{{ args.scan_modes|tojson }}');
-    const SCAN_MODE_KEYS = JSON.parse('{{ args.scan_mode_keys|tojson }}');
-    const SECTIONS = JSON.parse('{{ args.sections|tojson }}');
-    const SECTION_TYPES = JSON.parse('{{ args.section_types|tojson }}');
-    const SECTION_TYPE_KEYS = JSON.parse('{{ args.section_type_keys|tojson }}');
-    const SEARCH_KEYS = JSON.parse('{{ args.search_keys|tojson }}');
-    const SEARCHES = JSON.parse('{{ args.searches|tojson }}');
+    const TASKS = {{ args.tasks|tojson }};
+    const TASK_KEYS = {{ args.task_keys|tojson }};
+    const STATUSES = {{ args.statuses|tojson }};
+    const STATUS_KEYS = {{ args.status_keys|tojson }};
+    const FF_SCHEDULE_KEYS = {{ args.ff_schedule_keys|tojson }};
+    const FF_SCHEDULES = {{ args.ff_schedules|tojson }};
+    {%- set last_list_option = args[module_name ~ '_last_list_option'].split('|') %}
+    const LAST_LIST_OPTIONS = {{ last_list_option|tojson }};
+    const SCAN_MODES = {{ args.scan_modes|tojson }};
+    const SCAN_MODE_KEYS = {{ args.scan_mode_keys|tojson }};
+    const SECTIONS = {{ args.sections|tojson }};
+    const SECTION_TYPES = {{ args.section_types|tojson }};
+    const SECTION_TYPE_KEYS = {{ args.section_type_keys|tojson }};
+    const SEARCH_KEYS = {{ args.search_keys|tojson }};
+    const SEARCHES = {{ args.searches|tojson }};
 
-    const SETTING_RCLONE_REMOTES = JSON.parse('{{ args.setting_rclone_remotes|tojson }}');
-    const SETTING_RCLONE_MAPPINGS = JSON.parse('{{ args.setting_rclone_mappings|tojson }}');
+    const SETTING_RCLONE_REMOTES = {{ args.setting_rclone_remotes|tojson }};
+    const SETTING_RCLONE_MAPPINGS = {{ args.setting_rclone_mappings|tojson }};
 
     $(function() {
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
