@@ -39,7 +39,7 @@ class ScheduleAider(Aider):
                 paths = {pathlib.Path(row['file']).parent for row in trashes}
                 for path in paths:
                     if CONFIG.get('tool_trash_task_status') != STATUS_KEYS[1]:
-                        LOGGER.info(f'작업을 중지합니다.')
+                        LOGGER.info('작업을 중지합니다.')
                         break
                     if refresh:
                         rclone_aider.vfs_refresh(str(path), schedule.recursive)
@@ -97,7 +97,7 @@ class ScheduleAider(Aider):
             for target in targets:
                 RcloneAider(schedule.rclone_remote).vfs_refresh(target, schedule.recursive)
         else:
-            LOGGER.info(f'plex_mate: 새로고침 대상이 없습니다.')
+            LOGGER.info('plex_mate: 새로고침 대상이 없습니다.')
 
     def start_scan(self, schedule: ScheduleModel) -> None:
         '''scan'''
@@ -126,27 +126,26 @@ class ScheduleAider(Aider):
 
 class SettingAider(Aider):
 
-    depend_source_yaml = pathlib.Path(__file__).parent / 'files' / f'{__package__}.yaml'
-    depend_user_yaml = pathlib.Path(f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml')
-
-    @classmethod
-    def depends(cls, text: str = None) -> str:
+    @staticmethod
+    def config_from_file(text: str = None) -> str:
+        depend_source_yaml = pathlib.Path(__file__).parent / 'files' / f'{__package__}.yaml'
+        depend_user_yaml = pathlib.Path(CONFIG.get('setting_config_file'))
         try:
-            if not cls.depend_user_yaml.exists():
-                shutil.copyfile(cls.depend_source_yaml, cls.depend_user_yaml)
+            if not depend_user_yaml.exists():
+                shutil.copyfile(depend_source_yaml, depend_user_yaml)
             if text or text == '':
-                with cls.depend_user_yaml.open(mode='w', encoding='utf-8', newline='\n') as file:
+                with depend_user_yaml.open(mode='w', encoding='utf-8', newline='\n') as file:
                     file.write(text)
                     depends = text
             else:
-                with cls.depend_user_yaml.open(encoding='utf-8', newline='\n') as file:
+                with depend_user_yaml.open(encoding='utf-8', newline='\n') as file:
                     depends = file.read()
             return depends
         except:
             LOGGER.error(traceback.format_exc())
             if text: return text
             else:
-                with cls.depend_source_yaml.open(encoding='utf-8', newline='\n') as file:
+                with depend_source_yaml.open(encoding='utf-8', newline='\n') as file:
                     return file.read()
 
 
@@ -597,7 +596,7 @@ class RcloneAider(Aider):
                 to_be_tested = str(parents.pop(0))
                 result = self._vfs_refresh(to_be_tested, recursive)
             else:
-                LOGGER.warning(f'Hit the top-level path.')
+                LOGGER.warning('Hit the top-level path.')
                 break
         for path in not_exists_paths:
             if local_path.exists():
@@ -638,7 +637,7 @@ class StartupAider(Aider):
         startup_executable = CONFIG.get('setting_startup_executable')
         startup_executable = startup_executable.lower() == 'true'
         if not startup_executable:
-            msg = f'실행이 허용되지 않았어요.'
+            msg = '실행이 허용되지 않았어요.'
             LOGGER.error(msg)
             return subprocess.CompletedProcess(args, returncode=1, stderr='', stdout=msg)
         else:
@@ -653,7 +652,7 @@ class StartupAider(Aider):
 
     def startup(self) -> None:
         plugins_installed = [plugin_name for plugin_name in FRAMEWORK.PluginManager.all_package_list.keys()]
-        depends = yaml.safe_load(SettingAider.depends()).get('dependencies')
+        depends = yaml.safe_load(SettingAider.config_from_file()).get('dependencies')
 
         require_plugins, require_packages, require_commands = self.get_require_plugins(plugins_installed, depends)
 
@@ -692,7 +691,7 @@ class StartupAider(Aider):
                 result = FRAMEWORK.PluginManager.plugin_install(depends.get(plugin, {"repo": "NO INFO."}).get("repo"))
                 LOGGER.info(result.get('msg'))
         else:
-            LOGGER.warning(f'실행이 허용되지 않았어요.')
+            LOGGER.warning('실행이 허용되지 않았어요.')
 
     def get_installed_plugins(self) -> list[str]:
         return [plugin_name for plugin_name in FRAMEWORK.PluginManager.all_package_list.keys()]
@@ -737,5 +736,5 @@ class WindowsAider(StartupAider):
         super().__init__()
 
     def get_commands_from_packages(self, require_packages) -> list[str]:
-        LOGGER.warning(f'윈도우는 패키지 설치 명령어를 "commands" 혹은 "실행할 명령어"로 실행')
+        LOGGER.warning('윈도우는 패키지 설치 명령어를 "commands" 혹은 "실행할 명령어"로 실행')
         return []

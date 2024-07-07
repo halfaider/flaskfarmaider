@@ -2,7 +2,7 @@ import sqlite3
 import json
 import urllib.parse
 
-from .setup import LOGGER, CONFIG
+from .setup import LOGGER, CONFIG, FRAMEWORK
 from .constants import TASK_KEYS, SCAN_MODE_KEYS
 
 
@@ -29,7 +29,7 @@ def migrate_setting(ver: str, table, cs: sqlite3.Cursor) -> None:
 
 
 def migrate_schedule_v1(cs: sqlite3.Cursor, table: str) -> None:
-    LOGGER.warning(f'DB 버전 확인 필요')
+    LOGGER.warning('DB 버전 확인 필요')
 
 
 def migrate_schedule_v2(cs: sqlite3.Cursor, table: str) -> None:
@@ -38,7 +38,7 @@ def migrate_schedule_v2(cs: sqlite3.Cursor, table: str) -> None:
     old_table_rows = cs.execute(f"SELECT count(*) FROM sqlite_master WHERE type='table' AND name='job'").fetchall()
     if old_table_rows[0]['count(*)']:
         LOGGER.debug('old table exists!')
-        cs.execute(f'ALTER TABLE "job" RENAME TO "job_OLD_TABLE"')
+        cs.execute('ALTER TABLE "job" RENAME TO "job_OLD_TABLE"')
         new_table_rows = cs.execute(f"SELECT count(*) FROM sqlite_master WHERE type='table' AND name='{table}'").fetchall()
         if new_table_rows[0]['count(*)']:
             # drop new blank table
@@ -153,14 +153,14 @@ def migrate_schedule_v6(cs: sqlite3.Cursor, table: str) -> None:
 
 def migrate_schedule_v7(cs: sqlite3.Cursor, table: str) -> None:
     LOGGER.debug('DB 버전 7 로 마이그레이션')
-    row = cs.execute(f'SELECT name FROM sqlite_master WHERE type=? AND name=?', ('table', 'flaskfarmaider_jobs')).fetchone()
+    row = cs.execute('SELECT name FROM sqlite_master WHERE type=? AND name=?', ('table', 'flaskfarmaider_jobs')).fetchone()
     if row:
-        rows = cs.execute(f'SELECT name FROM pragma_table_info(?)', ('flaskfarmaider_jobs',)).fetchall()
+        rows = cs.execute('SELECT name FROM pragma_table_info(?)', ('flaskfarmaider_jobs',)).fetchall()
         cols = [row['name'] for row in rows]
         if 'periodic_id' in cols:
-            cs.execute(f'ALTER TABLE flaskfarmaider_jobs DROP COLUMN periodic_id')
+            cs.execute('ALTER TABLE flaskfarmaider_jobs DROP COLUMN periodic_id')
         if 'rclone_remote' not in cols:
-            cs.execute(f'ALTER TABLE flaskfarmaider_jobs RENAME COLUMN vfs TO rclone_remote')
+            cs.execute('ALTER TABLE flaskfarmaider_jobs RENAME COLUMN vfs TO rclone_remote')
         cs.execute(f"""
             INSERT INTO {table} (id, ctime, ftime, desc, target, task, recursive, rclone_remote, schedule_mode, schedule_interval,
                 schedule_auto_start, status, scan_mode, clear_type, clear_level, clear_section, section_id)
@@ -168,7 +168,7 @@ def migrate_schedule_v7(cs: sqlite3.Cursor, table: str) -> None:
                 schedule_auto_start, status, scan_mode, clear_type, clear_level, clear_section, section_id
             FROM flaskfarmaider_jobs
             """)
-        cs.execute(f'DROP TABLE flaskfarmaider_jobs')
+        cs.execute('DROP TABLE flaskfarmaider_jobs')
     rows = cs.execute(f'SELECT * FROM {table}').fetchall()
     remotes = CONFIG.get_json('setting_rclone_remotes')
     for row in rows:
@@ -188,7 +188,7 @@ def migrate_schedule_v8(cs: sqlite3.Cursor, table: str) -> None:
 
 
 def migrate_setting_v1(cs: sqlite3.Cursor, table: str) -> None:
-    LOGGER.warning(f'DB 버전 확인 필요')
+    LOGGER.warning('DB 버전 확인 필요')
 
 
 def migrate_setting_v2(cs: sqlite3.Cursor, table: str) -> None:
@@ -219,14 +219,12 @@ def migrate_setting_v3(cs: sqlite3.Cursor, table: str) -> None:
                 except:
                     commands = json.dumps(row['value'].splitlines())
                     cs.execute(f'UPDATE {table} SET value=? WHERE id=?', (commands, row['id']))
-            case key if key in ['setting_rclone_remote_addr', 'setting_rclone_remote_vfs', 'setting_rclone_remote_user', 'setting_rclone_remote_pass']:
-                rclone_remote[key] = row['value']
+            case 'setting_rclone_remote_addr' | 'setting_rclone_remote_vfs' | 'setting_rclone_remote_user' | 'setting_rclone_remote_pass':
+                rclone_remote[row['key']] = row['value']
                 cs.execute(f'DELETE FROM {table} WHERE id=?', (row['id'],))
-            case key if key in [
-                    'setting_gds_tool_request_span', 'setting_gds_tool_request_auto', 'setting_gds_tool_fp_span', 'setting_gds_tool_fp_auto',
-                    'setting_rclone_path_test', 'setting_logging_rotation', 'setting_logging_files', 'settings_logging_size',
-                    'tool_file_watcher_enable', 'tool_file_watcher_map', 'watcher_last_list_option',
-                ]:
+            case ('setting_gds_tool_request_span' | 'setting_gds_tool_request_auto' | 'setting_gds_tool_fp_span' | 'setting_gds_tool_fp_auto' |
+                    'setting_rclone_path_test' | 'setting_logging_rotation' | 'setting_logging_files' | 'settings_logging_size' |
+                    'tool_file_watcher_enable' | 'tool_file_watcher_map' | 'watcher_last_list_option' | 'setting_startup_dependencies'):
                 cs.execute(f'DELETE FROM {table} WHERE id=?', (row['id'],))
             case 'setting_rclone_remote_mapping':
                 mappings = json.dumps(row['value'].splitlines())

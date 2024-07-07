@@ -16,26 +16,6 @@ function testConnection() {
     });
 }
 
-function saveSettings() {
-    // model_setting.py의 setting_save()에서 중복 name을 처리 못 함.
-    globalSettingSaveBefore();
-    let formdata = getFormdata('#setting');;
-    formdata += '&command=save_settings';
-    $.ajax({
-        url: '/' + PACKAGE_NAME + '/ajax/' + MODULE_NAME + '/command',
-        type: "POST",
-        cache: false,
-        data: formdata,
-        dataType: "json",
-        success: function(result) {
-            notify(result.msg, result.ret)
-            if (result.ret == 'success') {
-                globalSettingSaveAfter();
-            }
-        }
-    });
-}
-
 function renderRemoteGroup() {
     const E_RCLONE_REMOTE_GROUP = $('#rclone-remote-group');
     let defaultInputGroup = '<div class="input-group">';
@@ -86,8 +66,6 @@ renderAddableInputGroup(SETTING_RCLONE_MAPPINGS, 'rclone-mapping-group', 'settin
 renderAddableInputGroup(SETTING_PLEX_MAPPINGS, 'plex-mapping-group', 'setting_plex_mappings', '/mnt/gds/GDRIVE:/host/mnt/gds/GDRIVE');
 renderAddableInputGroup(SETTING_STARTUP_COMMANDS, 'startup-command-group', 'setting_startup_commands', 'apt-get update');
 
-$('#btn-save-settings').on('click', saveSettings);
-
 E_SETTING_TEST_CONN.on('click', function (e) {
     globalSettingSave();
     e.preventDefault();
@@ -104,13 +82,13 @@ $('#setting_startup_executable').bootstrapToggle((SETTING_STARTUP_EXECUTABLE ? '
 $('#setting_logging_login').bootstrapToggle((SETTING_LOGGING_LOGIN ? 'on' : 'off'));
 $('#setting_logging_access').bootstrapToggle((SETTING_LOGGING_ACCESS ? 'on' : 'off'));
 
-$('#setting_startup_dependencies_update_Btn').on('click', function() {
+$('#setting_config_file_update_btn').on('click', function() {
     $(this);
     confirmModal(
         '최신 내용으로 덮어쓸까요?',
         '<a href="https://raw.githubusercontent.com/halfaider/flaskfarmaider/main/files/flaskfarmaider.yaml" target=_blank>https://raw.githubusercontent.com/halfaider/flaskfarmaider/main/files/flaskfarmaider.yaml</a>',
         function() {
-            globalSendCommand('update_dependencies', null, null, null, null);
+            globalSendCommand('update_config_file', null, null, null, null);
         }
     );
 });

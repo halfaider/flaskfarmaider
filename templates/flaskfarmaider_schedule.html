@@ -47,7 +47,7 @@
             <div class="form-check form-check-inline mt-3">
                 <label for="sch-schedule-auto-start" class="form-check-label mr-1"><strong>시작시 일정 등록</strong></label>
                 <input id="sch-schedule-auto-start" name="sch-schedule-auto-start" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
-                <input id="sch-schedule-auto-start-helper" type="checkbox" class="mx-1" hidden name="sch-checkbox-helper" title="Off로 저장시 체크">
+                <input id="sch-schedule-auto-start-helper" type="hidden" class="mx-1" hidden name="checkbox-helper" title="Off로 저장시 체크">
             </div>
         </div>
         <div class="col pr-0">
@@ -89,7 +89,7 @@
             <div class="form-check form-check-inline mt-3">
                 <label for="sch-recursive" class="form-check-label mr-1"><strong>Recursive</strong></label>
                 <input id="sch-recursive" name="sch-recursive" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
-                <input id="sch-recursive-helper" type="checkbox" class="mx-1" hidden name="sch-checkbox-helper" title="Off로 저장시 체크">
+                <input id="sch-recursive-helper" type="hidden" class="mx-1" hidden name="checkbox-helper" title="Off로 저장시 체크">
             </div>
 
             <small class="form-text text-muted">rclone vfs/refresh의 --recursive 옵션 적용 여부</small>
@@ -236,6 +236,7 @@
 <br />
 <br />
 
+<script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
     // assign variables
     const TASKS = JSON.parse('{{ args.tasks|tojson }}');
@@ -257,7 +258,7 @@
     const SETTING_RCLONE_MAPPINGS = JSON.parse('{{ args.setting_rclone_mappings|tojson }}');
 
     $(function() {
-        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider.js') }}")
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_schedule.js') }}")
     });
 </script>

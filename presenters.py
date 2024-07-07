@@ -23,52 +23,44 @@ from .constants import (TASK_KEYS, TASKS, TOOL_TRASH_KEYS, TOOL_TRASHES, STATUS_
 
 class Setting(ModuleBase):
 
-    __DB_VERSIONS = ['1', '2']
+    _DB_VERSIONS = ['1', '2']
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name='setting')
         self.db_default = {
-            f'{self.name}_db_version': self.__DB_VERSIONS[-1],
-            f'{self.name}_plexmate_max_scan_time': '60',
-            f'{self.name}_plexmate_timeover_range': '0~0',
-            f'{self.name}_startup_executable': 'false',
-            f'{self.name}_startup_commands': 'apt-get update',
-            f'{self.name}_startup_timeout': '300',
-            f'{self.name}_startup_dependencies': SettingAider.depends(),
-            f'{self.name}_logging_login': 'false',
-            f'{self.name}_logging_access': 'false',
-            f'{self.name}_logging_access_file': '/data/log/access.log',
-            f'{self.name}_logging_access_format': '{remote} {method} "{path}" {status}',
-
-            f'{self.name}_general_timeout': '0',
-            f'{self.name}_rclone_remotes': '["http://172.17.0.1:5572"]',
-            f'{self.name}_rclone_mappings': '["/mnt/gds:"]',
-            f'{self.name}_plex_mappings': '["/mnt/gds:"]',
+            'setting_db_version': self._DB_VERSIONS[-1],
+            'setting_plexmate_max_scan_time': '60',
+            'setting_plexmate_timeover_range': '0~0',
+            'setting_startup_executable': 'false',
+            'setting_startup_commands': '["apt-get update"]',
+            'setting_startup_timeout': '300',
+            'setting_logging_login': 'false',
+            'setting_logging_access': 'false',
+            'setting_logging_access_file': '/data/log/access.log',
+            'setting_logging_access_format': '{remote} {method} "{path}" {status}',
+            'setting_general_timeout': '0',
+            'setting_rclone_remotes': '["http://172.17.0.1:5572"]',
+            'setting_rclone_mappings': '["/mnt/gds:"]',
+            'setting_plex_mappings': '["/mnt/gds:"]',
+            'setting_config_file': f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml',
         }
-
-    def prerender(self, sub: str, req: flask.Request) -> None:
-        '''override'''
-        super().prerender(sub, req)
-        # yaml 파일 우선
-        CONFIG.set(f'{self.name}_startup_dependencies', SettingAider.depends())
 
     def get_template_args(self) -> dict:
         '''override'''
         args = super().get_template_args()
         for conf in self.db_default.keys():
-            if conf in [f'{self.name}_rclone_remotes', f'{self.name}_rclone_mappings', f'{self.name}_plex_mappings', f'{self.name}_startup_commands']:
+            if conf in ['setting_rclone_remotes', 'setting_rclone_mappings', 'setting_plex_mappings', 'setting_startup_commands']:
                 args[conf] = CONFIG.get_json(conf)
             else:
                 args[conf] = CONFIG.get(conf)
-        args[f'{self.name}_logging_login_file'] = f"{FRAMEWORK.config['path_data']}/log/system.log"
+        args['setting_logging_login_file'] = f"{FRAMEWORK.config['path_data']}/log/system.log"
+        args['setting_config_file_content'] = SettingAider.config_from_file()
         return args
 
     def migration(self) -> None:
         '''override'''
         super().migration()
-        version = CONFIG.get(f'{self.name}_db_version') or self.__DB_VERSIONS[0]
-        version = self._migration(version, self.__DB_VERSIONS, f'{PLUGIN.package_name}_setting', migrate_setting)
-        CONFIG.set(f'{self.name}_db_version', version)
+        self._migration('setting_db_version', f'{PLUGIN.package_name}_setting', migrate_setting)
 
     def command_test_connection(self, request: flask.Request) -> dict:
         rclone = RcloneAider(request.form.get('arg1'))
@@ -86,21 +78,28 @@ class Setting(ModuleBase):
             data['msg'] = '접속에 성공했습니다.'
         return data
 
-    def command_save_settings(self, request: flask.Request) -> dict:
+    def command_save(self, request: flask.Request) -> dict:
+        parsed = self.parse_command(request)
         changes = []
         result = self.returns('success', msg='설정을 저장했습니다.')
+        LOGGER.debug(f'Form data: {parsed["query"]}')
         try:
-            for key in request.form.keys():
+            for key in parsed['query'].keys():
                 match key:
-                    case 'command':
+                    case 'checkbox-helper':
                         continue
-                    case key if key in [f'{self.name}_rclone_remotes', f'{self.name}_rclone_mappings', f'{self.name}_plex_mappings', f'{self.name}_startup_commands']:
-                        values = [v.strip() for v in request.form.getlist(key) if v.strip()]
+                    case 'setting_rclone_remotes' | 'setting_rclone_mappings' | 'setting_plex_mappings' | 'setting_startup_commands':
+                        values = [v.strip() for v in parsed['query'][key]]
                         if not CONFIG.set_json(key, values):
                             continue
+                    case 'setting_logging_access' | 'setting_startup_executable' | 'setting_logging_login':
+                        if parsed['query'][key][0].strip().lower() == 'on':
+                            CONFIG.set(key, 'true')
+                        else:
+                            CONFIG.set(key, 'false')
                     case _:
-                        v = request.form.get(key).strip()
-                        CONFIG.set(key, v)
+                        value = parsed['query'][key][0].strip()
+                        CONFIG.set(key, value)
                 changes.append(key)
             if changes:
                 self.setting_save_after(changes)
@@ -116,12 +115,12 @@ class Setting(ModuleBase):
         plexmate.check_timeover(num_range)
         return self.returns('success', 'TIMEOUT 항목을 READY로 변경합니다.')
 
-    def command_update_dependencies(self, request: flask.Request) -> dict:
+    def command_update_config_file(self, request: flask.Request) -> dict:
         aider = SettingAider()
         result = self.returns('success', '업데이트를 완료했습니다.')
         try:
             response = aider.request('GET', 'https://raw.githubusercontent.com/halfaider/flaskfarmaider/main/files/flaskfarmaider.yaml')
-            aider.depends(response.text)
+            aider.config_from_file(response.text)
         except:
             LOGGER.error(traceback.format_exc())
             result['ret'] = 'warning'
@@ -133,44 +132,40 @@ class Setting(ModuleBase):
         super().setting_save_after(changes)
         for change in changes:
             match change:
-                case 'setting_startup_dependencies':
-                    SettingAider.depends(CONFIG.get(f'{self.name}_startup_dependencies'))
                 case 'setting_logging_login':
-                    enable = CONFIG.get(f'{self.name}_logging_login')
+                    enable = CONFIG.get('setting_logging_login')
                     set_login_log(enable.lower() == 'true')
 
     def plugin_load(self) -> None:
         '''override'''
         super().plugin_load()
-        set_login_log(CONFIG.get(f'{self.name}_logging_login').lower() == 'true')
+        set_login_log(CONFIG.get('setting_logging_login').lower() == 'true')
 
 
 class Schedule(ModuleBase):
 
-    __DB_VERSIONS = ['1', '2', '3', '4', '5', '6']
+    _DB_VERSIONS = ['1', '2', '3', '4', '5', '6']
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name='schedule')
         self.db_default = {
-            f'{self.name}_db_version': self.__DB_VERSIONS[-1],
-            f'{self.name}_working_directory': '/',
-            f'{self.name}_last_list_option': ''
+            'schedule_db_version': self._DB_VERSIONS[-1],
+            'schedule_working_directory': '/',
+            'schedule_last_list_option': ''
         }
         self.web_list_model = ScheduleModel
 
     def migration(self) -> None:
         '''override'''
         super().migration()
-        version = CONFIG.get(f'{self.name}_db_version')
-        version = self._migration(version, self.__DB_VERSIONS, f'{PLUGIN.package_name}_schedules', migrate_schedule)
-        CONFIG.set(f'{self.name}_db_version', version)
+        self._migration('schedule_db_version', f'{PLUGIN.package_name}_schedules', migrate_schedule)
 
     def get_template_args(self) -> dict:
         '''override'''
         args = super().get_template_args()
         confs = [
-            f'{self.name}_working_directory',
-            f'{self.name}_last_list_option',
+            'schedule_working_directory',
+            'schedule_last_list_option',
             'setting_rclone_remote_vfs',
             'setting_rclone_remote_vfses',
         ]
@@ -217,7 +212,7 @@ class Schedule(ModuleBase):
         schedule_mode = schedule.schedule_mode if schedule else FF_SCHEDULE_KEYS[0]
         match active, is_include:
             case True, True:
-                result, msg = False, f'이미 일정에 등록되어 있습니다.'
+                result, msg = False, '이미 일정에 등록되어 있습니다.'
             case False, True:
                 result, msg = FRAMEWORK.scheduler.remove_job(schedule_id), '일정에서 제외했습니다.'
             case False, False:
@@ -314,7 +309,7 @@ class Schedule(ModuleBase):
         except Exception as e:
             LOGGER.error(traceback.format_exc())
             return self.returns('warning', str(e))
-        CONFIG.set(f'{self.name}_working_directory', path)
+        CONFIG.set('schedule_working_directory', path)
         if dir_list:
             return self.returns('success', data=dir_list)
         else:
@@ -348,9 +343,9 @@ class Schedule(ModuleBase):
                     not_deleted.append(_id)
             if len(not_deleted) > 0:
                 LOGGER.warning(f'could not delete: {not_deleted}')
-                return self.returns('warning', f'일부는 삭제할 수 없었습니다.')
+                return self.returns('warning', '일부는 삭제할 수 없었습니다.')
             else:
-                return self.returns('success', f'모두 삭제 했습니다.')
+                return self.returns('success', '모두 삭제 했습니다.')
         else:
             if ScheduleModel.delete_by_id(parsed['ids'][0]):
                 self.set_schedule(parsed['ids'][0], False)
@@ -464,7 +459,7 @@ class ToolTrash(PageBase):
             schedule.rclone_remote = parsed['query'].get('rclone_remote', CONFIG.get_json('setting_rclone_remotes'))[0]
             schedule.recursive = False
             self.run_async(start_schedule, (schedule,))
-            return self.returns('success', f'작업을 실행했습니다.')
+            return self.returns('success', '작업을 실행했습니다.')
         else:
             return super().command_default(request)
 
@@ -545,7 +540,7 @@ def after_request(response: flask.Response) -> flask.Response:
         file = CONFIG.get('setting_logging_access_file') or f"{FRAMEWORK.config.get('path_data', '/data')}/log/access.log"
         level = FRAMEWORK.SystemModelSetting.get_int('log_level') or logging.DEBUG
         logger = get_rotating_file_logger(file, level=level)
-        log_format = CONFIG.get(f'setting_logging_access_format')
+        log_format = CONFIG.get('setting_logging_access_format')
         if not log_format:
             log_format = '{remote} {method} "{path}" {status}'
             CONFIG.set('setting_logging_access_format', log_format)

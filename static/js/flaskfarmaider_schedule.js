@@ -348,7 +348,7 @@ function openModal(from, data) {
         E_CLEAR_LEVEL.prop('value', data.clear_level);
         E_TARGET_SECTION.prop('value', data.section_id);
         E_RLCONE_REMOTE.prop('value', data.rclone_remote);
-        $('input[id$="-helper"]:checkbox').prop('checked', true);
+        $('input[id$="-helper"][type="hidden"]').prop('checked', true);
     } else if (from == 'multiple-edit') {
         setFormByTask('multiple-edit');
         E_MODAL_TITLE.html('일정 일괄 편집 - ' + data);
@@ -368,7 +368,7 @@ function openModal(from, data) {
         E_SCH_AUTO.bootstrapToggle('off');
         E_TASK.off('change');
         $('input[id^="sch-schedule-mode"]:radio').off('change');
-        $('input[id$="-helper"]:checkbox').prop('checked', false);
+        $('input[id$="-helper"][type="hidden"]').prop('checked', false);
     } else {
         // 새로 추가
         setFormByTask(TASK_KEYS[0]);
@@ -394,7 +394,7 @@ function openModal(from, data) {
         setPlexSections(E_CLEAR_RADIO_0.prop('value'), E_CLEAR_SECTION, SECTIONS);
         setClearLevel(E_CLEAR_RADIO_0.prop('value'));
         E_MODAL_TITLE.html("일정 추가");
-        $('input[id$="-helper"]:checkbox').prop('checked', true);
+        $('input[id$="-helper"][type="hidden"]').prop('checked', true);
     }
     E_MODAL.modal({backdrop: 'static', keyboard: true}, 'show');
 }

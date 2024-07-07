@@ -67,7 +67,7 @@ class ScheduleModel(Model):
             model = cls.get_by_id(id_)
         else:
             model = ScheduleModel()
-        formdata.pop('sch-checkbox-helper', None)
+        formdata.pop('checkbox-helper', None)
         if formdata.get('sch-task', [-1])[0] == TASK_KEYS[5]:
             formdata.update({'sch-schedule-interval': ['매 시작']})
         for key in ['sch-recursive', 'sch-schedule-auto-start']:

@@ -21,6 +21,8 @@ from .setup import (
 
 class Base:
 
+    _DB_VERSIONS = ['1']
+
     def __init__(self, *args, **kwds) -> None:
         super().__init__(*args, **kwds)
 
@@ -84,7 +86,8 @@ class Base:
     def returns(self, success: str, msg: str = None, title: str = None, modal: str = None, json: dict = None, reload: bool = False, data: dict = None) -> dict:
         return {'ret': success, 'msg': msg, 'title': title, 'modal': modal, 'json': json, 'reload': reload, 'data': data}
 
-    def _migration(self, version: str, versions: list, table: str, migrate_func: callable) -> str:
+    def _migration(self, version_key: str, table: str, migrate_func: callable) -> None:
+        version = CONFIG.get(version_key) or self._DB_VERSIONS[0]
         LOGGER.debug(f'{table} 현재 DB 버전: {version}')
         with FRAMEWORK.app.app_context():
             db_file = FRAMEWORK.app.config['SQLALCHEMY_BINDS'][PLUGIN.package_name].replace('sqlite:///', '').split('?')[0]
@@ -93,15 +96,16 @@ class Base:
                     conn.row_factory = sqlite3.Row
                     cs = conn.cursor()
                     # DB 볼륨 정리
-                    cs.execute(f'VACUUM;')
-                    for ver in versions[(versions.index(version)):]:
+                    cs.execute('VACUUM;')
+                    for ver in self._DB_VERSIONS[(self._DB_VERSIONS.index(version)):]:
                         migrate_func(ver, table, cs)
                         version = ver
                     FRAMEWORK.db.session.flush()
+                LOGGER.debug(f'{table} 최종 DB 버전: {version}')
+                CONFIG.set(version_key, version)
             except:
-                LOGGER.exception('마이그레이션 실패')
-        LOGGER.debug(f'{table} 최종 DB 버전: {version}')
-        return version
+                LOGGER.error(traceback.format_exc())
+                LOGGER.error('마이그레이션 실패')
 
 
 class ModuleBase(Base, PluginModuleBase):

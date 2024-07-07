@@ -67,6 +67,7 @@
     </ul>
 </nav>
 
+<script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
 <script type="text/javascript">
     const SECTION_TYPES = JSON.parse('{{ args.section_types|tojson }}');
     const SECTION_TYPE_KEYS = JSON.parse('{{ args.section_type_keys|tojson }}');
@@ -82,7 +83,7 @@
     const LAST_LIST_OPTIONS = '{{ args.tool_trash_last_list_option }}'.split('|')
 
     $(function() {
-        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider.js') }}")
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_tool_trash.js') }}")
     });
 </script>
