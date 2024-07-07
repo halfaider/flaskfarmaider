@@ -600,6 +600,8 @@ class RcloneAider(Aider):
                 LOGGER.warning(f'Hit the top-level path.')
                 break
         for path in not_exists_paths:
+            if local_path.exists():
+                break
             result = self._vfs_refresh(path, recursive)
             if not result['result'].get(path) == 'OK':
                 # If it is a file > 'invalid argument'
