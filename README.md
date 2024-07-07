@@ -1,5 +1,7 @@
 
 # 변경점
+- v1.3.10
+    - vfs/refresh 시 파일/디렉토리 체크
 - v1.3.9
     - page용 socket io 설정
 - v1.3.8

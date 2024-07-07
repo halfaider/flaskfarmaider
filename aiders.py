@@ -580,9 +580,14 @@ class RcloneAider(Aider):
         return result
 
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> None:
-        remote_path = pathlib.Path(update_path(local_path, self.mappings)) if self.mappings else pathlib.Path(local_path)
+        local_path = pathlib.Path(local_path)
+        remote_path = pathlib.Path(update_path(str(local_path), self.mappings)) if self.mappings else local_path
         parents: list[pathlib.Path] = list(remote_path.parents)
-        to_be_tested = str(remote_path)
+        if local_path.is_file():
+            to_be_tested = str(parents.pop(0))
+        else:
+            LOGGER.debug(f'It is a directory or not exists locally: {str(local_path)}')
+            to_be_tested = str(remote_path)
         not_exists_paths = []
         result = self._vfs_refresh(to_be_tested, recursive)
         while not result['result'].get(to_be_tested) == 'OK':
@@ -597,7 +602,7 @@ class RcloneAider(Aider):
         for path in not_exists_paths:
             result = self._vfs_refresh(path, recursive)
             if not result['result'].get(path) == 'OK':
-                # file 일 경우 'invalid argument'
+                # If it is a file > 'invalid argument'
                 break
 
     @check_metadata_cache
