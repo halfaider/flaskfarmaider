@@ -88,14 +88,18 @@ class ScheduleAider(Aider):
     def start_pm_ready_refresh(self, schedule: ScheduleModel) -> None:
         '''pm_ready_refresh'''
         plex_aider = PlexmateAider()
+        rclone_aider = RcloneAider(schedule.rclone_remote)
         # plexmate
         plex_aider.check_scanning(CONFIG.get_int('setting_plexmate_max_scan_time'))
         plex_aider.check_timeover(CONFIG.get('setting_plexmate_timeover_range'))
         # refresh
-        targets = {s.target for s in plex_aider.get_scan_items('READY')}
+        targets = {s for s in plex_aider.get_scan_items('READY')}
         if targets:
             for target in targets:
-                RcloneAider(schedule.rclone_remote).vfs_refresh(target, schedule.recursive)
+                if target.mode in ['REMOVE_FILE', 'REMOVE_FOLDER']:
+                    rclone_aider.vfs_forget(target.target)
+                else:
+                    rclone_aider.vfs_refresh(target.target, schedule.recursive)
         else:
             LOGGER.info('plex_mate: 새로고침 대상이 없습니다.')
 
