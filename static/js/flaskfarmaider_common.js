@@ -37,8 +37,10 @@ $('#save-btn').on('click', function() {
     console.log(query);
     globalSendCommand('save', query, null, null, function(result) {
         if (result.ret == 'success') {
-            $('#add-modal').modal('hide');
-            //globalRequestSearch(1);
+            if (MODULE_NAME == 'schedule') {
+                $('#add-modal').modal('hide');
+                globalRequestSearch(1);
+            }
         }
     });
 });
