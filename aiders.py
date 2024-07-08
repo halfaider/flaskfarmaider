@@ -36,15 +36,15 @@ class ScheduleAider(Aider):
             rclone_aider = RcloneAider(schedule.rclone_remote)
             trashes: dict = plex_aider.get_trashes(schedule.section_id, 1, -1)
             if trashes:
-                paths = {pathlib.Path(row['file']).parent for row in trashes}
+                paths: list[str] = {pathlib.Path(row['file']).parent.as_posix() for row in trashes}
                 for path in paths:
                     if CONFIG.get('tool_trash_task_status') != STATUS_KEYS[1]:
                         LOGGER.info('작업을 중지합니다.')
                         break
                     if refresh:
-                        rclone_aider.vfs_refresh(str(path), schedule.recursive)
+                        rclone_aider.vfs_refresh(path, schedule.recursive)
                     if scan:
-                        plex_aider.scan(SCAN_MODE_KEYS[0], str(path), schedule.section_id)
+                        plex_aider.scan(SCAN_MODE_KEYS[0], path, schedule.section_id)
             else:
                 LOGGER.info('이용 불가 파일이 없습니다.')
                 empty = False
@@ -207,7 +207,7 @@ class PlexmateAider(PluginAider):
     def get_trash_list(self, section_id: int, page_no: int = 1, limit: int = 10) -> dict:
         result = {'total': 0, 'limit': limit, 'page': page_no, 'section_id': section_id, 'total_paths': 0, 'data': None}
         total_rows = self.get_trashes(section_id, 1, -1)
-        paths ={pathlib.Path(row['file']).parent for row in total_rows}
+        paths ={pathlib.Path(row['file']).parent.as_posix() for row in total_rows}
         result['total'] = len(total_rows)
         result['total_paths'] = len(paths)
         rows = self.get_trashes(section_id, page_no, limit)
@@ -286,6 +286,7 @@ class PlexmateAider(PluginAider):
         targets = {}
         for location in locations:
             root = pathlib.Path(f'{location["root_path"]}')
+            root = pathlib.Path(root.as_posix())
             if target.is_relative_to(root):
                 targets[str(target)] = int(location['library_section_id'])
             elif root.is_relative_to(target):
@@ -585,19 +586,20 @@ class RcloneAider(Aider):
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> None:
         local_path = pathlib.Path(local_path)
         remote_path = pathlib.Path(update_path(str(local_path), self.mappings)) if self.mappings else local_path
+        remote_path = pathlib.Path(remote_path.as_posix())
         parents: list[pathlib.Path] = list(remote_path.parents)
         if local_path.is_file():
-            to_be_tested = str(parents.pop(0).as_posix())
+            to_be_tested = str(parents.pop(0))
         else:
             LOGGER.debug(f'It is a directory or not exists locally: {str(local_path)}')
-            to_be_tested = str(remote_path.as_posix())
+            to_be_tested = str(remote_path)
         not_exists_paths = []
         result = self._vfs_refresh(to_be_tested, recursive)
         while not result['result'].get(to_be_tested) == 'OK':
             if result['result'].get(to_be_tested) == 'file does not exist':
                 not_exists_paths.insert(0, to_be_tested)
             if parents:
-                to_be_tested = str(parents.pop(0).as_posix())
+                to_be_tested = str(parents.pop(0))
                 result = self._vfs_refresh(to_be_tested, recursive)
             else:
                 LOGGER.warning('Hit the top-level path.')
@@ -617,7 +619,8 @@ class RcloneAider(Aider):
 
     def vfs_forget(self, local_path: str, fs: str = None) -> None:
         remote_path = pathlib.Path(update_path(local_path, self.mappings)) if self.mappings else pathlib.Path(local_path)
-        self._vfs_forget(str(remote_path).as_posix(), fs)
+        remote_path = pathlib.Path(remote_path.as_posix())
+        self._vfs_forget(str(remote_path), fs)
 
     def get_metadata_cache(self, fs: str = None) -> tuple[int, int]:
         try:

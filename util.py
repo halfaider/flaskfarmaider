@@ -112,7 +112,7 @@ def pack_dir(entry: os.DirEntry | pathlib.Path) -> dict:
     stats: os.stat_result = entry.stat(follow_symlinks=True)
     return {
         'name': entry.name,
-        'path': entry.path if isinstance(entry, os.DirEntry) else str(entry),
+        'path': pathlib.Path(entry.path).as_posix() if isinstance(entry, os.DirEntry) else str(pathlib.Path(entry).as_posix()),
         'is_file': entry.is_file(),
         'size': format_file_size(stats.st_size),
         'ctime': get_readable_time(stats.st_ctime),
