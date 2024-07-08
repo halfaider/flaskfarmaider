@@ -278,7 +278,7 @@ class PlexmateAider(PluginAider):
 
     def get_targets(self, target: str, section_id: int = None) -> dict[str, int]:
         mappings = parse_mappings(CONFIG.get_json('setting_plex_mappings'))
-        target = pathlib.PurePosixPath(update_path(target, mappings))
+        target = pathlib.Path(update_path(target, mappings))
         if section_id and int(section_id) > 0:
             locations = self.db.select(f'SELECT library_section_id, root_path FROM section_locations WHERE library_section_id = {section_id}')
         else:
@@ -286,11 +286,11 @@ class PlexmateAider(PluginAider):
         targets = {}
         for location in locations:
             root = pathlib.Path(f'{location["root_path"]}')
-            root = pathlib.PurePosixPath(root.as_posix())
+            root = pathlib.Path(root.as_posix())
             if target.is_relative_to(root):
-                targets[str(target)] = int(location['library_section_id'])
+                targets[target.as_posix()] = int(location['library_section_id'])
             elif root.is_relative_to(target):
-                targets[str(root)] = int(location['library_section_id'])
+                targets[root.as_posix()] = int(location['library_section_id'])
         return targets
 
     def web_scan(self, section_id: int, location: str = None) -> None:
@@ -585,21 +585,20 @@ class RcloneAider(Aider):
 
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> None:
         local_path = pathlib.Path(local_path)
-        local_path = pathlib.PurePosixPath(local_path.as_posix())
-        remote_path = pathlib.PurePosixPath(update_path(str(local_path), self.mappings)) if self.mappings else local_path
-        parents: list[pathlib.PurePosixPath] = list(remote_path.parents)
+        remote_path = pathlib.Path(update_path(str(local_path), self.mappings)) if self.mappings else local_path
+        parents: list[pathlib.Path] = list(remote_path.parents)
         if local_path.is_file():
-            to_be_tested = str(parents.pop(0))
+            to_be_tested = parents.pop(0).as_posix()
         else:
             LOGGER.debug(f'It is a directory or not exists locally: {str(local_path)}')
-            to_be_tested = str(remote_path)
+            to_be_tested = remote_path.as_posix()
         not_exists_paths = []
         result = self._vfs_refresh(to_be_tested, recursive)
         while not result['result'].get(to_be_tested) == 'OK':
             if result['result'].get(to_be_tested) == 'file does not exist':
                 not_exists_paths.insert(0, to_be_tested)
             if parents:
-                to_be_tested = str(parents.pop(0))
+                to_be_tested = parents.pop(0).as_posix()
                 result = self._vfs_refresh(to_be_tested, recursive)
             else:
                 LOGGER.warning('Hit the top-level path.')
@@ -619,8 +618,7 @@ class RcloneAider(Aider):
 
     def vfs_forget(self, local_path: str, fs: str = None) -> None:
         remote_path = pathlib.Path(update_path(local_path, self.mappings)) if self.mappings else pathlib.Path(local_path)
-        remote_path = pathlib.PurePosixPath(remote_path.as_posix())
-        self._vfs_forget(str(remote_path), fs)
+        self._vfs_forget(remote_path.as_posix(), fs)
 
     def get_metadata_cache(self, fs: str = None) -> tuple[int, int]:
         try:
