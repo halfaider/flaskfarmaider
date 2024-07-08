@@ -587,17 +587,17 @@ class RcloneAider(Aider):
         remote_path = pathlib.Path(update_path(str(local_path), self.mappings)) if self.mappings else local_path
         parents: list[pathlib.Path] = list(remote_path.parents)
         if local_path.is_file():
-            to_be_tested = str(parents.pop(0))
+            to_be_tested = str(parents.pop(0).as_posix())
         else:
             LOGGER.debug(f'It is a directory or not exists locally: {str(local_path)}')
-            to_be_tested = str(remote_path)
+            to_be_tested = str(remote_path.as_posix())
         not_exists_paths = []
         result = self._vfs_refresh(to_be_tested, recursive)
         while not result['result'].get(to_be_tested) == 'OK':
             if result['result'].get(to_be_tested) == 'file does not exist':
                 not_exists_paths.insert(0, to_be_tested)
             if parents:
-                to_be_tested = str(parents.pop(0))
+                to_be_tested = str(parents.pop(0).as_posix())
                 result = self._vfs_refresh(to_be_tested, recursive)
             else:
                 LOGGER.warning('Hit the top-level path.')
@@ -617,7 +617,7 @@ class RcloneAider(Aider):
 
     def vfs_forget(self, local_path: str, fs: str = None) -> None:
         remote_path = pathlib.Path(update_path(local_path, self.mappings)) if self.mappings else pathlib.Path(local_path)
-        self._vfs_forget(str(remote_path), fs)
+        self._vfs_forget(str(remote_path).as_posix(), fs)
 
     def get_metadata_cache(self, fs: str = None) -> tuple[int, int]:
         try:

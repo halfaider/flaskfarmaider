@@ -84,9 +84,7 @@ def _parse_mappings(settings: list) -> dict[str, str]:
 
 
 def update_path(target: str, mappings: dict) -> str:
-    # 윈도우 경로 변경시
-    if '\\' in target:
-        target = target.replace('\\', '/')
+    target = pathlib.Path(target).as_posix()
     for k, v in mappings.items():
         target = target.replace(k, v)
     if not target:
