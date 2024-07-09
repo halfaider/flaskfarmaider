@@ -219,14 +219,9 @@ function make_list(data) {
         let colScheduleMode = '<td class="text-center">';
         colScheduleMode += FF_SCHEDULES[model.schedule_mode]['name'];
         colScheduleMode += '</td>';
-
-        let rowSub = '<tr><td colspan="8" class="p-0"><div id="collapse-' + model.id;
-        rowSub += '" class="collapse hide" aria-labelledby="list-' + model.id;
-        rowSub += '" data-parent="#sch-accordion"><div class="">';
-        rowSub += '';
-        rowSub += '</div></div></td></tr>';
+        
         let rowGroup = '<tr id="list-' + model.id + '" class="" data-id="'+ model.id +'" data-schedule_mode="' + model.schedule_mode + '">';
-        rowGroup += colCheckbox + colId + colTask + colTitle + colStatus + colInterval + colFtime + colScheduleMode + colSwitch + colManage + '</tr>' + rowSub;
+        rowGroup += colCheckbox + colId + colTask + colTitle + colStatus + colInterval + colFtime + colScheduleMode + colSwitch + colManage + '</tr>';
         E_SCH_LIST_TBODY.append(rowGroup);
     }
     // is_include 토글 활성화
