@@ -67,10 +67,16 @@
             <small class="form-text text-muted">Flaskfarm이 접근 가능한 로컬 경로</small>
             <label for="sch-target-section" class="mt-3"><strong>라이브러리 섹션</strong></label>
             <div class="input-group">
-                <select id="sch-target-section" name="sch-target-section" class="form-control form-control-sm"></select>
+                <select id="sch-target-section" name="sch-target-section" class="form-control form-control-sm">
+                    <option value="-1">선택 안 함</option>
+                </select>
             </div>
             <small class="form-text text-muted">plex_mate 플러그인에 등록된 플렉스 서버의 라이브러리 섹션</small>
-            <span class="mt-3 text-warning">"로컬 경로"만 지정해도 됩니다. "라이브러리 섹션"이 지정되면 "로컬 경로(기본값:/)"와 비교하여 좀 더 상세한 경로(하위 경로)를 대상으로 새로고침/스캔 합니다.</span>
+            <span class="mt-3 text-warning">
+                "라이브러리 섹션"을 지정하면 "로컬 경로"(기본값:/)와 비교하여 좀 더 상세한 경로(하위 경로)를 대상으로 새로고침/스캔 합니다.<br>
+                - "스캔" 포함: 지정된 "라이브러리 섹션" 혹은 전체 라이브러리 섹션의 경로와 비교<br>
+                - "스캔" 미포함: 지정된 "라이브러리 섹션"의 경로를 비교
+            </span>
         </div>
         <div class="col pr-0">
             <label for="sch-rclone-remote" class=""><strong>Rclone 리모트 콘트롤 서버</strong></label>

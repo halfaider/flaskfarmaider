@@ -105,13 +105,17 @@ class ScheduleAider(Aider):
 
     def start_scan(self, schedule: ScheduleModel) -> None:
         '''scan'''
-        PlexmateAider().scan(schedule.scan_mode, schedule.target, schedule.section_id)
+        plex_aider = PlexmateAider()
+        # 스캔 작업 포함시 get_scan_targets()으로 대상 한정
+        targets = plex_aider.get_scan_targets(schedule.target, schedule.section_id)
+        for location, section_id in targets.items():
+            plex_aider.scan(schedule.scan_mode, location, section_id=section_id)
 
     def start_refresh(self, schedule: ScheduleModel) -> None:
         '''refresh'''
         rclone_aider = RcloneAider(schedule.rclone_remote)
         if schedule.section_id and int(schedule.section_id) > 0:
-            targets = PlexmateAider().get_targets(schedule.target, schedule.section_id)
+            targets = PlexmateAider().get_scan_targets(schedule.target, schedule.section_id)
             for location, _ in targets.items():
                 rclone_aider.vfs_refresh(location, schedule.recursive)
         else:
@@ -119,10 +123,10 @@ class ScheduleAider(Aider):
 
     def start_refresh_scan(self, schedule: ScheduleModel) -> None:
         '''refresh_scan'''
-        # refresh
         plex_aider = PlexmateAider()
         rclone_aider = RcloneAider(schedule.rclone_remote)
-        targets = plex_aider.get_targets(schedule.target, schedule.section_id)
+        # 스캔 작업 포함시 get_scan_targets()으로 대상 한정
+        targets = plex_aider.get_scan_targets(schedule.target, schedule.section_id)
         for location, section_id in targets.items():
             rclone_aider.vfs_refresh(location, schedule.recursive)
             plex_aider.scan(schedule.scan_mode, location, section_id=section_id)
@@ -276,7 +280,7 @@ class PlexmateAider(PluginAider):
                     over.created_time = datetime.datetime.now()
                     over.set_status('READY', save=True)
 
-    def get_targets(self, target: str, section_id: int = None) -> dict[str, int]:
+    def get_scan_targets(self, target: str, section_id: int = None) -> dict[str, int]:
         mappings = parse_mappings(CONFIG.get_json('setting_plex_mappings'))
         target = pathlib.Path(update_path(target, mappings))
         if section_id and int(section_id) > 0:
@@ -291,6 +295,10 @@ class PlexmateAider(PluginAider):
                 targets[target.as_posix()] = int(location['library_section_id'])
             elif root.is_relative_to(target):
                 targets[root.as_posix()] = int(location['library_section_id'])
+        if targets:
+            LOGGER.debug(f'섹션 ID 검색 결과: {set(targets.values())}')
+        else:
+            LOGGER.error(f'섹션 ID를 찾을 수 없습니다: {target}')
         return targets
 
     def web_scan(self, section_id: int, location: str = None) -> None:
@@ -315,19 +323,13 @@ class PlexmateAider(PluginAider):
                 - library_sections 테이블의 updated_at이 스캔 종료 후 1분 뒤에 변경됨
             서버에 스캔 명령만 전달하는 방식으로 실행(서버에서 알아서 순차적으로 스캔하도록...)
             '''
-            targets = self.get_targets(target, section_id)
-            if targets:
-                LOGGER.debug(f'섹션 ID 검색 결과: {set(targets.values())}')
-                for location, section_id in targets.items():
-                    #before = self.get_section_updated_at(section_id)
-                    self.web_scan(section_id, location)
-                    #for i in range(120):
-                    #    after = self.get_section_updated_at(section_id)
-                    #    LOGGER.info(f"{before=}")
-                    #    LOGGER.info(f"{after=}")
-                    #    time.sleep(1)
-            else:
-                LOGGER.error(f'섹션 ID를 찾을 수 없습니다: {target}')
+            self.web_scan(section_id, target)
+            #before = self.get_section_updated_at(section_id)
+            #for i in range(120):
+            #    after = self.get_section_updated_at(section_id)
+            #    LOGGER.info(f"{before=}")
+            #    LOGGER.info(f"{after=}")
+            #    time.sleep(1)
         else:
             scan_item = self.get_scan_model()(target)
             scan_item.save()
