@@ -81,6 +81,7 @@ E_PLEXMATE_TIMEOVER_BTN.on('click', function (e) {
 $('#setting_startup_executable').bootstrapToggle((SETTING_STARTUP_EXECUTABLE ? 'on' : 'off'));
 $('#setting_logging_login').bootstrapToggle((SETTING_LOGGING_LOGIN ? 'on' : 'off'));
 $('#setting_logging_access').bootstrapToggle((SETTING_LOGGING_ACCESS ? 'on' : 'off'));
+$('#setting_plexmate_periodic_scan').bootstrapToggle((SETTING_PLEXMATE_PERIODIC_SCAN ? 'on' : 'off'));
 
 $('#setting_config_file_update_btn').on('click', function() {
     $(this);

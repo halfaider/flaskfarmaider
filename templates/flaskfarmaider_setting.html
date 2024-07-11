@@ -107,6 +107,16 @@
                 <small class="form-text text-muted">
                     형식: /변경할/로컬/경로:/변경될/플렉스/경로<br>예시 1: /mnt/gds/GDRIVE:/host/mnt/gds/GDRIVE<br>예시 2: /mnt/gds:<br>예시 3: Y:/GDRIVE:/GDRIVE
                 </small>
+                <div class="form-check form-check-inline mt-3">
+                    <label for="setting_plexmate_periodic_scan" class="form-check-label mr-1"><strong>새로고침 후 주기적 스캔 실행</strong></label>
+                    <input id="setting_plexmate_periodic_scan" name="setting_plexmate_periodic_scan" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
+                    <input id="setting_plexmate_periodic_scan-helper" type="hidden" class="mx-1" hidden name="checkbox-helper" title="Off로 저장시 체크" checked>
+                </div>
+                <small class="form-text text-muted">
+                    plex_mate의 주기적 스캔이 실행되면 스캔 대상을 미리 새로고침 합니다.<br>
+                    "Remote Control 주소" 중 첫번째 서버를 사용합니다.<br>
+                    설정 변경은 재시작시 적용됩니다.
+                </small>
             </div>
         </div>
     </div>
@@ -149,6 +159,7 @@
     const SETTING_RCLONE_MAPPINGS = {{ args.setting_rclone_mappings|tojson }};
     const SETTING_PLEX_MAPPINGS = {{ args.setting_plex_mappings|tojson }};
     const SETTING_STARTUP_COMMANDS = {{ args.setting_startup_commands|tojson }};
+    const SETTING_PLEXMATE_PERIODIC_SCAN = {{ args.setting_plexmate_periodic_scan|lower }};
 
     $(function() {
         $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")

@@ -658,7 +658,7 @@ class StartupAider(Aider):
                 return subprocess.CompletedProcess(args, returncode=1, stderr='', stdout=str(e))
 
     def startup(self) -> None:
-        plugins_installed = [plugin_name for plugin_name in FRAMEWORK.PluginManager.all_package_list.keys()]
+        plugins_installed = self.get_installed_plugins()
         depends = yaml.safe_load(SettingAider.config_from_file()).get('dependencies')
 
         require_plugins, require_packages, require_commands = self.get_require_plugins(plugins_installed, depends)
@@ -700,15 +700,15 @@ class StartupAider(Aider):
         else:
             LOGGER.warning('실행이 허용되지 않았어요.')
 
-    def get_installed_plugins(self) -> list[str]:
-        return [plugin_name for plugin_name in FRAMEWORK.PluginManager.all_package_list.keys()]
+    def get_installed_plugins(self) -> dict:
+        return FRAMEWORK.PluginManager.all_package_list
 
-    def get_require_plugins(self, plugins_installed: list[str], depends) -> tuple[set, set, set]:
+    def get_require_plugins(self, plugins_installed: dict, depends) -> tuple[set, set, set]:
         require_plugins = set()
         require_packages = set()
         require_commands = set()
         # plugin by plugin
-        for plugin in plugins_installed:
+        for plugin in plugins_installed.keys():
             # append this plugin's requires to
             depend_plugins = depends.get(plugin, {}).get('plugins', [])
             for depend in depend_plugins:

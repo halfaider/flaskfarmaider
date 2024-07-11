@@ -83,6 +83,19 @@ def setting_set_json(key: str, value: dict | list) -> bool:
         return False
 
 
+def setting_get_boolean(key: str) -> bool:
+    value = CONFIG.get(key)
+    match value.lower():
+        case 'true' | 'on' | 'yes':
+            value = True
+        case 'false' | 'off' | 'no':
+            value = False
+        case _:
+            LOGGER.error(f'Could not determine a boolean type: {value}')
+            value = False
+    return value
+
+
 def default_route_socketio_page(page):
     module = page.parent
     page.socketio_list = page.socketio_list or []
@@ -112,6 +125,7 @@ def default_route_socketio_page(page):
 
 CONFIG.get_json = setting_get_json
 CONFIG.set_json = setting_set_json
+CONFIG.get_boolean = setting_get_boolean
 
 
 from .presenters import Setting
