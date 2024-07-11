@@ -142,7 +142,6 @@ class Setting(ModuleBase):
         '''override'''
         super().plugin_load()
         set_login_log(CONFIG.get('setting_logging_login').lower() == 'true')
-
         # 주기적 스캔 설정
         periodic_scan_enable = CONFIG.get_boolean('setting_plexmate_periodic_scan')
         if periodic_scan_enable:
@@ -150,6 +149,7 @@ class Setting(ModuleBase):
             mod_periodic = plex_mate.logic.get_module('periodic')
             rclone_aider = RcloneAider(CONFIG.get_json('setting_rclone_remotes')[0])
             plexmate_aider = PlexmateAider()
+            from plex_mate.task_periodic import Task
 
             def function_job(idx) -> None:
                 plex_mate.logger.warning(f"job_function IDX : {idx}")
@@ -168,7 +168,6 @@ class Setting(ModuleBase):
                     plex_mate.logger.debug(f"스캔모드 : 웹 실행")
                     plex_mate.logger.debug(data)
                     return
-                from plex_mate.task_periodic import Task
                 mod_periodic.start_celery(Task.start, None, *(idx,'scheduler'))
 
             mod_periodic.job_function = function_job
