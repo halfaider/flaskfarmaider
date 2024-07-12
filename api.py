@@ -70,7 +70,7 @@ class Base:
             return flask.jsonify(data)
 
     def parse_command(self, request: flask.Request) -> dict[str, Any]:
-        query = urllib.parse.parse_qs(request.form.get('arg1'))
+        query = urllib.parse.parse_qs(request.form.get('arg1'), keep_blank_values=True)
         ids = list(map(int, query.pop('id', [-1])))
         return {
             'command': request.form.get('command'),
