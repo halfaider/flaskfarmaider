@@ -90,8 +90,8 @@ class ScheduleAider(Aider):
         plex_aider = PlexmateAider()
         rclone_aider = RcloneAider(schedule.rclone_remote)
         # plexmate
-        plex_aider.check_scanning(CONFIG.get_int('setting_plexmate_max_scan_time'))
-        plex_aider.check_timeover(CONFIG.get('setting_plexmate_timeover_range'))
+        plex_aider.check_scanning(CONFIG.get_int('setting_plexmate_max_scan_time') or 0)
+        plex_aider.check_timeover(CONFIG.get('setting_plexmate_timeover_range') or '0~0')
         # refresh
         targets = {s for s in plex_aider.get_scan_items('READY')}
         if targets:
@@ -135,26 +135,21 @@ class ScheduleAider(Aider):
 class SettingAider(Aider):
 
     @staticmethod
-    def config_from_file(text: str = None) -> str:
-        depend_source_yaml = pathlib.Path(__file__).parent / 'files' / f'{__package__}.yaml'
-        depend_user_yaml = pathlib.Path(CONFIG.get('setting_config_file'))
+    def config_from_file(text: str = None) -> str | None:
         try:
-            if not depend_user_yaml.exists():
-                shutil.copyfile(depend_source_yaml, depend_user_yaml)
-            if text or text == '':
-                with depend_user_yaml.open(mode='w', encoding='utf-8', newline='\n') as file:
+            source_config = pathlib.Path(__file__).parent / 'files' / f'{__package__}.yaml'
+            user_config = pathlib.Path(CONFIG.get('setting_config_file'))
+            if not user_config.exists():
+                shutil.copyfile(source_config, user_config)
+            with user_config.open(mode='r+', encoding='utf-8', newline='\n') as file:
+                if text is None:
+                    depends = file.read()
+                else:
                     file.write(text)
                     depends = text
-            else:
-                with depend_user_yaml.open(encoding='utf-8', newline='\n') as file:
-                    depends = file.read()
             return depends
         except:
             LOGGER.error(traceback.format_exc())
-            if text: return text
-            else:
-                with depend_source_yaml.open(encoding='utf-8', newline='\n') as file:
-                    return file.read()
 
 
 class PlexmateAider(PluginAider):
@@ -659,7 +654,11 @@ class StartupAider(Aider):
 
     def startup(self) -> None:
         plugins_installed = self.get_installed_plugins()
-        depends = yaml.safe_load(SettingAider.config_from_file()).get('dependencies')
+        content = SettingAider.config_from_file()
+        if content:
+            depends = yaml.safe_load(content).get('dependencies')
+        else:
+            depends = {}
 
         require_plugins, require_packages, require_commands = self.get_require_plugins(plugins_installed, depends)
 

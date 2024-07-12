@@ -424,7 +424,11 @@ class Aider:
         self.name = name
 
     def request(self, method: str, url: str, *args: tuple, **kwds: dict) -> requests.Response:
-        timeout_ = CONFIG.get_int('setting_general_timeout')
+        try:
+            timeout_ = int(CONFIG.get('setting_general_timeout'))
+        except:
+            LOGGER.error(traceback.format_exc())
+            timeout_ = 0
         kwds['timeout'] = timeout_ if timeout_ > 0 else kwds.get('timeout')
         try:
             if method.upper() == 'JSON':

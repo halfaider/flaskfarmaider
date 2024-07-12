@@ -23,7 +23,7 @@ from .constants import (TASK_KEYS, TASKS, TOOL_TRASH_KEYS, TOOL_TRASHES, STATUS_
 
 class Setting(ModuleBase):
 
-    _DB_VERSIONS = ['1', '2']
+    _DB_VERSIONS = ['1', '2', '3']
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name='setting')
@@ -51,12 +51,11 @@ class Setting(ModuleBase):
         args = super().get_template_args()
         for conf in self.db_default.keys():
             if conf in ['setting_rclone_remotes', 'setting_rclone_mappings', 'setting_plex_mappings', 'setting_startup_commands']:
-                #args[conf] = json.dumps(CONFIG.get_json(conf)).replace('\\"', '\\\\"')
                 args[conf] = CONFIG.get_json(conf)
             else:
                 args[conf] = CONFIG.get(conf)
         args['setting_logging_login_file'] = f"{FRAMEWORK.config['path_data']}/log/system.log"
-        args['setting_config_file_content'] = SettingAider.config_from_file()
+        args['setting_config_file_content'] = SettingAider.config_from_file() or ''
         return args
 
     def migration(self) -> None:
@@ -119,14 +118,14 @@ class Setting(ModuleBase):
 
     def command_update_config_file(self, request: flask.Request) -> dict:
         aider = SettingAider()
-        result = self.returns('success', '업데이트를 완료했습니다.')
+        result = self.returns('warning', '업데이트를 실패했습니다.')
         try:
             response = aider.request('GET', 'https://raw.githubusercontent.com/halfaider/flaskfarmaider/main/files/flaskfarmaider.yaml')
             aider.config_from_file(response.text)
+            result['ret'] = 'success'
+            result['msg'] = '업데이트를 성공했습니다.'
         except:
             LOGGER.error(traceback.format_exc())
-            result['ret'] = 'warning'
-            result['msg'] = '업데이트를 실패했습니다.'
         return result
 
     def setting_save_after(self, changes: list) -> None:
@@ -175,7 +174,7 @@ class Setting(ModuleBase):
 
 class Schedule(ModuleBase):
 
-    _DB_VERSIONS = ['1', '2', '3', '4', '5', '6']
+    _DB_VERSIONS = ['1', '2', '3', '4', '5', '6', '7']
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name='schedule')
@@ -574,7 +573,6 @@ def after_request(response: flask.Response) -> flask.Response:
         log_format = CONFIG.get('setting_logging_access_format')
         if not log_format:
             log_format = '{remote} {method} "{path}" {status}'
-            CONFIG.set('setting_logging_access_format', log_format)
         try:
             logger.log(level, log_format.format(**namespace))
         except:
