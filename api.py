@@ -436,11 +436,11 @@ class Aider:
                 return requests.request('POST', url, *args, json=data, **kwds)
             else:
                 return requests.request(method, url, *args, **kwds)
-        except:
-            tb = traceback.format_exc()
-            LOGGER.error(tb)
+        except Exception as e:
+            LOGGER.error(traceback.format_exc())
+            LOGGER.error(url)
             response = requests.Response()
-            response._content = bytes(tb, 'utf-8')
+            response._content = bytes(str(e), 'utf-8')
             response.status_code = 0
             return response
 

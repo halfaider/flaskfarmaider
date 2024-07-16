@@ -1,8 +1,6 @@
 import json
 import traceback
-import urllib.parse
 import functools
-import logging
 import pathlib
 import time
 
@@ -15,7 +13,7 @@ from .models import ScheduleModel
 from .aiders import ScheduleAider, SettingAider, PlexmateAider, RcloneAider
 from .migrations import migrate_schedule, migrate_setting
 from .api import ModuleBase, PageBase
-from .util import ThreadHasReturn, get_rotating_file_logger, get_dir, get_client_ip
+from .util import ThreadHasReturn, get_dir
 from .constants import (TASK_KEYS, TASKS, TOOL_TRASH_KEYS, TOOL_TRASHES, STATUS_KEYS, STATUSES,
     FF_SCHEDULE_KEYS, FF_SCHEDULES, SCAN_MODE_KEYS, SCAN_MODES, SECTION_TYPE_KEYS, SECTION_TYPES,
     SEARCH_KEYS, SEARCHES)
@@ -548,33 +546,3 @@ def start_schedule(task, schedule: ScheduleModel) -> dict:
         schedule = schedule.as_dict()
         schedule['msg'] = msg
         return schedule
-
-
-@FRAMEWORK.app.after_request
-def after_request(response: flask.Response) -> flask.Response:
-    enable = CONFIG.get('setting_logging_access').lower() == 'true'
-    if enable:
-        request = flask.request
-        namespace = {
-            'remote': get_client_ip(request),
-            'method': request.method,
-            'scheme': request.scheme,
-            'path': request.full_path,
-            'status': response.status_code,
-            'agent': request.user_agent,
-            'length': response.content_length,
-            'form': urllib.parse.urlencode(request.form, doseq=False),
-            'headers': request.headers,
-            'hostname': urllib.parse.urlparse(request.base_url).hostname,
-        }
-        file = CONFIG.get('setting_logging_access_file') or f"{FRAMEWORK.config.get('path_data', '/data')}/log/access.log"
-        level = FRAMEWORK.SystemModelSetting.get_int('log_level') or logging.DEBUG
-        logger = get_rotating_file_logger(file, level=level)
-        log_format = CONFIG.get('setting_logging_access_format')
-        if not log_format:
-            log_format = '{remote} {method} "{path}" {status}'
-        try:
-            logger.log(level, log_format.format(**namespace))
-        except:
-            LOGGER.exception(f'엑세스 로그 형식 확인: {log_format}')
-    return response

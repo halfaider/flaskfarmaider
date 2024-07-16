@@ -1,4 +1,6 @@
 import json
+import logging
+import urllib.parse
 import traceback
 
 import flask
@@ -16,7 +18,7 @@ from system.setup import P as SYSTEM_PLUGIN
 from support import AlchemyEncoder
 
 from .constants import OPTS
-from .util import get_client_ip
+from .util import get_client_ip, get_rotating_file_logger
 
 PLUGIN = P = create_plugin_instance(OPTS)
 LOGGER = PLUGIN.logger
@@ -84,7 +86,7 @@ def setting_set_json(key: str, value: dict | list) -> bool:
 
 
 def setting_get_boolean(key: str) -> bool:
-    value = CONFIG.get(key)
+    value = CONFIG.get(key) or 'false'
     match value.lower():
         case 'true' | 'on' | 'yes':
             value = True
@@ -126,6 +128,36 @@ def default_route_socketio_page(page):
 CONFIG.get_json = setting_get_json
 CONFIG.set_json = setting_set_json
 CONFIG.get_boolean = setting_get_boolean
+
+
+@FRAMEWORK.app.after_request
+def after_request(response: flask.Response) -> flask.Response:
+    if CONFIG.get_boolean('setting_logging_access'):
+        request = flask.request
+        apikey = SYSTEM_PLUGIN.ModelSetting.get('apikey')
+        form = urllib.parse.urlencode(request.form, doseq=True)
+        namespace = {
+            'remote': get_client_ip(request),
+            'method': request.method,
+            'scheme': request.scheme,
+            'path': request.full_path.replace(apikey, '<REDACTED>') if apikey else request.full_path,
+            'status': response.status_code,
+            'agent': request.user_agent,
+            'length': response.content_length,
+            'form': form.replace(apikey, '<REDACTED>') if apikey else form,
+            'headers': request.headers,
+            'hostname': urllib.parse.urlparse(request.base_url).hostname,
+        }
+        log_format = CONFIG.get('setting_logging_access_format') or '{remote} {method} "{path}" {status}'
+        try:
+            CONFIG.access_logger.info(log_format.format(**namespace))
+        except:
+            LOGGER.exception(f'엑세스 로그 형식 확인: {log_format}')
+    return response
+
+
+file = CONFIG.get('setting_logging_access_file') or f"{FRAMEWORK.config.get('path_data', '/data')}/log/access.log"
+CONFIG.access_logger = get_rotating_file_logger(file, level=logging.INFO)
 
 
 from .presenters import Setting
