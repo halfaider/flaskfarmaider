@@ -132,7 +132,7 @@
                     명령어 실행 허용 여부<br>로그에서 실행될 명령어를 확인하고 결정
                 </small>
                 <label for="setting_startup_timeout" class="mt-3"><strong>명령어 최대 대기 시간</strong></label>
-                <input id="setting_startup_timeout" name="setting_startup_timeout" type="number" placeholder="0" class="form-control form-control-sm">
+                <input id="setting_startup_timeout" name="setting_startup_timeout" type="number" placeholder="300" class="form-control form-control-sm" value="{{ args.setting_startup_timeout }}">
                 <small class="form-text text-muted">
                     각 명령어의 최대 대기 시간<br>단위: 초
                 </small>
