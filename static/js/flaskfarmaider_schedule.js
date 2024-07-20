@@ -219,7 +219,7 @@ function make_list(data) {
         let colScheduleMode = '<td class="text-center">';
         colScheduleMode += FF_SCHEDULES[model.schedule_mode]['name'];
         colScheduleMode += '</td>';
-        
+
         let rowGroup = '<tr id="list-' + model.id + '" class="" data-id="'+ model.id +'" data-schedule_mode="' + model.schedule_mode + '">';
         rowGroup += colCheckbox + colId + colTask + colTitle + colStatus + colInterval + colFtime + colScheduleMode + colSwitch + colManage + '</tr>';
         E_SCH_LIST_TBODY.append(rowGroup);
@@ -425,6 +425,7 @@ function setFormByTask(task) {
         case TASK_KEYS[5]:
             E_PATH.prop('disabled', true);
             E_PATH_BTN.prop('disabled', true);
+            E_TARGET_SECTION.prop('disabled', true);
     }
     switch(task) {
         case TASK_KEYS[2]:
@@ -440,12 +441,6 @@ function setFormByTask(task) {
         case TASK_KEYS[4]:
         case TASK_KEYS[5]:
             $('input[id^="sch-scan-mode"]:radio').prop('disabled', true);
-    }
-    switch(task) {
-        case TASK_KEYS[3]:
-        case TASK_KEYS[4]:
-        case TASK_KEYS[5]:
-            E_TARGET_SECTION.prop('disabled', true);
     }
     switch(task) {
         case TASK_KEYS[5]:
