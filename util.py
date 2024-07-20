@@ -78,8 +78,9 @@ def parse_mappings(settings: str | list) -> dict[str, str]:
 def _parse_mappings(settings: list) -> dict[str, str]:
     mappings = {}
     for setting in settings:
-        source, target = setting.rsplit(':', 1)
-        mappings[source.strip()] = target.strip()
+        if setting:
+            source, target = setting.rsplit(':', 1)
+            mappings[source.strip()] = target.strip()
     return mappings
 
 
