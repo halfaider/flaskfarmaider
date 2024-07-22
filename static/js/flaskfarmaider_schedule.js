@@ -42,6 +42,98 @@ const E_GLOBAL_SEARCH_OPTION1 = $('#option1');
 const E_GLOBAL_SEARCH_OPTION2 = $('#option2');
 const E_SCH_LIST_TBODY = $('#sch-list-table tbody');
 
+let remoteOptions = {};
+for (let idx in SETTING_RCLONE_REMOTES) {
+    remoteOptions[idx] = SETTING_RCLONE_REMOTES[idx];
+}
+let DEFAULT_CONTEXT_MENU_OPTIONS = {
+    className: 'context-menu',
+    autohide: true,
+    callback: function(command, opt) {
+        let path = opt.$trigger.data('path');
+        confirmModal(TASKS[command].name + ' 작업을 실행할까요?', path, function() {
+            let cmd = {
+                command: command,
+                path: path,
+                recursive: opt.inputs['recursive'].$input.prop('checked'),
+                scan_mode: opt.inputs['scan_mode'].$input.prop('value'),
+                rclone_remote: opt.inputs['rclone_remote'].$input.prop('value'),
+            }
+            browserCommand(cmd);
+        });
+    },
+    events: {
+        show: function(opt) {
+            console.log(opt.$trigger.data('path'));
+        }
+    },
+    items: {
+        [TASK_KEYS[0]]: {
+            name: TASKS[TASK_KEYS[0]].name,
+            icon: 'fa-refresh',
+            disabled: function(){return $(this).hasClass('restrict-context');},
+        },
+        [TASK_KEYS[1]]: {
+            name: TASKS[TASK_KEYS[1]].name,
+            icon: 'fa-refresh',
+            disabled: function(){return $(this).hasClass('restrict-context');},
+        },
+        [TASK_KEYS[2]]: {
+            name: TASKS[TASK_KEYS[2]].name,
+            icon: 'fa-search',
+            disabled: function(){return $(this).hasClass('restrict-context');},
+        },
+        [TASK_KEYS[6]]: {
+            name: TASKS[TASK_KEYS[6]].name,
+            icon: 'fa-undo',
+            disabled: function(){return $(this).hasClass('restrict-context');},
+        },
+        sep1: "---------",
+        schedule: {
+            name: '일정에 추가',
+            icon: 'fa-plus',
+            callback: function(key, opt, e) {
+                path = $(this).data('path');
+                openModal('browser', {target: path});
+            },
+            disabled: function(){return $(this).hasClass('restrict-context');},
+        },
+        clipboard: {
+            name: '경로 복사',
+            icon: 'fa-clipboard',
+            callback: function(key, opt, e) {
+                path = $(this).data('path');
+                copyToClipboard(path);
+            },
+            disabled: function(){return $(this).hasClass('no-context');},
+        },
+        sep2: "---------",
+        recursive: {
+            name: 'Recursive',
+            type: 'checkbox',
+            selected: false,
+            disabled: function(){return $(this).hasClass('restrict-context');},
+        },
+        rclone_remote: {
+            name: '리모트 URL',
+            type: 'select',
+            options: remoteOptions,
+            selected: 0,
+            disabled: function(){return $(this).hasClass('restrict-context');},
+        },
+        scan_mode: {
+            name: '스캔 방식',
+            type: 'select',
+            options: {
+                [SCAN_MODE_KEYS[0]]: SCAN_MODES[SCAN_MODE_KEYS[0]].name,
+                [SCAN_MODE_KEYS[1]]: SCAN_MODES[SCAN_MODE_KEYS[1]].name,
+            },
+            selected: SCAN_MODE_KEYS[0],
+            disabled: function(){return $(this).hasClass('restrict-context');},
+        },
+    },
+}
+
 function browserCommand(cmd) {
     let query = 'target=' + cmd.path;
     query += '&rclone_remote=' + SETTING_RCLONE_REMOTES[cmd.rclone_remote];
@@ -71,10 +163,14 @@ function listDirectory(result) {
         } else {
             linkClasses = 'dir-folder';
         }
-        let tdName = '<td style="width: 70%" class="pl-3"><span href="#" class="dir-name pr-5' + linkClasses +'"><i class="fa fa-2 ' + nameIClasses + '" aria-hidden="true"></i>' + result[index].name + '</span></td>';
-        let tdSize = '<td style="width: 10%" class="text-right">' + result[index].size + '</td>';
-        let tdMtime = '<td style="width: 20%" class="text-center">' + result[index].mtime + '</td></tr>';
-        let trGroup = '<tr role="button" data-path="' + result[index].path + '" class="dir-btn browser-context-menu btn-neutral dir-index-' + index + ' ' + linkClasses + '">' + tdName + tdSize + tdMtime + '</tr>';
+        let tdName = '<td style="width: 60%" class="dir-btn browser-context-menu ' + linkClasses + '" data-path="' + result[index].path + '" role="button"><span href="#" class="dir-name pr-5' + linkClasses +'"><i class="fa fa-2 ' + nameIClasses + '" aria-hidden="true"></i>' + result[index].name + '</span></td>';
+        let tdSize = '<td style="" class="text-right">' + result[index].size + '</td>';
+        let tdMtime = '<td style="" class="text-center">' + result[index].mtime + '</td>';
+        let tdButton = '<td style="" class="text-center"></td>';
+        if (index != 0) {
+            tdButton = '<td style="" class="text-center"><button class="btn browser-context-menu-btn dir-index-' + index + ' ' + linkClasses + '" data-path="' + result[index].path + '"><i class="fa fa-ellipsis-h fa-2x" aria-hidden="true"></i></button></td>';
+        }
+        let trGroup = '<tr class="dir-index-' + index + '">' + tdName + tdSize + tdMtime + tdButton + '</tr>';
         if (index == 0) {
             E_BROWSER_PARENT.append(trGroup);
         } else {
@@ -95,98 +191,13 @@ function listDirectory(result) {
         }
     });
     // attach context menu
-    let remoteOptions = {};
-    for (let idx in SETTING_RCLONE_REMOTES) {
-        remoteOptions[idx] = SETTING_RCLONE_REMOTES[idx];
-    }
-    $.contextMenu({
-        selector: '.browser-context-menu',
-        className: 'context-menu',
-        autohide: true,
-        callback: function(command, opt) {
-            let path = opt.$trigger.data('path');
-            confirmModal(TASKS[command].name + ' 작업을 실행할까요?', path, function() {
-                let cmd = {
-                    command: command,
-                    path: path,
-                    recursive: opt.inputs['recursive'].$input.prop('checked'),
-                    scan_mode: opt.inputs['scan_mode'].$input.prop('value'),
-                    rclone_remote: opt.inputs['rclone_remote'].$input.prop('value'),
-                }
-                browserCommand(cmd);
-            });
-        },
-        events: {
-            show: function(opt) {
-                // console.log(opt.$trigger.data('path'));
-            }
-        },
-        items: {
-            [TASK_KEYS[0]]: {
-                name: TASKS[TASK_KEYS[0]].name,
-                icon: 'fa-refresh',
-                disabled: function(){return $(this).hasClass('restrict-context');},
-            },
-            [TASK_KEYS[1]]: {
-                name: TASKS[TASK_KEYS[1]].name,
-                icon: 'fa-refresh',
-                disabled: function(){return $(this).hasClass('restrict-context');},
-            },
-            [TASK_KEYS[2]]: {
-                name: TASKS[TASK_KEYS[2]].name,
-                icon: 'fa-search',
-                disabled: function(){return $(this).hasClass('restrict-context');},
-            },
-            [TASK_KEYS[6]]: {
-                name: TASKS[TASK_KEYS[6]].name,
-                icon: 'fa-undo',
-                disabled: function(){return $(this).hasClass('restrict-context');},
-            },
-            sep1: "---------",
-            schedule: {
-                name: '일정에 추가',
-                icon: 'fa-plus',
-                callback: function(key, opt, e) {
-                    path = $(this).data('path');
-                    openModal('browser', {target: path});
-                },
-                disabled: function(){return $(this).hasClass('restrict-context');},
-            },
-            clipboard: {
-                name: '경로 복사',
-                icon: 'fa-clipboard',
-                callback: function(key, opt, e) {
-                    path = $(this).data('path');
-                    copyToClipboard(path);
-                },
-                disabled: function(){return $(this).hasClass('no-context');},
-            },
-            sep2: "---------",
-            recursive: {
-                name: 'Recursive',
-                type: 'checkbox',
-                selected: false,
-                disabled: function(){return $(this).hasClass('restrict-context');},
-            },
-            rclone_remote: {
-                name: '리모트 URL',
-                type: 'select',
-                options: remoteOptions,
-                selected: 0,
-                disabled: function(){return $(this).hasClass('restrict-context');},
-            },
-            scan_mode: {
-                name: '스캔 방식',
-                type: 'select',
-                options: {
-                    [SCAN_MODE_KEYS[0]]: SCAN_MODES[SCAN_MODE_KEYS[0]].name,
-                    [SCAN_MODE_KEYS[1]]: SCAN_MODES[SCAN_MODE_KEYS[1]].name,
-                },
-                selected: SCAN_MODE_KEYS[0],
-                disabled: function(){return $(this).hasClass('restrict-context');},
-            },
-        },
-    });
+    let contextMenuTr = { ...DEFAULT_CONTEXT_MENU_OPTIONS };
+    contextMenuTr.selector = '.browser-context-menu';
+    $.contextMenu(contextMenuTr);
+    let contextMenuBtn = { ...DEFAULT_CONTEXT_MENU_OPTIONS };
+    contextMenuBtn.selector = '.browser-context-menu-btn'
+    contextMenuBtn.trigger = 'left';
+    $.contextMenu(contextMenuBtn);
 }
 
 // 일정 리스트 globalRequestSearch()@ff_global1.js 에서 make_list() 호출하기 때문에 구현
