@@ -153,7 +153,7 @@ class Setting(ModuleBase):
                 data = mod_periodic.get_jobs()[idx]
 
                 if data.get('폴더'):
-                    targets = list(data.get('폴더'))
+                    targets = {data.get('폴더')}
                 else:
                     targets = plexmate_aider.get_locations_by_id(data.get('섹션ID'))
                 LOGGER.debug(f'vfs/refresh before running a periodic scan job: {idx}')
