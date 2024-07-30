@@ -441,14 +441,14 @@ class RcloneAider(Aider):
 
     def __init__(self, rc_url: str = None) -> None:
         super().__init__()
-        if not rc_url or not rc_url.startswith('http'):
-            raise Exception(f'Rclone RC 리모트 주소를 입력하세요: {rc_url}')
         url = urllib.parse.urlparse(rc_url)
+        if not url.netloc or not url.scheme:
+            raise Exception(f'Rclone RC 리모트 주소를 입력하세요: {rc_url}')
         self._vfs = url.fragment
         self._rc_user = url.username
         self._rc_pass = url.password
         try:
-            self._rc_url = urllib.parse.urlunparse([url.scheme, f'{url.hostname}:{url.port}', '', '', '', ''])
+            self._rc_url = urllib.parse.urlunparse([url.scheme, url.netloc, '', '', '', ''])
         except Exception as e:
             LOGGER.error(traceback.format_exc())
             LOGGER.error(f'url: {url}')

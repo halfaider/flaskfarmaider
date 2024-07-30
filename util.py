@@ -79,7 +79,12 @@ def _parse_mappings(settings: list) -> dict[str, str]:
     mappings = {}
     for setting in settings:
         if setting:
-            source, target = setting.rsplit(':', 1)
+            try:
+                source, target = setting.rsplit(':', 1)
+            except:
+                logger.error(traceback.format_exc())
+                logger.error(f'Check your mapping settings: {settings}')
+                source, target = ('', '')
             mappings[source.strip()] = target.strip()
     return mappings
 

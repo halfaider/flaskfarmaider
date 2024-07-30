@@ -30,7 +30,7 @@ class Setting(ModuleBase):
             'setting_plexmate_max_scan_time': '60',
             'setting_plexmate_timeover_range': '0~0',
             'setting_plexmate_periodic_scan': 'false',
-            'setting_plex_mappings': '["/mnt/gds:"]',
+            'setting_plex_mappings': '["/mnt/gds/:/"]',
             'setting_startup_executable': 'false',
             'setting_startup_commands': '["apt-get update"]',
             'setting_startup_timeout': '300',
@@ -40,7 +40,7 @@ class Setting(ModuleBase):
             'setting_logging_access_format': '{remote} {method} "{path}" {status}',
             'setting_general_timeout': '0',
             'setting_rclone_remotes': '["http://172.17.0.1:5572"]',
-            'setting_rclone_mappings': '["/mnt/gds:"]',
+            'setting_rclone_mappings': '["/mnt/gds/:/"]',
             'setting_config_file': f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml',
         }
 
@@ -140,34 +140,37 @@ class Setting(ModuleBase):
         super().plugin_load()
         set_login_log(CONFIG.get('setting_logging_login').lower() == 'true')
         # 주기적 스캔 설정
-        periodic_scan_enable = CONFIG.get_boolean('setting_plexmate_periodic_scan')
-        if periodic_scan_enable:
-            plex_mate = FRAMEWORK.PluginManager.get_plugin_instance('plex_mate')
-            mod_periodic = plex_mate.logic.get_module('periodic')
-            rclone_aider = RcloneAider(CONFIG.get_json('setting_rclone_remotes')[0])
-            plexmate_aider = PlexmateAider()
-            from plex_mate.task_periodic import Task
+        try:
+            periodic_scan_enable = CONFIG.get_boolean('setting_plexmate_periodic_scan')
+            if periodic_scan_enable:
+                plex_mate = FRAMEWORK.PluginManager.get_plugin_instance('plex_mate')
+                mod_periodic = plex_mate.logic.get_module('periodic')
+                rclone_aider = RcloneAider(CONFIG.get_json('setting_rclone_remotes')[0])
+                plexmate_aider = PlexmateAider()
+                from plex_mate.task_periodic import Task
 
-            def function_job(idx) -> None:
-                plex_mate.logger.warning(f"job_function IDX : {idx}")
-                data = mod_periodic.get_jobs()[idx]
+                def function_job(idx) -> None:
+                    plex_mate.logger.warning(f"job_function IDX : {idx}")
+                    data = mod_periodic.get_jobs()[idx]
 
-                if data.get('폴더'):
-                    targets = {data.get('폴더')}
-                else:
-                    targets = plexmate_aider.get_locations_by_id(data.get('섹션ID'))
-                LOGGER.debug(f'vfs/refresh before running a periodic scan job: {idx}')
-                for target in targets:
-                    rclone_aider.vfs_refresh(target, recursive=True)
-                LOGGER.debug(f'Run a periodic sacn job: {idx}')
-                if data.get('스캔모드', None) == '웹':
-                    plex_mate.PlexWebHandle.section_scan(data['섹션ID'])
-                    plex_mate.logger.debug(f"스캔모드 : 웹 실행")
-                    plex_mate.logger.debug(data)
-                    return
-                mod_periodic.start_celery(Task.start, None, *(idx,'scheduler'))
+                    if data.get('폴더'):
+                        targets = {data.get('폴더')}
+                    else:
+                        targets = plexmate_aider.get_locations_by_id(data.get('섹션ID'))
+                    LOGGER.debug(f'vfs/refresh before running a periodic scan job: {idx}')
+                    for target in targets:
+                        rclone_aider.vfs_refresh(target, recursive=True)
+                    LOGGER.debug(f'Run a periodic sacn job: {idx}')
+                    if data.get('스캔모드', None) == '웹':
+                        plex_mate.PlexWebHandle.section_scan(data['섹션ID'])
+                        plex_mate.logger.debug(f"스캔모드 : 웹 실행")
+                        plex_mate.logger.debug(data)
+                        return
+                    mod_periodic.start_celery(Task.start, None, *(idx,'scheduler'))
 
-            mod_periodic.job_function = function_job
+                mod_periodic.job_function = function_job
+        except:
+            LOGGER.error(traceback.format_exc())
 
 
 class Schedule(ModuleBase):
