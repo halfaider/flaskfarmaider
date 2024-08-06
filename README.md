@@ -1,5 +1,7 @@
 
 # 변경점
+- v1.3.29
+    - 일부 설정의 기본값 삭제
 - v1.3.28
     - 플러그인 로딩 단계에서 오류 처리
 - v1.3.27
@@ -296,6 +298,23 @@
 
     Flaskfarm의 로컬 경로와 플렉스의 로컬 경로가 다를 경우 입력해 주세요. Rclone 경로 변경 규칙과 동일한 방식으로 입력해 주면 됩니다.
 
+    예를 들어 아래와 같이 `/volume1/rclone/gds`에 GDS가 마운트되어 있고 Flaskfarm 컨테이너의 볼륨 바인딩은 아래처럼 되어 있다고 가정해 보겠습니다.
+    ```
+    rclone 마운트:
+    rclone mount /volume1/rclone/gds gds:
+
+    Plex 서버의 라이브러리 폴더:
+    /volume1/rclone/gds/GDRIVE/..
+
+    Flaskfarm 컨테이너의 볼륨 바인딩:
+    - /:/host
+    ```
+
+    Flaskfarm 컨테이너의 경로는 `/host/volume1/rclone/gds`로 시작되기 때문에 이 경로를 그대로 Plex 서버에 스캔 요청을 하면 없는 경로라서 스캔을 할 수가 없습니다. 이 경우에는 `/volume1/rclone/gds`로 변경할 수 있게 아래처럼 규칙을 설정해 주면 됩니다.
+
+    ```
+    /host/:/
+    ```
 
 - ### 새로고침 후 주기적 스캔 실행
 

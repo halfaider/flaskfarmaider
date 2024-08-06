@@ -23,6 +23,11 @@ function renderRemoteGroup() {
     defaultInputGroup += '<button type="button" class="btn btn-outline-primary btn-sm btn-test-connection">접속 확인</button>';
     defaultInputGroup += '<button type="button" class="btn btn-outline-warning btn-sm btn-remove-remote">삭제</button>';
     defaultInputGroup += '</div>';
+
+    if (SETTING_RCLONE_REMOTES.length < 1) {
+        SETTING_RCLONE_REMOTES.push('');
+    }
+
     for (let idx in SETTING_RCLONE_REMOTES) {
         let inputGroup = $(defaultInputGroup);
         if (idx < 1) {
