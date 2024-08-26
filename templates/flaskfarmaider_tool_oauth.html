@@ -1,0 +1,58 @@
+{% extends 'flaskfarmaider.html' %}
+{% block content %}
+
+<form id="setting">
+    <div class="form-group row mx-2">
+        <div class="col pl-0">
+            <label for="tool_oauth_client_id"><strong>클라이언트 ID</strong></label>
+            <input id="tool_oauth_client_id" name="tool_oauth_client_id" class="form-control form-control-sm" type="text" value="{{ args.tool_oauth_client_id }}" required>
+            <br>
+            <label for="tool_oauth_client_secret"><strong>클라이언트 보안 비밀번호</strong></label>
+            <input id="tool_oauth_client_secret" name="tool_oauth_client_secret" class="form-control form-control-sm" type="text" value="{{ args.tool_oauth_client_secret }}" required>
+            <br>
+            <label for="tool_oauth_scopes"><strong>승인 범위</strong></label>
+            <textarea id="tool_oauth_scopes" name="tool_oauth_scopes" class="form-control form-control-sm" rows="5" required>{{ args.tool_oauth_scopes }}</textarea>
+            <small class="form-text text-muted">
+                <a href="https://developers.google.com/identity/protocols/oauth2/scopes#drive" target="_blank">https://developers.google.com/identity/protocols/oauth2/scopes#drive</a><br>
+                <a href="https://developers.google.com/identity/protocols/oauth2/scopes#driveactivity" target="_blank">https://developers.google.com/identity/protocols/oauth2/scopes#driveactivity</a>
+
+            </small>
+            <br>
+            <label for="tool_oauth_redirect"><strong>리디렉션 주소</strong></label>
+            <input id="tool_oauth_redirect" name="tool_oauth_redirect" class="form-control form-control-sm" type="text" value="{{ args.tool_oauth_redirect }}" required placeholder="https://your.flaskfarm.com/flaskfarmaider/tool/oauth">
+            <small class="form-text text-warning">
+                https://your.flaskfarm.com/flaskfarmaider/tool/oauth<br>리디렉션 URL은 "OAuth 2.0 클라이언트 ID"의 "승인된 리디렉션 URI"에 사전 등록되어 있어야 합니다.<br>리디렉션 URL은 https로 시작해야 하며 최상위 도메인이 <a href="https://publicsuffix.org/list" target="_blank">Public suffix list</a>에 존재하는 도메인이어야 합니다.<br><a href="https://console.cloud.google.com/apis/credentials" target="_blank">https://console.cloud.google.com/apis/credentials</a>
+            </small>
+            <br>
+            <label for="tool_oauth_refresh_token"><strong>리프레시 토큰</strong></label>
+            <input id="tool_oauth_refresh_token" name="tool_oauth_refresh_token" class="form-control form-control-sm" type="text" value="{{ args.tool_oauth_refresh_token }}" disabled>
+            <small class="form-text text-warning">
+                인증 요청 후 자동으로 입력 및 저장됩니다.
+            </small>
+
+        </div>
+    </div>
+</form>
+<div class="input-group mb-3">
+    <button id="save-page-btn" type="button" class="btn btn-block btn-primary">저장</button>
+</div>
+
+<hr class="border border-secondary">
+<h4>1. "인증 요청" 버튼을 누르면 구글 인증 서버로 리디렉션 됩니다.</h4>
+<h4>2. 인증에 사용할 구글 계정을 선택한 후 "...(으)로 이동(안전하지 않음)"을 눌러 계속 진행합니다.</h4>
+<h4>3. 엑세스 요청에 동의를 구하는 페이지가 나오면 "계속"을 눌러 마무리 합니다.</h4>
+<h4>4. 정상적으로 토큰이 발급되면 리프레시 토큰이 자동으로 저장됩니다.</h4>
+<button type="button" id="authorize-btn" class="btn btn-block btn-primary">인증 요청</button>
+<br>
+
+<script src="{{ url_for('.static', filename='js/flaskfarmaider.js') }}"></script>
+<script>
+    $('#authorize-btn').on('click', function(e) {
+        window.location.href = '{{ args.tool_oauth_redirect }}?command=authorize';
+    });
+    $(function() {
+        $.getScript("{{ url_for('.static', filename='js/flaskfarmaider_common.js') }}")
+    });
+</script>
+
+{% endblock %}

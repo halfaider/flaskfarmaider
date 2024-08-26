@@ -5,6 +5,7 @@ import pathlib
 import time
 
 import flask
+import google_auth_oauthlib.flow
 
 from .setup import (PluginBase, FrameworkJob,
     FRAMEWORK, PLUGIN, LOGGER, CONFIG,
@@ -423,7 +424,7 @@ class Tool(ModuleBase):
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name='tool', first_menu='trash')
-        self.set_page_list([ToolTrash])
+        self.set_page_list([TrashTool, OAuthTool])
 
     def setting_save_after(self, changes: list) -> None:
         '''override'''
@@ -432,7 +433,7 @@ class Tool(ModuleBase):
             page.setting_save_after(changes)
 
 
-class ToolTrash(PageBase):
+class TrashTool(PageBase):
 
     def __init__(self, plugin: PluginBase, parent: ModuleBase) -> None:
         super().__init__(plugin, parent, name='trash')
@@ -526,6 +527,64 @@ class ToolTrash(PageBase):
         '''override'''
         super().plugin_unload()
         CONFIG.set('tool_trash_task_status', STATUS_KEYS[0])
+
+
+class OAuthTool(PageBase):
+
+    def __init__(self, plugin: PluginBase, parent: ModuleBase) -> None:
+        super().__init__(plugin, parent, name='oauth')
+        self.db_default = {
+            'tool_oauth_client_id': '',
+            'tool_oauth_client_secret': '',
+            'tool_oauth_refresh_token': '',
+            'tool_oauth_scopes': '',
+            'tool_oauth_redirect': '',
+        }
+
+    def get_template_args(self) -> dict:
+        '''override'''
+        args = super().get_template_args()
+        for key in self.db_default:
+            args[key] = CONFIG.get(key)
+        return args
+
+    def process_menu(self, req: flask.Request) -> flask.Response:
+        '''override'''
+        self.prerender(self.name, req)
+        try:
+            args = self.get_template_args()
+            client_config = {
+                'web': {
+                    'client_id': CONFIG.get('tool_oauth_client_id'),
+                    'client_secret': CONFIG.get('tool_oauth_client_secret'),
+                    'redirect_uris': [CONFIG.get('tool_oauth_redirect')],
+                    'auth_uri': 'https://accounts.google.com/o/oauth2/auth',
+                    'token_uri': 'https://accounts.google.com/o/oauth2/token',
+                    'auth_provider_x509_cert_url': 'https://www.googleapis.com/oauth2/v1/certs'
+                }
+            }
+            if req.args.get('command') == 'authorize':
+                flow = google_auth_oauthlib.flow.Flow.from_client_config(client_config, CONFIG.get_list('tool_oauth_scopes'), redirect_uri=CONFIG.get('tool_oauth_redirect'))
+                authorization_url, state = flow.authorization_url(access_type='offline', prompt='consent', include_granted_scopes='true')
+                flask.session['oauth_state'] = state
+                return flask.redirect(authorization_url)
+            if req.args.get('code') and req.args.get('state'):
+                state = flask.session['oauth_state']
+                flow = google_auth_oauthlib.flow.Flow.from_client_config(client_config, CONFIG.get_list('tool_oauth_scopes'), redirect_uri=CONFIG.get('tool_oauth_redirect'), state=state)
+                flow.fetch_token(code=req.args.get('code'))
+                CONFIG.set('tool_oauth_refresh_token', flow.credentials.refresh_token)
+                return flask.redirect(CONFIG.get('tool_oauth_redirect'))
+            return flask.render_template(f'{PLUGIN.package_name}_{self.parent.name}_{self.name}.html', args=args)
+        except:
+            self.P.logger.error(traceback.format_exc())
+            return flask.render_template('sample.html', title=f"process_menu() - {PLUGIN.package_name}/{self.parent.name}/{self.name}")
+
+    def command_save(self, request: flask.Request) -> dict:
+        parsed = self.parse_command(request)
+        LOGGER.info(parsed)
+        for key in parsed['query']:
+            CONFIG.set(key, parsed['query'][key][0])
+        return self.returns('success', '저장했습니다.')
 
 
 @FRAMEWORK.celery.task(bind=True)

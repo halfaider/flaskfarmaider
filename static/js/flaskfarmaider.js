@@ -144,3 +144,20 @@ function renderAddableInputGroup(itemList, groupId, formName, placeHolder) {
         }
     }
 }
+
+function getQueryFromSaveBtn(button) {
+    let ids = button.data('id');
+    let formdata = new FormData(document.getElementById('setting'));
+    $('input[id$="-helper"][type="hidden"]').each(function(index) {
+        let targetId = $(this).prop('id').replace('-helper', '');
+        let isTargetChecked = $('#' + targetId).prop('checked');
+        let isChecked = $(this).prop('checked');
+        if (isChecked && !isTargetChecked) {
+            formdata.append(targetId, 'off');
+        }
+    });
+    for (let i in ids) {
+        formdata.append('id', ids[i]);
+    }
+    return new URLSearchParams(formdata).toString();
+}

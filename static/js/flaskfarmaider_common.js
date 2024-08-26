@@ -20,21 +20,7 @@ $('#add-btn').on('click', function(e) {
 
 // 저장 버튼
 $('#save-btn').on('click', function() {
-    let ids = $(this).data('id');
-    let formdata = new FormData(document.getElementById('setting'));
-    $('input[id$="-helper"][type="hidden"]').each(function(index) {
-        let targetId = $(this).prop('id').replace('-helper', '');
-        let isTargetChecked = $('#' + targetId).prop('checked');
-        let isChecked = $(this).prop('checked');
-        if (isChecked && !isTargetChecked) {
-            formdata.append(targetId, 'off');
-        }
-    });
-    for (let i in ids) {
-        formdata.append('id', ids[i]);
-    }
-    let query = new URLSearchParams(formdata).toString();
-    console.log(query);
+    let query = getQueryFromSaveBtn($(this));
     globalSendCommand('save', query, null, null, function(result) {
         if (result.ret == 'success') {
             if (MODULE_NAME == 'schedule') {
@@ -43,6 +29,11 @@ $('#save-btn').on('click', function() {
             }
         }
     });
+});
+
+$('#save-page-btn').on('click', function() {
+    let query = getQueryFromSaveBtn($(this));
+    globalSendCommandPage('save', query, null, null, null);
 });
 
 E_SELECT_ALL.on('click', function(e) {
