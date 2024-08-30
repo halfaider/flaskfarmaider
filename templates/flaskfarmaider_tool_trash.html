@@ -2,17 +2,19 @@
 {% block content %}
 <form>
     <div class="input-group mb-3">
-        <select class="custom-select col-1" id="trash-section-type">
+        <select class="custom-select col-2" id="trash-section-type">
             <option value="{{ args.section_type_keys.0 }}">{{ args.section_types[args.section_type_keys.0].name }}</option>
             <option value="{{ args.section_type_keys.1 }}">{{ args.section_types[args.section_type_keys.1].name }}</option>
             <option value="{{ args.section_type_keys.2 }}">{{ args.section_types[args.section_type_keys.2].name }}</option>
         </select>
-        <select class="custom-select col" id="trash-sections">
+        <select class="custom-select" id="trash-sections">
             <option>No sections</option>
         </select>
         <div class="input-group-append">
-            <button class="btn btn-primary px-4" type="button" id="trash-btn-list">조회</button>
+            <button class="btn btn-primary" type="button" id="trash-btn-list">조회</button>
         </div>
+    </div>
+    <div class="input-group mb-3">
         <select class="custom-select col-2" id="trash-task">
             <option value="{{ args.tool_trash_keys.0 }}">{{ args.tool_trashes[args.tool_trash_keys.0].name }}</option>
             <option value="{{ args.tool_trash_keys.1 }}">{{ args.tool_trashes[args.tool_trash_keys.1].name }}</option>
@@ -26,10 +28,10 @@
         {%- endfor %}
         </select>
         <div class="input-group-append">
-            <button class="btn btn-primary px-5" type="button" id="trash-btn-execute" data-tool_trash_task_status="{{ args.tool_trash_task_status }}">
+            <button class="btn btn-primary" type="button" id="trash-btn-execute" data-tool_trash_task_status="{{ args.tool_trash_task_status }}">
                 실행
             </button>
-            <button class="btn btn-warning px-5" type="button" id="trash-btn-stop">중지</button>
+            <button class="btn btn-warning" type="button" id="trash-btn-stop">중지</button>
         </div>
     </div>
 </form>

@@ -14,135 +14,145 @@
 <form id="setting">
 <div class="tab-content" id="nav-tabContent">
     <div class="tab-pane fade show active" id="nav-general" role="tabpanel" aria-labelledby="nav-general-tab">
-        <div class="form-group row mx-2">
-            <div class="col pl-0">
-                <label for="setting_general_timeout"><strong>최대 대기 시간</strong></label>
-                <input id="setting_general_timeout" name="setting_general_timeout" class="form-control form-control-sm" type="number" placeholder="0" value="{{ args.setting_general_timeout }}" required>
-                <small class="form-text text-muted">
-                    기본 최대 대기 시간<br>단위: 초
-                </small>
-                <div class="form-check form-check-inline">
-                    <label for="setting_logging_login" class="form-check-label mr-1"><strong>로그인 로그</strong></label>
-                    <input id="setting_logging_login" name="setting_logging_login" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
-                    <input id="setting_logging_login-helper" type="hidden" class="mx-1" hidden name="checkbox-helper" title="Off로 저장시 체크" checked>
+        <div class="container-fluid">
+            <div class="form-group row mx-2">
+                <div class="col-md">
+                    <label for="setting_general_timeout"><strong>최대 대기 시간</strong></label>
+                    <input id="setting_general_timeout" name="setting_general_timeout" class="form-control form-control-sm" type="number" placeholder="0" value="{{ args.setting_general_timeout }}" required>
+                    <div class="form-text text-muted mb-3">
+                        기본 최대 대기 시간<br>단위: 초
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <label for="setting_logging_login" class="form-check-label mr-1"><strong>로그인 로그</strong></label>
+                        <input id="setting_logging_login" name="setting_logging_login" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
+                        <input id="setting_logging_login-helper" type="hidden" class="mx-1" hidden name="checkbox-helper" title="Off로 저장시 체크" checked>
+                    </div>
+                    <div class="form-text text-muted mb-3">
+                        /data/log/system.log
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <label for="setting_logging_access" class="form-check-label mr-1"><strong>접속 로그</strong></label>
+                        <input id="setting_logging_access" name="setting_logging_access" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
+                        <input id="setting_logging_access-helper" type="hidden" class="mx-1" hidden name="checkbox-helper" title="Off로 저장시 체크" checked>
+                    </div>
+                    <div class="form-text text-muted mb-3">
+                        Flaskfarm의 접속 로그
+                    </div>
+                    <label for="setting_logging_access_file"><strong>접속 로그 파일 경로</strong></label>
+                    <input id="setting_logging_access_file" name="setting_logging_access_file" type="text" class="form-control form-control-sm" placeholder="/data/log/access.log" value="{{ args.setting_logging_access_file }}">
+                    <div class="form-text text-muted mb-3">
+                        접속 로그 파일의 경로
+                    </div>
+                    <label for="setting_logging_access_format"><strong>접속 로그 형식</strong></label>
+                    <input id="setting_logging_access_format" name="setting_logging_access_format" type="text" class="form-control form-control-sm" placeholder="{remote} {method} &quot;{path} &quot; {status}" value="{{ args.setting_logging_access_format }}">
+                    <div class="form-text text-muted mb-3">
+                        {remote}: 클라이언트 IP<br>{method}: HTTP 메소드 (GET, POST, ...)<br>{path}: 요청 경로<br>{status}: HTTP 응답 상태 코드(200, 404, ...)<br>{length}: 응답 크기<br>{agent}: User-Agent<br>{form}: form 데이터<br>{headers}: HTTP 헤더<br>{hostname}: 호스트명
+                    </div>
                 </div>
-                <small class="form-text text-muted">
-                    /data/log/system.log
-                </small>
-                <div class="form-check form-check-inline mt-3">
-                    <label for="setting_logging_access" class="form-check-label mr-1"><strong>접속 로그</strong></label>
-                    <input id="setting_logging_access" name="setting_logging_access" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
-                    <input id="setting_logging_access-helper" type="hidden" class="mx-1" hidden name="checkbox-helper" title="Off로 저장시 체크" checked>
+                <div class="col-md">
+                    <label for="setting_config_file"><strong>기타 설정 파일</strong></label>
+                    <div class="input-group">
+                        <input id="setting_config_file" name="setting_config_file" class="form-control form-control-sm" value="{{ args.setting_config_file }}">
+                        <button id="globalEditBtn" class="btn btn-sm btn-outline-primary btn-sm" data-file="{{ args.setting_config_file }}">편집</button>
+                        <button type="button" id="setting_config_file_update_btn" class="btn btn-outline-primary btn-sm">최신으로 덮어쓰기</button>
+                    </div>
+                    <div class="input-group">
+                        <textarea class="form-control form-control-sm" rows="20" disabled>{{ args.setting_config_file_content }}</textarea>
+                    </div>
+                    <div class="form-text text-muted mb-3">
+                        플러그인 의존성 목록
+                    </div>
                 </div>
-                <small class="form-text text-muted">
-                    Flaskfarm의 접속 로그
-                </small>
-                <label for="setting_logging_access_file" class="mt-3"><strong>접속 로그 파일 경로</strong></label>
-                <input id="setting_logging_access_file" name="setting_logging_access_file" type="text" class="form-control form-control-sm" placeholder="/data/log/access.log" value="{{ args.setting_logging_access_file }}">
-                <small class="form-text text-muted">
-                    접속 로그 파일의 경로
-                </small>
-                <label for="setting_logging_access_format" class=""><strong>접속 로그 형식</strong></label>
-                <input id="setting_logging_access_format" name="setting_logging_access_format" type="text" class="form-control form-control-sm" placeholder="{remote} {method} &quot;{path} &quot; {status}" value="{{ args.setting_logging_access_format }}">
-                <small class="form-text text-muted">
-                    {remote}: 클라이언트 IP<br>{method}: HTTP 메소드 (GET, POST, ...)<br>{path}: 요청 경로<br>{status}: HTTP 응답 상태 코드(200, 404, ...)<br>{length}: 응답 크기<br>{agent}: User-Agent<br>{form}: form 데이터<br>{headers}: HTTP 헤더<br>{hostname}: 호스트명
-                </small>
             </div>
-            <div class="col pr-0">
-                <label for="setting_config_file"><strong>기타 설정 파일</strong></label>
-                <div class="input-group mt-1">
-                    <input id="setting_config_file" name="setting_config_file" class="form-control form-control-sm" value="{{ args.setting_config_file }}">
-                    <button id="globalEditBtn" class="btn btn-sm btn-outline-primary btn-sm" data-file="{{ args.setting_config_file }}">편집</button>
-                    <button type="button" id="setting_config_file_update_btn" class="btn btn-outline-primary btn-sm">최신으로 덮어쓰기</button>
-                </div>
-                <div class="input-group mt-1">
-                    <textarea class="form-control form-control-sm" rows="20" disabled>{{ args.setting_config_file_content }}</textarea>
-                </div>
-                <small class="form-text text-muted">
-                    플러그인 의존성 목록
-                </small>
-            </div>
+
         </div>
     </div>
     <div class="tab-pane fade" id="nav-rclone" role="tabpanel" aria-labelledby="nav-rclone-tab">
-        <div class="form-group row mx-2">
-            <div class="col pl-0">
-                <label for="rclone-remote-group"><strong>Remote Control 주소</strong></label>
-                <div id="rclone-remote-group"></div>
-                <small class="form-text text-muted">
-                    형식: scheme://user:pass@address#remote<br>예시 1: http://admin:12345@localhost:5275#gds<br>예시 2: https://user:pass@mydomain.com#my_remote<br>예시 3: http://172.17.0.1:5572
-                </small>
-            </div>
-            <div class="col pr-0">
-                <label for="rclone-mapping-group"><strong>Rclone 경로 변경 규칙</strong></label>
-                <div id="rclone-mapping-group"></div>
-                <small class="form-text text-muted">
-                    형식: /변경할/로컬/경로:/변경될/리모트/경로<br>예시 1: /mnt/gds/GDRIVE:/GDRIVE<br>예시 2: /mnt/gds:<br>예시 3: Y:/GDRIVE:/GDRIVE
-                </small>
+        <div class="container-fluid">
+            <div class="form-group row mx-2">
+                <div class="col-md">
+                    <label for="rclone-remote-group"><strong>Remote Control 주소</strong></label>
+                    <div id="rclone-remote-group"></div>
+                    <div class="form-text text-muted mb-3">
+                        형식: scheme://user:pass@address#remote<br>예시 1: http://admin:12345@localhost:5275#gds<br>예시 2: https://user:pass@mydomain.com#my_remote<br>예시 3: http://172.17.0.1:5572
+                    </div>
+                </div>
+                <div class="col-md">
+                    <label for="rclone-mapping-group"><strong>Rclone 경로 변경 규칙</strong></label>
+                    <div id="rclone-mapping-group"></div>
+                    <div class="form-text text-muted mb-3">
+                        형식: /변경할/로컬/경로:/변경될/리모트/경로<br>예시 1: /mnt/gds/GDRIVE:/GDRIVE<br>예시 2: /mnt/gds:<br>예시 3: Y:/GDRIVE:/GDRIVE
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     <div class="tab-pane fade" id="nav-plex_mate" role="tabpanel" aria-labelledby="nav-plex_mate-tab">
-        <div class="form-group row mx-2">
-            <div class="col pl-0">
-                <label for="setting_plexmate_max_scan_time"><strong>최대 스캔 시간</strong></label>
-                <div class="input-group">
-                    <input id="setting_plexmate_max_scan_time" name="setting_plexmate_max_scan_time" class="form-control form-control-sm" type="number" placeholder="0" value="{{ args.setting_plexmate_max_scan_time }}" required>
+        <div class="container-fluid">
+            <div class="form-group row mx-2">
+                <div class="col-md">
+                    <label for="setting_plexmate_max_scan_time"><strong>최대 스캔 시간</strong></label>
+                    <div class="input-group">
+                        <input id="setting_plexmate_max_scan_time" name="setting_plexmate_max_scan_time" class="form-control form-control-sm" type="number" placeholder="0" value="{{ args.setting_plexmate_max_scan_time }}" required>
+                    </div>
+                    <div class="form-text text-muted mb-3">
+                        이 시간을 초과한 plex_mate 플러그인의 스캔 항목을 FINISH_TIMEOVER 처리<br>단위: 분
+                    </div>
+                    <label for="setting_plexmate_timeover_range"><strong>타임오버 항목 재시도</strong></label>
+                    <div class="input-group">
+                        <input id="setting_plexmate_timeover_range" name="setting_plexmate_timeover_range" class="form-control form-control-sm" type="text" placeholder="100~110" value="{{ args.setting_plexmate_timeover_range }}" required>
+                        <button type="button" id="setting_plexmate_timeover_btn" class="btn btn-outline-primary btn-sm">지금 실행</button>
+                    </div>
+                    <div class="form-text text-muted mb-3">
+                        이 ID 범위의 항목 중 FINISH_TIMEOVER 처리된 항목을 다시 READY로 변경<br>형식: 시작ID~끝ID<br>예시 : 100~110 (100, 101, 102 ... 107, 108, 109, 110)
+                    </div>
                 </div>
-                <small class="form-text text-muted">
-                    이 시간을 초과한 plex_mate 플러그인의 스캔 항목을 FINISH_TIMEOVER 처리<br>단위: 분
-                </small>
-                <label for="setting_plexmate_timeover_range" class="mt-3"><strong>타임오버 항목 재시도</strong></label>
-                <div class="input-group">
-                    <input id="setting_plexmate_timeover_range" name="setting_plexmate_timeover_range" class="form-control form-control-sm" type="text" placeholder="100~110" value="{{ args.setting_plexmate_timeover_range }}" required>
-                    <button type="button" id="setting_plexmate_timeover_btn" class="btn btn-outline-primary btn-sm">지금 실행</button>
+                <div class="col-md">
+                    <label for="plex-mapping-group"><strong>Plex 경로 변경 규칙</strong></label>
+                    <div id="plex-mapping-group"></div>
+                    <div class="form-text text-muted mb-3">
+                        형식: /변경할/로컬/경로:/변경될/플렉스/경로<br>예시 1: /mnt/gds/GDRIVE:/host/mnt/gds/GDRIVE<br>예시 2: /mnt/gds:<br>예시 3: Y:/GDRIVE:/GDRIVE
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <label for="setting_plexmate_periodic_scan" class="form-check-label mr-1"><strong>새로고침 후 주기적 스캔 실행</strong></label>
+                        <input id="setting_plexmate_periodic_scan" name="setting_plexmate_periodic_scan" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
+                        <input id="setting_plexmate_periodic_scan-helper" type="hidden" class="mx-1" hidden name="checkbox-helper" title="Off로 저장시 체크" checked>
+                    </div>
+                    <div class="form-text text-muted mb-3">
+                        <span class="text-warning">Off로 설정 후 주기적 스캔의 새로고침 기능을 직접 사용하세요.</span><br>
+                        plex_mate의 주기적 스캔이 실행되면 스캔 대상을 미리 새로고침 합니다.<br>
+                        "Remote Control 주소" 중 첫번째 서버를 사용합니다.<br>
+                        설정 변경은 재시작시 적용됩니다.
+                    </div>
                 </div>
-                <small class="form-text text-muted">
-                    이 ID 범위의 항목 중 FINISH_TIMEOVER 처리된 항목을 다시 READY로 변경<br>형식: 시작ID~끝ID<br>예시 : 100~110 (100, 101, 102 ... 107, 108, 109, 110)
-                </small>
-            </div>
-            <div class="col pr-0">
-                <label for="plex-mapping-group"><strong>Plex 경로 변경 규칙</strong></label>
-                <div id="plex-mapping-group"></div>
-                <small class="form-text text-muted">
-                    형식: /변경할/로컬/경로:/변경될/플렉스/경로<br>예시 1: /mnt/gds/GDRIVE:/host/mnt/gds/GDRIVE<br>예시 2: /mnt/gds:<br>예시 3: Y:/GDRIVE:/GDRIVE
-                </small>
-                <div class="form-check form-check-inline mt-3">
-                    <label for="setting_plexmate_periodic_scan" class="form-check-label mr-1"><strong>새로고침 후 주기적 스캔 실행</strong></label>
-                    <input id="setting_plexmate_periodic_scan" name="setting_plexmate_periodic_scan" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
-                    <input id="setting_plexmate_periodic_scan-helper" type="hidden" class="mx-1" hidden name="checkbox-helper" title="Off로 저장시 체크" checked>
-                </div>
-                <small class="form-text text-muted">
-                    plex_mate의 주기적 스캔이 실행되면 스캔 대상을 미리 새로고침 합니다.<br>
-                    "Remote Control 주소" 중 첫번째 서버를 사용합니다.<br>
-                    설정 변경은 재시작시 적용됩니다.
-                </small>
             </div>
         </div>
     </div>
     <div class="tab-pane fade" id="nav-startup" role="tabpanel" aria-labelledby="nav-startup-tab">
-        <div class="form-group row mx-2">
-            <div class="col pl-0">
-                <div class="form-check form-check-inline">
-                    <label for="setting_startup_executable" class="form-check-label mr-1"><strong>실행 허용</strong></label>
-                    <input id="setting_startup_executable" name="setting_startup_executable" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
-                    <input id="setting_startup_executable-helper" type="hidden" class="mx-1" name="checkbox-helper" title="Off로 저장시 체크" checked hidden>
+        <div class="container-fluid">
+            <div class="form-group row mx-2">
+                <div class="col-md">
+                    <div class="form-check form-check-inline">
+                        <label for="setting_startup_executable" class="form-check-label mr-1"><strong>실행 허용</strong></label>
+                        <input id="setting_startup_executable" name="setting_startup_executable" type="checkbox" class="form-check-input" data-toggle="toggle" data-size="xs">
+                        <input id="setting_startup_executable-helper" type="hidden" class="mx-1" name="checkbox-helper" title="Off로 저장시 체크" checked hidden>
+                    </div>
+                    <div class="form-text text-muted mb-3">
+                        명령어 실행 허용 여부<br>로그에서 실행될 명령어를 확인하고 결정
+                    </div>
+                    <label for="setting_startup_timeout"><strong>명령어 최대 대기 시간</strong></label>
+                    <input id="setting_startup_timeout" name="setting_startup_timeout" type="number" placeholder="300" class="form-control form-control-sm" value="{{ args.setting_startup_timeout }}">
+                    <div class="form-text text-muted mb-3">
+                        각 명령어의 최대 대기 시간<br>단위: 초
+                    </div>
                 </div>
-                <small class="form-text text-muted">
-                    명령어 실행 허용 여부<br>로그에서 실행될 명령어를 확인하고 결정
-                </small>
-                <label for="setting_startup_timeout" class="mt-3"><strong>명령어 최대 대기 시간</strong></label>
-                <input id="setting_startup_timeout" name="setting_startup_timeout" type="number" placeholder="300" class="form-control form-control-sm" value="{{ args.setting_startup_timeout }}">
-                <small class="form-text text-muted">
-                    각 명령어의 최대 대기 시간<br>단위: 초
-                </small>
-            </div>
-            <div class="col pr-0">
-                <label for="startup-command-group" class="mt-3"><strong>실행할 명령어</strong></label>
-                <div id="startup-command-group"></div>
-                <small class="form-text text-muted">
-                    실행할 커맨드<br>예시 1: apt-get update<br>예시 2: cmd.exe /c calc
-                </small>
+                <div class="col-md">
+                    <label for="startup-command-group"><strong>실행할 명령어</strong></label>
+                    <div id="startup-command-group"></div>
+                    <div class="form-text text-muted mb-3">
+                        실행할 커맨드<br>예시 1: apt-get update<br>예시 2: cmd.exe /c calc
+                    </div>
+                </div>
             </div>
         </div>
     </div>

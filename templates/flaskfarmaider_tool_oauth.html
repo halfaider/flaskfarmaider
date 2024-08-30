@@ -3,32 +3,27 @@
 
 <form id="setting">
     <div class="form-group row mx-2">
-        <div class="col pl-0">
+        <div class="col-md">
             <label for="tool_oauth_client_id"><strong>클라이언트 ID</strong></label>
-            <input id="tool_oauth_client_id" name="tool_oauth_client_id" class="form-control form-control-sm" type="text" value="{{ args.tool_oauth_client_id }}" required>
-            <br>
+            <input id="tool_oauth_client_id" name="tool_oauth_client_id" class="form-control form-control-sm mb-3" type="text" value="{{ args.tool_oauth_client_id }}" required>
             <label for="tool_oauth_client_secret"><strong>클라이언트 보안 비밀번호</strong></label>
-            <input id="tool_oauth_client_secret" name="tool_oauth_client_secret" class="form-control form-control-sm" type="text" value="{{ args.tool_oauth_client_secret }}" required>
-            <br>
+            <input id="tool_oauth_client_secret" name="tool_oauth_client_secret" class="form-control form-control-sm mb-3" type="text" value="{{ args.tool_oauth_client_secret }}" required>
             <label for="tool_oauth_scopes"><strong>승인 범위</strong></label>
             <textarea id="tool_oauth_scopes" name="tool_oauth_scopes" class="form-control form-control-sm" rows="5" required>{{ args.tool_oauth_scopes }}</textarea>
-            <small class="form-text text-muted">
+            <div class="form-text text-muted mb-3">
                 <a href="https://developers.google.com/identity/protocols/oauth2/scopes#drive" target="_blank">https://developers.google.com/identity/protocols/oauth2/scopes#drive</a><br>
                 <a href="https://developers.google.com/identity/protocols/oauth2/scopes#driveactivity" target="_blank">https://developers.google.com/identity/protocols/oauth2/scopes#driveactivity</a>
-
-            </small>
-            <br>
+            </div>            
             <label for="tool_oauth_redirect"><strong>리디렉션 주소</strong></label>
             <input id="tool_oauth_redirect" name="tool_oauth_redirect" class="form-control form-control-sm" type="text" value="{{ args.tool_oauth_redirect }}" required placeholder="https://your.flaskfarm.com/flaskfarmaider/tool/oauth">
-            <small class="form-text text-warning">
+            <div class="form-text text-warning mb-3">
                 https://your.flaskfarm.com/flaskfarmaider/tool/oauth<br>리디렉션 URL은 "OAuth 2.0 클라이언트 ID"의 "승인된 리디렉션 URI"에 사전 등록되어 있어야 합니다.<br>리디렉션 URL은 https로 시작해야 하며 최상위 도메인이 <a href="https://publicsuffix.org/list" target="_blank">Public suffix list</a>에 존재하는 도메인이어야 합니다.<br><a href="https://console.cloud.google.com/apis/credentials" target="_blank">https://console.cloud.google.com/apis/credentials</a>
-            </small>
-            <br>
+            </div>            
             <label for="tool_oauth_refresh_token"><strong>리프레시 토큰</strong></label>
             <input id="tool_oauth_refresh_token" name="tool_oauth_refresh_token" class="form-control form-control-sm" type="text" value="{{ args.tool_oauth_refresh_token }}">
-            <small class="form-text text-warning">
+            <div class="form-text text-warning mb-3">
                 인증 요청 후 자동으로 입력 및 저장됩니다.
-            </small>
+            </div>
 
         </div>
     </div>
