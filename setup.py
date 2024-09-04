@@ -103,6 +103,7 @@ def default_route_socketio_page(page):
     page.socketio_list = page.socketio_list or []
 
     @F.socketio.on('connect', namespace=f'/{P.package_name}/{module.name}/{page.name}')
+    @F.login_required
     def connect():
         P.logger.debug(f'socket_connect : {P.package_name}/{module.name}/{page.name}')
         page.socketio_list.append(request.sid)
