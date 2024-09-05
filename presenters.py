@@ -3,6 +3,7 @@ import traceback
 import functools
 import pathlib
 import time
+import datetime
 
 import flask
 import google_auth_oauthlib.flow
@@ -539,6 +540,8 @@ class OAuthTool(PageBase):
             'tool_oauth_refresh_token': '',
             'tool_oauth_scopes': '',
             'tool_oauth_redirect': '',
+            'tool_oauth_credentials_json': '',
+            'tool_oauth_rclone_token': '',
         }
 
     def get_template_args(self) -> dict:
@@ -572,7 +575,16 @@ class OAuthTool(PageBase):
                 state = flask.session['oauth_state']
                 flow = google_auth_oauthlib.flow.Flow.from_client_config(client_config, CONFIG.get_list('tool_oauth_scopes'), redirect_uri=CONFIG.get('tool_oauth_redirect'), state=state)
                 flow.fetch_token(code=req.args.get('code'))
+                expiry = flow.credentials.expiry.replace(tzinfo=datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')
+                rclone_token = {
+                    'access_token': flow.credentials.token,
+                    'token_type': 'Bearer',
+                    'refresh_token': flow.credentials.refresh_token,
+                    'expiry': f'{expiry}+00:00',
+                }
                 CONFIG.set('tool_oauth_refresh_token', flow.credentials.refresh_token)
+                CONFIG.set('tool_oauth_credentials_json', flow.credentials.to_json())
+                CONFIG.set('tool_oauth_rclone_token', json.dumps(rclone_token, separators=(',', ':')))
                 return flask.redirect(CONFIG.get('tool_oauth_redirect'))
             return flask.render_template(f'{PLUGIN.package_name}_{self.parent.name}_{self.name}.html', args=args)
         except:
