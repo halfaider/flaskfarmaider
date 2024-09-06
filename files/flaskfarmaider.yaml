@@ -39,6 +39,8 @@ dependencies:
     plugins:
       - sjva
       - support_site
+    commands:
+      - 'pip install google-api-python-client'
   make_yaml:
     repo: 'https://github.com/kihyyo/make_yaml'
     plugins:
@@ -125,6 +127,8 @@ dependencies:
     repo: 'https://github.com/halfaider/flaskfarmaider'
     plugins:
       - plex_mate
+    commands:
+      - 'pip install google-auth-oauthlib'
   alive:
     repo: 'https://github.com/by275/alive'
     commands:
