@@ -683,6 +683,8 @@ class StartupAider(Aider):
         startup_executable = startup_executable.lower() == 'true'
         if startup_executable:
             for command in commands:
+                if not command:
+                    continue
                 command = shlex.split(command)
                 timeout = CONFIG.get_int('setting_startup_timeout') or 0
                 timeout = timeout if timeout > 0 else None
