@@ -4,6 +4,7 @@ import functools
 import pathlib
 import time
 import datetime
+import os
 
 import flask
 import google_auth_oauthlib.flow
@@ -515,6 +516,9 @@ class OAuthTool(PageBase):
             'tool_oauth_credentials_json': '',
             'tool_oauth_rclone_token': '',
         }
+        # https://github.com/oauthlib/oauthlib/blob/564d526fdbdc32a936e4b5ddac186c26024f626b/oauthlib/oauth2/rfc6749/parameters.py#L466
+        os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+
 
     def get_template_args(self) -> dict:
         '''override'''
