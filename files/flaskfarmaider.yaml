@@ -38,7 +38,6 @@ dependencies:
     repo: 'https://github.com/soju6jan/gds_tool'
     plugins:
       - sjva
-      - support_site
     commands:
       - 'pip install google-api-python-client'
   make_yaml:
@@ -62,10 +61,6 @@ dependencies:
     repo: 'https://github.com/by275/static_host'
   rclone:
     repo: 'https://github.com/flaskfarm/rclone'
-    plugins:
-      - sjva
-      - support_site
-      - wv_tool
     packages:
       - fuse3
       - unzip
