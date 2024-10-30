@@ -145,6 +145,7 @@ class SettingAider(Aider):
                 if text is None:
                     depends = file.read()
                 else:
+                    file.truncate(0)
                     file.write(text)
                     depends = text
             return depends
