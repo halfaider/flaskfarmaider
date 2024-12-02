@@ -128,3 +128,5 @@ dependencies:
     repo: 'https://github.com/by275/alive'
     commands:
       - 'pip install streamlink<6.6'
+    plugins:
+      - support_site
