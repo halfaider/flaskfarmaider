@@ -69,8 +69,6 @@ dependencies:
       - 'bash /data/install_rclone.sh'
   support_site:
     repo: 'https://github.com/flaskfarm/support_site'
-    plugins:
-      - wv_tool
   metadata:
     repo: 'https://github.com/flaskfarm/metadata'
     plugins:
