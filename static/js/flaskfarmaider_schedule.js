@@ -135,7 +135,7 @@ let DEFAULT_CONTEXT_MENU_OPTIONS = {
 }
 
 function browserCommand(cmd) {
-    let query = 'target=' + cmd.path;
+    let query = 'target=' + encodeURIComponent(cmd.path);
     query += '&rclone_remote=' + SETTING_RCLONE_REMOTES[cmd.rclone_remote];
     query += '&recursive=' + cmd.recursive;
     query += '&scan_mode=' + cmd.scan_mode;
