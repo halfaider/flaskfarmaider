@@ -2,6 +2,7 @@ import json
 import logging
 import urllib.parse
 import traceback
+import html
 
 import flask
 import flask_login
@@ -48,7 +49,7 @@ def commad_process_route_system(command: str, arg1: str | None, arg2: str | None
         username = arg1
         password = arg2
         remember = (arg3 == 'true')
-        client_info = f"user={username} ip={get_client_ip(request)}"
+        client_info = f"user={html.escape(username)} ip={get_client_ip(request)}"
         failed_msg = f'로그인 실패: {client_info}'
         if username not in FRAMEWORK.users:
             SYSTEM_PLUGIN.logger.warning(failed_msg)
@@ -149,6 +150,14 @@ def after_request(response: flask.Response) -> flask.Response:
             'headers': request.headers,
             'hostname': urllib.parse.urlparse(request.base_url).hostname,
         }
+        for key_ in ('path', 'form', 'agent'):
+            if namespace.get(key_):
+                namespace[key_] = html.escape(namespace[key_])
+        headers = []
+        if namespace.get('headers'):
+            for header in namespace.get('headers', ()):
+                headers.append(f'{html.escape(header[0])}: {html.escape(header[1])}')
+            namespace['headers'] = '\n'.join(headers)
         log_format = CONFIG.get('setting_logging_access_format') or '{remote} {method} "{path}" {status}'
         try:
             CONFIG.access_logger.info(log_format.format(**namespace))
