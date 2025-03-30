@@ -582,32 +582,18 @@ class RcloneAider(Aider):
         return result
 
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> None:
-        local_path = pathlib.Path(local_path)
         remote_path = pathlib.Path(update_path(str(local_path), self.mappings)) if self.mappings else local_path
-        parents: list[pathlib.Path] = list(remote_path.parents)
-        if local_path.is_file():
-            to_be_tested = parents.pop(0).as_posix()
+        for parent in remote_path.parents:
+            result = self._vfs_refresh(str(parent))
+            LOGGER.info(f'Rclone: {result}')
+            if result.get('result', {}).get(str(parent), '').lower() == 'ok':
+                break
         else:
-            LOGGER.debug(f'It is a directory or not exists locally: {str(local_path)}')
-            to_be_tested = remote_path.as_posix()
-        not_exists_paths = []
-        result = self._vfs_refresh(to_be_tested, recursive)
-        while not result['result'].get(to_be_tested) == 'OK':
-            if result['result'].get(to_be_tested) == 'file does not exist':
-                not_exists_paths.insert(0, to_be_tested)
-            if parents:
-                to_be_tested = parents.pop(0).as_posix()
-                result = self._vfs_refresh(to_be_tested, recursive)
-            else:
-                LOGGER.warning('Hit the top-level path.')
-                break
-        for path in not_exists_paths:
-            if local_path.exists():
-                break
-            result = self._vfs_refresh(path, recursive)
-            if not result['result'].get(path) == 'OK':
-                # If it is a file > 'invalid argument'
-                break
+            LOGGER.error(f'It has hit the root path: "{str(remote_path)}"')
+            return
+        if not pathlib.Path(local_path).is_file():
+            result = self._vfs_refresh(str(remote_path), recursive)
+            LOGGER.info(f'Rclone: {result}')
 
     @check_metadata_cache
     def _vfs_forget(self, remote_path: str, fs: str = None) -> dict[str, Any]:
