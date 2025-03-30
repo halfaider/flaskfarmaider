@@ -584,15 +584,15 @@ class RcloneAider(Aider):
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> None:
         remote_path = pathlib.Path(update_path(str(local_path), self.mappings)) if self.mappings else local_path
         for parent in remote_path.parents:
-            result = self._vfs_refresh(str(parent))
+            result = self._vfs_refresh(parent.as_posix())
             LOGGER.info(f'Rclone: {result}')
-            if result.get('result', {}).get(str(parent), '').lower() == 'ok':
+            if result.get('result', {}).get(parent.as_posix(), '').lower() == 'ok':
                 break
         else:
-            LOGGER.error(f'It has hit the root path: "{str(remote_path)}"')
+            LOGGER.error(f'It has hit the root path: "{remote_path.as_posix()}"')
             return
         if not pathlib.Path(local_path).is_file():
-            result = self._vfs_refresh(str(remote_path), recursive)
+            result = self._vfs_refresh(remote_path.as_posix(), recursive)
             LOGGER.info(f'Rclone: {result}')
 
     @check_metadata_cache

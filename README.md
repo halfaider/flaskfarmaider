@@ -1,5 +1,7 @@
 
 # 변경점
+- v1.3.41
+    - vfs/refresh 버그 수정
 - v1.3.40
     - vfs/refresh 버그 수정
 - v1.3.39
