@@ -48,6 +48,11 @@
                     <div class="form-text text-muted mb-3">
                         {remote}: 클라이언트 IP<br>{method}: HTTP 메소드 (GET, POST, ...)<br>{path}: 요청 경로<br>{status}: HTTP 응답 상태 코드(200, 404, ...)<br>{length}: 응답 크기<br>{agent}: User-Agent<br>{form}: form 데이터<br>{headers}: HTTP 헤더<br>{hostname}: 호스트명
                     </div>
+                    <label for="setting_logging_access_regex"><strong>접속 로그 필터 정규표현식</strong></label>
+                    <textarea id="setting_logging_access_regex" name="setting_logging_access_regex" class="form-control form-control-sm" rows="5" placeholder="/static/">{{ args.setting_logging_access_regex }}</textarea>
+                    <div class="form-text text-muted mb-3">
+                        필터링할 내용을 정규표현식으로 한 줄씩 작성<br>정규표현식과 매칭되는 로그는 출력하지 않음
+                    </div>
                 </div>
                 <div class="col-md">
                     <label for="setting_config_file"><strong>기타 설정 파일</strong></label>

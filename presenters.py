@@ -45,6 +45,7 @@ class Setting(ModuleBase):
             'setting_rclone_remotes': '[""]',
             'setting_rclone_mappings': '[""]',
             'setting_config_file': f'{FRAMEWORK.config["path_data"]}/db/{__package__}.yaml',
+            'setting_logging_access_regex': '',
         }
 
     def get_template_args(self) -> dict:

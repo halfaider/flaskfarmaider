@@ -3,6 +3,7 @@ import logging
 import urllib.parse
 import traceback
 import html
+import re
 
 import flask
 import flask_login
@@ -159,8 +160,17 @@ def after_request(response: flask.Response) -> flask.Response:
                 headers.append(f'{html.escape(header[0])}: {html.escape(header[1])}')
             namespace['headers'] = '\n'.join(headers)
         log_format = CONFIG.get('setting_logging_access_format') or '{remote} {method} "{path}" {status}'
+        if regexes := CONFIG.get('setting_logging_access_regex'):
+            filters = [re.compile(line) for line in regexes.splitlines() if line]
+        else:
+            filters = []
         try:
-            CONFIG.access_logger.info(log_format.format(**namespace))
+            log_message = log_format.format(**namespace)
+            for filter in filters:
+                if filter.search(log_message):
+                    break
+            else:
+                CONFIG.access_logger.info(log_message)
         except:
             LOGGER.exception(f'엑세스 로그 형식 확인: {log_format}')
     return response
