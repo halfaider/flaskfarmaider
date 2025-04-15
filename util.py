@@ -5,7 +5,7 @@ import pathlib
 import datetime
 import os
 import traceback
-from typing import Any
+from typing import Any, Callable
 from threading import Thread
 
 import flask
@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 class ThreadHasReturn(Thread):
 
-    def __init__(self, group=None, target: callable = None, name: str = None, args: tuple | list = (),
-                 kwargs: dict = {}, daemon: bool = None, callback: callable = None) -> None:
+    def __init__(self, group=None, target: Callable = None, name: str = None, args: tuple | list = (),
+                 kwargs: dict = {}, daemon: bool = None, callback: Callable = None) -> None:
         Thread.__init__(self, group, target, name, args, kwargs, daemon=daemon)
         self._return = None
         self.callback = callback

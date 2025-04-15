@@ -2,7 +2,7 @@ import sqlite3
 import json
 import urllib.parse
 
-from .setup import LOGGER, CONFIG, FRAMEWORK
+from .setup import LOGGER, CONFIG
 from .constants import TASK_KEYS, SCAN_MODE_KEYS
 
 

@@ -5,6 +5,7 @@ import pathlib
 import time
 import datetime
 import os
+from typing import Callable
 
 import flask
 import google_auth_oauthlib.flow
@@ -417,7 +418,7 @@ class TrashTool(PageBase):
             'tool_trash_last_list_option': ''
         }
 
-    def check_status(func: callable) -> callable:
+    def check_status(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrap(*args, **kwds) -> dict:
             status = CONFIG.get('tool_trash_task_status')

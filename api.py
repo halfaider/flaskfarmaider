@@ -3,7 +3,7 @@ import urllib.parse
 import sqlite3
 import functools
 from threading import Thread
-from typing import Any
+from typing import Any, Callable
 
 import flask
 import requests
@@ -21,7 +21,7 @@ from .setup import (
 
 class Base:
 
-    _DB_VERSIONS = ['1']
+    _DB_VERSIONS = ('1',)
 
     def __init__(self, *args, **kwds) -> None:
         super().__init__(*args, **kwds)
@@ -42,7 +42,7 @@ class Base:
     def prerender(self, sub: str, req: flask.Request) -> None:
         self.set_recent_menu(req)
 
-    def run_async(self, func: callable, args: tuple = (), kwargs: dict = {}, **opts) -> None:
+    def run_async(self, func: Callable, args: tuple = (), kwargs: dict = {}, **opts) -> None:
         if celery_is_active():
             result = func.apply_async(args=args, kwargs=kwargs, link=self.celery_link.s(), **opts)
             # 결과는 serve 중인 메인 스레드에 출력해야 하므로
@@ -86,7 +86,7 @@ class Base:
     def returns(self, success: str, msg: str = None, title: str = None, modal: str = None, json: dict = None, reload: bool = False, data: dict = None) -> dict:
         return {'ret': success, 'msg': msg, 'title': title, 'modal': modal, 'json': json, 'reload': reload, 'data': data}
 
-    def _migration(self, version_key: str, table: str, migrate_func: callable) -> None:
+    def _migration(self, version_key: str, table: str, migrate_func: Callable) -> None:
         version = CONFIG.get(version_key) or self._DB_VERSIONS[0]
         LOGGER.debug(f'{table} 현재 DB 버전: {version}')
         with FRAMEWORK.app.app_context():
@@ -232,7 +232,7 @@ class ModuleBase(Base, PluginModuleBase):
         '''override'''
         super().process_discord_data(data)
 
-    def start_celery(self, func: callable, *args, on_message: callable = None, page: PluginPageBase = None) -> dict:
+    def start_celery(self, func: Callable, *args, on_message: Callable = None, page: PluginPageBase = None) -> dict:
         '''override'''
         if FRAMEWORK.config['use_celery']:
             result = func.apply_async(args)
@@ -347,7 +347,7 @@ class PageBase(Base, PluginPageBase):
         '''override'''
         return super().db_delete(day)
 
-    def start_celery(self, func: callable, *args, on_message: callable = None) -> dict:
+    def start_celery(self, func: Callable, *args, on_message: Callable = None) -> dict:
         '''override'''
         return self.parent.start_celery(func, *args, on_message, page=self)
 
@@ -454,7 +454,7 @@ class PluginAider(Aider):
     def plugin(self) -> PluginModuleBase | None:
         return FRAMEWORK.PluginManager.get_plugin_instance(self.name)
 
-    def check_plugin(func: callable) -> callable:
+    def check_plugin(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrap(self, *args, **kwds):
             if self.plugin:

@@ -10,7 +10,7 @@ import platform
 import time
 import urllib.parse
 import functools
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 
@@ -25,18 +25,18 @@ class ScheduleAider(Aider):
 
     def start_trash(self, schedule: ScheduleModel) -> None:
         refresh = scan = empty = False
-        if schedule.task in [TOOL_TRASH_KEYS[0], TOOL_TRASH_KEYS[3], TOOL_TRASH_KEYS[4]]:
+        if schedule.task in (TOOL_TRASH_KEYS[0], TOOL_TRASH_KEYS[3], TOOL_TRASH_KEYS[4]):
             refresh = True
-        if schedule.task in [TOOL_TRASH_KEYS[1], TOOL_TRASH_KEYS[3], TOOL_TRASH_KEYS[4]]:
+        if schedule.task in (TOOL_TRASH_KEYS[1], TOOL_TRASH_KEYS[3], TOOL_TRASH_KEYS[4]):
             scan = True
-        if schedule.task in [TOOL_TRASH_KEYS[2], TOOL_TRASH_KEYS[4]]:
+        if schedule.task in (TOOL_TRASH_KEYS[2], TOOL_TRASH_KEYS[4]):
             empty = True
         plex_aider = PlexmateAider()
         if not schedule.task == TOOL_TRASH_KEYS[2]:
             rclone_aider = RcloneAider(schedule.rclone_remote)
             trashes: dict = plex_aider.get_trashes(schedule.section_id, 1, -1)
             if trashes:
-                paths: list[str] = {pathlib.Path(row['file']).parent.as_posix() for row in trashes}
+                paths: set[str] = {pathlib.Path(row['file']).parent.as_posix() for row in trashes}
                 for path in paths:
                     if CONFIG.get('tool_trash_task_status') != STATUS_KEYS[1]:
                         LOGGER.info('작업을 중지합니다.')
@@ -96,7 +96,7 @@ class ScheduleAider(Aider):
         targets = {s for s in plex_aider.get_scan_items('READY')}
         if targets:
             for target in targets:
-                if target.mode in ['REMOVE_FILE', 'REMOVE_FOLDER']:
+                if target.mode in ('REMOVE_FILE', 'REMOVE_FOLDER'):
                     rclone_aider.vfs_forget(target.target)
                 else:
                     rclone_aider.vfs_refresh(target.target, schedule.recursive)
@@ -188,7 +188,7 @@ class PlexmateAider(PluginAider):
             periodics.append({'idx': idx, 'name': name, 'desc': job.get('설명', '')})
         return periodics
 
-    def get_trashes(self, section_id: int, page_no: int = 1, limit: int = 10) -> dict:
+    def get_trashes(self, section_id: int, page_no: int = 1, limit: int = 10) -> list[dict]:
         query = '''
         SELECT media_items.id, media_items.metadata_item_id, media_items.deleted_at, media_parts.file, media_parts.deleted_at
         FROM media_parts, media_items
@@ -242,23 +242,22 @@ class PlexmateAider(PluginAider):
         주의:
             계속 SCANNING 상태로 유지되는 항목은 확인 후 조치.
         '''
-        scans = self.get_scan_items('SCANNING')
-        if scans:
-            model = self.get_scan_model()
-            for scan in scans:
-                if int((datetime.datetime.now() - scan.process_start_time).total_seconds() / 60) >= max_scan_time:
-                    LOGGER.warning(f'스캔 시간 {max_scan_time}분 초과: {scan.target}')
-                    LOGGER.warning(f'스캔 QUEUE에서 제외: {scan.target}')
-                    # 대안 1
-                    scan.remove_in_queue(scan)
-                    scan.set_status('FINISH_TIMEOVER', save=True)
-                    '''
-                    # 대안 2
-                    model.delete_by_id(scan.id)
-                    new_item = model(scan.target)
-                    new_item.id = scan.id
-                    new_item.save()
-                    '''
+        scans = self.get_scan_items('SCANNING') or ()
+        model = self.get_scan_model()
+        for scan in scans:
+            if int((datetime.datetime.now() - scan.process_start_time).total_seconds() / 60) >= max_scan_time:
+                LOGGER.warning(f'스캔 시간 {max_scan_time}분 초과: {scan.target}')
+                LOGGER.warning(f'스캔 QUEUE에서 제외: {scan.target}')
+                # 대안 1
+                scan.remove_in_queue(scan)
+                scan.set_status('FINISH_TIMEOVER', save=True)
+                '''
+                # 대안 2
+                model.delete_by_id(scan.id)
+                new_item = model(scan.target)
+                new_item.id = scan.id
+                new_item.save()
+                '''
 
     def check_timeover(self, item_range: str) -> None:
         '''
@@ -266,15 +265,14 @@ class PlexmateAider(PluginAider):
         ID가 item_range 범위 안에 있는 TIMEOVER 항목들을 다시 READY 로 변경
         주의: 계속 시간 초과로 뜨는 항목은 확인 후 수동으로 조치
         '''
-        overs = self.get_scan_items('FINISH_TIMEOVER')
-        if overs:
-            start_id, end_id = list(map(int, item_range.split('~')))
-            for over in overs:
-                if over.id in range(start_id, end_id + 1):
-                    LOGGER.warning(f'READY 로 상태 변경: {over.id} {over.target}')
-                    over.filecheck_count = 0
-                    over.created_time = datetime.datetime.now()
-                    over.set_status('READY', save=True)
+        overs = self.get_scan_items('FINISH_TIMEOVER') or ()
+        start_id, end_id = list(map(int, item_range.split('~')))
+        for over in overs:
+            if over.id in range(start_id, end_id + 1):
+                LOGGER.warning(f'READY 로 상태 변경: {over.id} {over.target}')
+                over.filecheck_count = 0
+                over.created_time = datetime.datetime.now()
+                over.set_status('READY', save=True)
 
     def get_scan_targets(self, target: str, section_id: int = None) -> dict[str, int]:
         mappings = parse_mappings(CONFIG.get_json('setting_plex_mappings'))
@@ -476,7 +474,7 @@ class RcloneAider(Aider):
     def mappings(self) -> str:
         return self._mappings
 
-    def command(method: callable) -> callable:
+    def command(method: Callable) -> Callable:
         @functools.wraps(method)
         def wrapper(self, *args: tuple, **kwds: dict) -> dict[str, Any]:
             data = method(self, *args, **kwds)
@@ -500,7 +498,7 @@ class RcloneAider(Aider):
             return result
         return wrapper
 
-    def check_metadata_cache(method: callable) -> callable:
+    def check_metadata_cache(method: Callable) -> Callable:
         @functools.wraps(method)
         def wrapper(self, *args: tuple, **kwds: dict) -> dict[str, Any]:
             start_dirs, start_files = self.get_metadata_cache()
@@ -584,10 +582,12 @@ class RcloneAider(Aider):
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> None:
         remote_path = pathlib.Path(update_path(str(local_path), self.mappings)) if self.mappings else local_path
         for parent in remote_path.parents:
-            result = self._vfs_refresh(parent.as_posix())
+            result = self._vfs_refresh(parent.as_posix()) or {}
             LOGGER.info(f'Rclone: {result}')
-            if result.get('result', {}).get(parent.as_posix(), '').lower() == 'ok':
+            if ((result.get('result') or {}).get(parent.as_posix()) or '').lower() == 'ok':
                 break
+            if (result.get('result') or {}).get('error'):
+                return
         else:
             LOGGER.error(f'It has hit the root path: "{remote_path.as_posix()}"')
             return
