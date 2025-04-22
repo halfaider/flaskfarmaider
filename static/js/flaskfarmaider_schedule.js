@@ -418,8 +418,10 @@ function setFormByTask(task) {
     $('input[id^="sch-schedule-mode"]:radio').prop('disabled', false);
     E_CLEAR_SECTION.prop('disabled', false);
     E_CLEAR_LEVEL.prop('disabled', false);
-    E_INTERVAL.prop('disabled', false);
-    E_SCH_AUTO.bootstrapToggle('enable');
+    if (E_SCH_RADIO_2.prop('checked')) {
+        E_INTERVAL.prop('disabled', false);
+        E_SCH_AUTO.bootstrapToggle('enable');
+    }
     switch(task) {
         case TASK_KEYS[0]:
         case TASK_KEYS[1]:
