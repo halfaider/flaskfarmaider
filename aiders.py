@@ -529,13 +529,15 @@ class RcloneAider(Aider):
         }
 
     @command
-    def vfs__refresh(self, remote_path: str, recursive: bool = False, fs: str = None, interface: str = None) -> dict[str, Any]:
-        return {
-            'dir': remote_path,
+    def vfs__refresh(self, remote_path: str = None, recursive: bool = False, fs: str = None, interface: str = None) -> dict[str, Any]:
+        data = {
             'recursive': f'{bool(recursive)}'.lower(),
             'interface': interface,
             'fs': fs or self.vfs,
         }
+        if remote_path:
+            data['dir'] = remote_path
+        return data
 
     @command
     def vfs__forget(self, remote_path: str, fs: str = None, interface: str = None) -> dict[str, Any]:
@@ -575,22 +577,24 @@ class RcloneAider(Aider):
         return {'interface': interface}
 
     @check_metadata_cache
-    def _vfs_refresh(self, remote_path: str, recursive: bool = False, fs: str = None) -> dict[str, Any]:
+    def _vfs_refresh(self, remote_path: str = None, recursive: bool = False, fs: str = None) -> dict[str, Any]:
         result: dict = self.vfs__refresh(remote_path, recursive, fs)
         return result
 
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> None:
         remote_path = pathlib.Path(update_path(str(local_path), self.mappings)) if self.mappings else local_path
-        for parent in remote_path.parents[:-1]:
-            result = self._vfs_refresh(parent.as_posix()) or {}
+        for parent in remote_path.parents:
+            if parent == parent.parent:
+                result = self._vfs_refresh() or {}
+            else:
+                result = self._vfs_refresh(parent.as_posix()) or {}
             LOGGER.info(f'Rclone: {result}')
             if ((result.get('result') or {}).get(parent.as_posix()) or '').lower() == 'ok':
                 break
             if (result.get('result') or {}).get('error'):
                 return
         else:
-            LOGGER.error(f'It has hit the root path: "{remote_path.as_posix()}"')
-            return
+            LOGGER.warning(f'It has hit the root path: "{remote_path.as_posix()}"')
         if not pathlib.Path(local_path).is_file():
             result = self._vfs_refresh(remote_path.as_posix(), recursive)
             LOGGER.info(f'Rclone: {result}')
