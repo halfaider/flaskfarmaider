@@ -581,7 +581,7 @@ class RcloneAider(Aider):
 
     def vfs_refresh(self, local_path: str, recursive: bool = False, fs: str = None) -> None:
         remote_path = pathlib.Path(update_path(str(local_path), self.mappings)) if self.mappings else local_path
-        for parent in remote_path.parents:
+        for parent in remote_path.parents[:-1]:
             result = self._vfs_refresh(parent.as_posix()) or {}
             LOGGER.info(f'Rclone: {result}')
             if ((result.get('result') or {}).get(parent.as_posix()) or '').lower() == 'ok':
