@@ -8,6 +8,7 @@ import re
 import flask
 import flask_login
 from flask import request
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from framework.init_main import Framework
 from framework.scheduler import Job as FrameworkJob
@@ -26,7 +27,7 @@ PLUGIN = P = create_plugin_instance(OPTS)
 LOGGER = PLUGIN.logger
 CONFIG = PLUGIN.ModelSetting
 FRAMEWORK = F = Framework.get_instance()
-
+FRAMEWORK.app.wsgi_app = ProxyFix(FRAMEWORK.app.wsgi_app, x_proto=1)
 
 def celery_is_active() -> bool:
     try:

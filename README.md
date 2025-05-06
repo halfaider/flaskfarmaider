@@ -1,5 +1,7 @@
 
 # 변경점
+- v1.3.47
+    - X-Forwarded-Proto 헤더 참조
 - v1.3.46
     - root 폴더 vfs/refresh 가능하도록 수정
 - v1.3.45
