@@ -1,5 +1,7 @@
 
 # 변경점
+- v1.3.48
+    - Flaskfarm 로그 보안 및 X-Forwarded-Proto 적용 수정
 - v1.3.47
     - X-Forwarded-Proto 헤더 참조
 - v1.3.46

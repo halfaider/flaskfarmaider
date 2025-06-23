@@ -2,13 +2,11 @@ import json
 import logging
 import urllib.parse
 import traceback
-import html
 import re
 
 import flask
 import flask_login
 from flask import request
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 from framework.init_main import Framework
 from framework.scheduler import Job as FrameworkJob
@@ -27,7 +25,7 @@ PLUGIN = P = create_plugin_instance(OPTS)
 LOGGER = PLUGIN.logger
 CONFIG = PLUGIN.ModelSetting
 FRAMEWORK = F = Framework.get_instance()
-FRAMEWORK.app.wsgi_app = ProxyFix(FRAMEWORK.app.wsgi_app, x_proto=1)
+
 
 def celery_is_active() -> bool:
     try:
@@ -51,7 +49,7 @@ def commad_process_route_system(command: str, arg1: str | None, arg2: str | None
         username = arg1
         password = arg2
         remember = (arg3 == 'true')
-        client_info = f"user={html.escape(username)} ip={get_client_ip(request)}"
+        client_info = f"user={username} ip={get_client_ip(request)}"
         failed_msg = f'로그인 실패: {client_info}'
         if username not in FRAMEWORK.users:
             SYSTEM_PLUGIN.logger.warning(failed_msg)
@@ -152,14 +150,6 @@ def after_request(response: flask.Response) -> flask.Response:
             'headers': request.headers,
             'hostname': urllib.parse.urlparse(request.base_url).hostname,
         }
-        for key_ in ('path', 'form', 'agent'):
-            if namespace.get(key_):
-                namespace[key_] = html.escape(namespace[key_])
-        headers = []
-        if namespace.get('headers'):
-            for header in namespace.get('headers', ()):
-                headers.append(f'{html.escape(header[0])}: {html.escape(header[1])}')
-            namespace['headers'] = '\n'.join(headers)
         log_format = CONFIG.get('setting_logging_access_format') or '{remote} {method} "{path}" {status}'
         if regexes := CONFIG.get('setting_logging_access_regex'):
             filters = [re.compile(line) for line in regexes.splitlines() if line]
