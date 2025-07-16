@@ -83,6 +83,7 @@ dependencies:
     repo: 'https://github.com/flaskfarm/plex_mate'
     commands:
       - 'pip install xmltodict'
+      - 'pip install tmdbsimple'
   vnStat:
     repo: 'https://github.com/by275/vnStat'
     packages:
