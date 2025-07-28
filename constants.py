@@ -78,7 +78,6 @@ PLEX_MEDIA_TYPE_VALUES = {
 }
 
 OPTS = {
-    'filepath' : __file__,
     'use_db': True,
     'use_default_setting': True,
     'home_module': 'schedule',

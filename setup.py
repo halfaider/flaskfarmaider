@@ -21,6 +21,7 @@ from support import AlchemyEncoder
 from .constants import OPTS
 from .util import get_client_ip, get_rotating_file_logger
 
+OPTS['filepath'] = __file__
 PLUGIN = P = create_plugin_instance(OPTS)
 LOGGER = PLUGIN.logger
 CONFIG = PLUGIN.ModelSetting

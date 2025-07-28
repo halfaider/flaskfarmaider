@@ -69,6 +69,8 @@ dependencies:
       - 'bash /data/install_rclone.sh'
   support_site:
     repo: 'https://github.com/flaskfarm/support_site'
+    commands:
+      - 'pip install imagehash'
   metadata:
     repo: 'https://github.com/flaskfarm/metadata'
     plugins:
