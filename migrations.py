@@ -15,6 +15,7 @@ def migrate_schedule(ver: str, table, cs: sqlite3.Cursor) -> None:
         '5': migrate_schedule_v6,
         '6': migrate_schedule_v7,
         '7': migrate_schedule_v8,
+        '8': migrate_schedule_v9,
     }
     migrations.get(ver, migrate_schedule_v1)(cs, table)
 
@@ -183,6 +184,13 @@ def migrate_schedule_v7(cs: sqlite3.Cursor, table: str) -> None:
 
 
 def migrate_schedule_v8(cs: sqlite3.Cursor, table: str) -> None:
+    LOGGER.debug('DB 버전 8 로 마이그레이션')
+    cols = [row[1] for row in cs.execute(f'PRAGMA table_info({table});').fetchall()]
+    if 'clear_orphans' not in cols:
+        cs.execute(f'ALTER TABLE "{table}" ADD COLUMN "clear_orphans" BOOLEAN DEFAULT FALSE NOT NULL')
+
+
+def migrate_schedule_v9(cs: sqlite3.Cursor, table: str) -> None:
     # Reseved for future use
     pass
 

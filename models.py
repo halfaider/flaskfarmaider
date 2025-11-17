@@ -29,6 +29,7 @@ class ScheduleModel(Model):
     clear_type = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     clear_section = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
     clear_level = FRAMEWORK.db.Column(FRAMEWORK.db.String)
+    clear_orphans = FRAMEWORK.db.Column(FRAMEWORK.db.Boolean)
     section_id = FRAMEWORK.db.Column(FRAMEWORK.db.Integer)
     rclone_remote = FRAMEWORK.db.Column(FRAMEWORK.db.String)
     # Column, type, default value
@@ -44,6 +45,7 @@ class ScheduleModel(Model):
         'sch-clear-type': (clear_type, clear_type.type.python_type, ''),
         'sch-clear-level': (clear_level, clear_level.type.python_type, ''),
         'sch-clear-section': (clear_section, clear_section.type.python_type, -1),
+        'sch-clear-orphans': (clear_orphans, clear_orphans.type.python_type, False),
         'sch-target-section': (section_id, section_id.type.python_type, -1),
         'sch-rclone-remote': (rclone_remote, rclone_remote.type.python_type, ''),
     }
@@ -70,7 +72,7 @@ class ScheduleModel(Model):
         formdata.pop('checkbox-helper', None)
         if formdata.get('sch-task', [-1])[0] == TASK_KEYS[5]:
             formdata.update({'sch-schedule-interval': ['매 시작']})
-        for key in ['sch-recursive', 'sch-schedule-auto-start']:
+        for key in ['sch-recursive', 'sch-schedule-auto-start', 'sch-clear-orphans']:
             val = formdata.get(key)
             if val and type(val[0]) is str:
                 formdata[key] = [val[0].lower() == 'on']

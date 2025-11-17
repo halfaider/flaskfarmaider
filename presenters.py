@@ -152,7 +152,7 @@ class Setting(ModuleBase):
 
 class Schedule(ModuleBase):
 
-    _DB_VERSIONS = ['1', '2', '3', '4', '5', '6', '7']
+    _DB_VERSIONS = ['1', '2', '3', '4', '5', '6', '7', '8']
 
     def __init__(self, plugin: PluginBase) -> None:
         super().__init__(plugin, name='schedule')

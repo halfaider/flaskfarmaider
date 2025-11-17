@@ -83,7 +83,7 @@ class ScheduleAider(Aider):
 
     def start_clear(self, schedule: ScheduleModel) -> None:
         '''clear'''
-        PlexmateAider().clear_section(schedule.clear_section, schedule.clear_type, schedule.clear_level)
+        PlexmateAider().clear_section(schedule.clear_section, schedule.clear_type, schedule.clear_level, schedule.clear_orphans)
 
     def start_pm_ready_refresh(self, schedule: ScheduleModel) -> None:
         '''pm_ready_refresh'''
@@ -362,14 +362,17 @@ class PlexmateAider(PluginAider):
     def get_section_updated_at(self, section_id: int) -> int:
         return self.db.library_section(section_id)['updated_at']
 
-    def clear_section(self, section_id: int, clear_type: str, clear_level: str) -> None:
+    def clear_section(self, section_id: int, clear_type: str, clear_level: str, clear_orphans: bool) -> None:
         mod = self.get_module('clear')
         page = mod.get_page(clear_type)
         sec = self.get_section_by_id(section_id)
         if sec:
             info = f'{clear_level}, {sec.get("name")}'
+            args = [clear_level, section_id, 'false']
+            if clear_type == SECTION_TYPE_KEYS[1]:
+                args.append(str(clear_orphans).lower())
             LOGGER.info(f'파일 정리 시작: {info}')
-            page.task_interface(clear_level, section_id, 'false').join()
+            page.task_interface(*args).join()
             LOGGER.info(f'파일 정리 종료: {info}')
         else:
             LOGGER.warning(f'존재하지 않는 섹션입니다: {section_id}')
