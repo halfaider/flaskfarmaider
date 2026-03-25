@@ -70,7 +70,8 @@ dependencies:
   support_site:
     repo: 'https://github.com/flaskfarm/support_site'
     commands:
-      - 'pip install imagehash'
+      - 'pip install curl_cffi'
+      - 'pip install xmltodict'
   metadata:
     repo: 'https://github.com/flaskfarm/metadata'
     plugins:

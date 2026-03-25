@@ -100,12 +100,11 @@ class Base:
                     for ver in self._DB_VERSIONS[(self._DB_VERSIONS.index(version)):]:
                         migrate_func(ver, table, cs)
                         version = ver
-                    FRAMEWORK.db.session.flush()
+                FRAMEWORK.db.session.flush()
                 LOGGER.debug(f'{table} 최종 DB 버전: {version}')
                 CONFIG.set(version_key, version)
-            except:
-                LOGGER.error(traceback.format_exc())
-                LOGGER.error('마이그레이션 실패')
+            except Exception:
+                LOGGER.exception('마이그레이션 실패')
 
 
 class ModuleBase(Base, PluginModuleBase):
