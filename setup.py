@@ -9,6 +9,7 @@ import flask_login
 from flask import request
 
 from framework.init_main import Framework
+from framework.init_route import socketio_login_required
 from framework.scheduler import Job as FrameworkJob
 from plugin.create_plugin import create_plugin_instance
 from plugin.create_plugin import PluginBase
@@ -98,34 +99,6 @@ def setting_get_boolean(key: str) -> bool:
             LOGGER.error(f'Could not determine a boolean type: {value}')
             value = False
     return value
-
-
-def default_route_socketio_page(page):
-    module = page.parent
-    page.socketio_list = page.socketio_list or []
-
-    @F.socketio.on('connect', namespace=f'/{P.package_name}/{module.name}/{page.name}')
-    @F.login_required
-    def connect():
-        P.logger.debug(f'socket_connect : {P.package_name}/{module.name}/{page.name}')
-        page.socketio_list.append(request.sid)
-        socketio_callback('start', '')
-        page.socketio_connect()
-
-    @F.socketio.on('disconnect', namespace=f'/{P.package_name}/{module.name}/{page.name}')
-    def disconnect():
-        P.logger.debug(f'socket_disconnect : {P.package_name}/{module.name}/{page.name}')
-        page.socketio_list.remove(request.sid)
-        page.socketio_disconnect()
-
-    def socketio_callback(cmd, data, encoding=True):
-        if page.socketio_list:
-            if encoding:
-                data = json.dumps(data, cls=AlchemyEncoder)
-                data = json.loads(data)
-            F.socketio.emit(cmd, data, namespace=f'/{P.package_name}/{module.name}/{page.name}')
-
-    page.socketio_callback = socketio_callback
 
 
 CONFIG.get_json = setting_get_json

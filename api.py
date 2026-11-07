@@ -10,12 +10,14 @@ import requests
 from flask_sqlalchemy.query import Query
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
+from plugin.route import default_route_socketio_page
+
 from .constants import *
 from .util import ThreadHasReturn
 from .setup import FRAMEWORK, PLUGIN, LOGGER, CONFIG
 from .setup import (
     PluginBase, PluginModuleBase, PluginPageBase, ModelBase,
-    default_route_socketio_module, default_route_socketio_page, celery_is_active
+    default_route_socketio_module, celery_is_active
 )
 
 
