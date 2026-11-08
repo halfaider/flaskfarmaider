@@ -9,7 +9,6 @@ import flask_login
 from flask import request
 
 from framework.init_main import Framework
-from framework.init_route import socketio_login_required
 from framework.scheduler import Job as FrameworkJob
 from plugin.create_plugin import create_plugin_instance
 from plugin.create_plugin import PluginBase
